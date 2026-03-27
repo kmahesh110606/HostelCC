@@ -1,0 +1,8 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="tabs">
+  <section class="tab"><span class="label">Control</span><h2>Admin Console</h2><p class="muted">Manage users, roles, blocks, rooms, menus, schedules, and complaints.</p></section>
+  <section class="tab"><span class="label">CSV Upload</span><h2>Bulk Student Import</h2><p class="muted">Use /api/students/upload-csv with roll_no, name, block, room_no data.</p></section>
+  <section class="tab"><span class="label">Security</span><h2>Audit Trail</h2><p class="muted">IP/MAC and suspicious traffic logging enabled via middleware.</p></section>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="tabs" style="grid-template-columns: 1fr; max-width: 840px; margin-inline: auto;">
+  <section class="tab">
+    <span class="label">Profile</span>
+    <h2>User Profile</h2>
+    <p class="muted">Account and hostel details for your login.</p>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 14px;">
+      <div>
+        <label>Name</label>
+        <input value="{{ user.get_full_name|default:user.username }}" disabled />
+      </div>
+      <div>
+        <label>Email</label>
+        <input value="{{ user.email }}" disabled />
+      </div>
+      <div>
+        <label>Role</label>
+        <input value="{{ user.get_role_display }}" disabled />
+      </div>
+      <div>
+        <label>Registration Number</label>
+        <input value="{% if student %}{{ student.roll_no }}{% else %}N/A{% endif %}" disabled />
+      </div>
+      <div>
+        <label>Hostel Block</label>
+        <input value="{% if student and student.block %}{{ student.block.block_name }}{% else %}N/A{% endif %}" disabled />
+      </div>
+      <div>
+        <label>Room Number</label>
+        <input value="{% if student %}{{ student.room_no }}{% else %}N/A{% endif %}" disabled />
+      </div>
+      <div>
+        <label>Mess Allotment</label>
+        <input value="{% if student %}{{ student.mess_allotment }}{% else %}N/A{% endif %}" disabled />
+      </div>
+      <div>
+        <label>Points Balance</label>
+        <input value="{% if student %}{{ student.points_balance }}{% else %}N/A{% endif %}" disabled />
+      </div>
+    </div>
+
+    <div class="row" style="margin-top: 16px;">
+      <a class="button" href="/accounts/forgot-password/">Forgot Password</a>
+      <a class="button secondary" href="/community/">Open Community</a>
+    </div>
+  </section>
+</div>
+{% endblock %}

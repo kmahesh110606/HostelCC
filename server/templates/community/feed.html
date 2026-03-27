@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="tabs" style="grid-template-columns: 2fr 1fr;">
+  <section class="tab">
+    <span class="label">Community</span>
+    <h2>Hostel Complaints Feed</h2>
+    <p class="muted">Post text/image/video complaints and tag the relevant category.</p>
+
+    <form method="get" class="row" style="align-items: flex-end; margin-top: 14px;">
+      <div style="flex: 1 1 220px;">
+        <label for="q">Search</label>
+        <input id="q" name="q" value="{{ query }}" placeholder="Search complaints" />
+      </div>
+      <div style="flex: 1 1 180px;">
+        <label for="category_filter">Category</label>
+        <select id="category_filter" name="category">
+          <option value="">All</option>
+          {% for code, label in categories %}
+          <option value="{{ code }}" {% if category_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="flex: 1 1 150px;">
+        <label for="media_filter">Media</label>
+        <select id="media_filter" name="media_type">
+          <option value="">All</option>
+          {% for code, label in media_choices %}
+          <option value="{{ code }}" {% if media_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <button type="submit">Apply</button>
+      </div>
+    </form>
+
+    <form method="post" enctype="multipart/form-data" style="margin-top: 20px; border-top: 1px solid var(--line); padding-top: 16px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create" />
+      <label for="category">Complaint Tag</label>
+      <select id="category" name="category" required>
+        <option value="">Select category</option>
+        {% for code, label in categories %}
+        <option value="{{ code }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+      <label for="text">Complaint</label>
+      <textarea id="text" name="text" rows="4" placeholder="Describe the issue clearly"></textarea>
+      <label for="media">Image/Video (optional)</label>
+      <input id="media" name="media" type="file" accept="image/*,video/*" />
+      <button type="submit">Post Complaint</button>
+    </form>
+
+    <div style="margin-top: 22px; display: grid; gap: 14px;">
+      {% for item in complaint_items %}
+      <article class="tab" style="margin: 0;">
+        <div class="row" style="justify-content: space-between; align-items: flex-start;">
+          <div>
+            <span class="label">{{ item.obj.get_category_display }}</span>
+            <h3 style="margin: 8px 0 6px;">{{ item.author_name }}</h3>
+            <p class="muted" style="margin: 0;">Reg No: {{ item.registration_no|default:'N/A' }} | Hostel: {{ item.block_name|default:'N/A' }} | Room: {{ item.room_no|default:'N/A' }}</p>
+          </div>
+          {% if item.can_delete %}
+          <form method="post" onsubmit="return confirm('Delete this post?')">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete" />
+            <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
+            <button type="submit" class="button secondary">Delete</button>
+          </form>
+          {% endif %}
+        </div>
+
+        {% if item.obj.text %}
+        <p style="margin-top: 10px; white-space: pre-wrap;">{{ item.obj.text }}</p>
+        {% endif %}
+
+        {% if item.obj.media %}
+          {% if item.obj.media_type == 'IMAGE' %}
+          <img src="{{ item.obj.media.url }}" alt="Complaint media" style="width: 100%; max-height: 420px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line);" />
+          {% elif item.obj.media_type == 'VIDEO' %}
+          <video controls style="width: 100%; max-height: 420px; border-radius: 8px; border: 1px solid var(--line);">
+            <source src="{{ item.obj.media.url }}" />
+          </video>
+          {% endif %}
+        {% endif %}
+
+        <div class="row" style="margin-top: 10px;">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="vote" />
+            <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
+            <input type="hidden" name="direction" value="up" />
+            <button type="submit" class="button secondary">Upvote ({{ item.obj.upvotes }})</button>
+          </form>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="vote" />
+            <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
+            <input type="hidden" name="direction" value="down" />
+            <button type="submit" class="button secondary">Downvote ({{ item.obj.downvotes }})</button>
+          </form>
+          <span class="muted">{{ item.obj.created_at|date:'d M Y, h:i A' }}</span>
+        </div>
+
+        <div style="margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px;">
+          <h4 style="margin: 0 0 8px;">Comments</h4>
+          {% for reply in item.obj.replies.all %}
+          <p style="margin: 0 0 8px;"><strong>{{ reply.author.get_full_name|default:reply.author.username }}</strong>: {{ reply.text }}</p>
+          {% empty %}
+          <p class="muted" style="margin: 0 0 8px;">No comments yet.</p>
+          {% endfor %}
+          <form method="post" class="row" style="align-items: flex-end;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="comment" />
+            <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
+            <div style="flex: 1;">
+              <label for="comment_{{ item.obj.id }}">Add Comment</label>
+              <input id="comment_{{ item.obj.id }}" name="comment_text" required placeholder="Write a comment" />
+            </div>
+            <div>
+              <button type="submit">Comment</button>
+            </div>
+          </form>
+        </div>
+      </article>
+      {% empty %}
+      <p class="muted">No posts yet. Be the first to post a complaint.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="tab">
+    <span class="label">Mess</span>
+    <h2>Sample Weekly Menu</h2>
+    <p class="muted">Quick view of meal plan while browsing community posts.</p>
+    <div style="display: grid; gap: 10px; margin-top: 12px;">
+      {% for menu in menus %}
+      <div style="border: 1px solid var(--line); border-radius: 8px; padding: 10px;">
+        <h3 style="margin: 0 0 8px;">{{ menu.get_week_day_display }}</h3>
+        <p class="muted"><strong>Breakfast:</strong> {{ menu.breakfast_items }}</p>
+        <p class="muted"><strong>Lunch:</strong> {{ menu.lunch_items }}</p>
+        <p class="muted"><strong>Snacks:</strong> {{ menu.snacks_items }}</p>
+        <p class="muted"><strong>Dinner:</strong> {{ menu.dinner_items }}</p>
+      </div>
+      {% empty %}
+      <p class="muted">Menu not configured yet.</p>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

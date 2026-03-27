@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="tabs" style="grid-template-columns: 1fr; max-width: 900px; margin-inline: auto;">
+  <section class="tab">
+    <span class="label">Community Rules</span>
+    <h2>Before You Post</h2>
+    <p class="muted">Please keep complaints factual and respectful. Violating posts can be removed by admins or the post author.</p>
+    <ul class="muted" style="margin-top: 12px; line-height: 1.8;">
+      <li>No abusive, hateful, or threatening content.</li>
+      <li>No personal attacks, doxxing, or fake allegations.</li>
+      <li>Upload only relevant photos/videos linked to the complaint.</li>
+      <li>Use the correct category tag to help faster resolution.</li>
+    </ul>
+    <h3 style="margin-top: 18px;">Available Complaint Tags</h3>
+    <div class="row" style="gap: 8px; margin-top: 8px;">
+      {% for code, label in categories %}
+      <span class="label">{{ label }}</span>
+      {% endfor %}
+    </div>
+    <form method="post" style="margin-top: 20px;">
+      {% csrf_token %}
+      <button type="submit" name="agree" value="yes">I Agree and Continue</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="auth-wrap">
+  <section class="auth-panel">
+    <h2>Sign In</h2>
+    <p class="muted">Secure access for students, wardens, managers, and admins.</p>
+
+    {% if error_message %}
+    <div class="error">{{ error_message }}</div>
+    {% endif %}
+
+    {% if stage == 'email' %}
+    <form method="post" autocomplete="off">
+      {% csrf_token %}
+      <input type="hidden" name="stage" value="email" />
+      <input type="hidden" name="next" value="{{ next_url }}" />
+      <label for="email">Email Address</label>
+      <input id="email" name="email" type="email" required placeholder="name@vitstudent.ac.in" />
+      <button type="submit">Continue</button>
+      <a class="button linklike" href="/accounts/forgot-password/">Forgot Password?</a>
+    </form>
+    {% elif stage == 'password' %}
+    <form method="post" autocomplete="off">
+      {% csrf_token %}
+      <input type="hidden" name="stage" value="password" />
+      <input type="hidden" name="email" value="{{ email }}" />
+      <input type="hidden" name="next" value="{{ next_url }}" />
+      <label>Email Address</label>
+      <input type="email" value="{{ email }}" disabled />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" required placeholder="Enter your password" />
+      <button type="submit">Login</button>
+      <a class="button linklike" href="/accounts/forgot-password/">Forgot Password?</a>
+    </form>
+    {% else %}
+    <form method="post" autocomplete="off">
+      {% csrf_token %}
+      <input type="hidden" name="stage" value="otp" />
+      <input type="hidden" name="email" value="{{ email }}" />
+      <input type="hidden" name="next" value="{{ next_url }}" />
+      <label>Email Address</label>
+      <input type="email" value="{{ email }}" disabled />
+      <label for="otp_code">One-Time Password (OTP)</label>
+      <input id="otp_code" name="otp_code" type="text" maxlength="6" required placeholder="Enter 6-digit OTP" />
+      {% if fixed_otp %}
+      <p class="hint">Dev OTP: {{ fixed_otp }}</p>
+      {% endif %}
+      <label for="new_password">Create Password</label>
+      <input id="new_password" name="new_password" type="password" minlength="8" required placeholder="At least 8 characters" />
+      <button type="submit">Verify OTP and Set Password</button>
+    </form>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
