@@ -1,5 +1,5 @@
 name: hostel_cc_app
-description: Hostel management Flutter client for all roles.
+description: Hostel management Flutter client for all roles with Fluent Design UI.
 publish_to: none
 version: 1.0.0+1
 
@@ -12,6 +12,8 @@ dependencies:
   http: ^1.2.2
   shared_preferences: ^2.3.2
   intl: ^0.19.0
+  fluentui_system_icons: ^1.1.228
+  mobile_scanner: ^6.0.2
 
 dev_dependencies:
   flutter_test:

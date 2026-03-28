@@ -1,6 +1,7 @@
 class UserSession {
   const UserSession({
     required this.username,
+    required this.email,
     required this.role,
     required this.accessToken,
     required this.refreshToken,
@@ -8,6 +9,7 @@ class UserSession {
   });
 
   final String username;
+  final String email;
   final String role;
   final String accessToken;
   final String refreshToken;
@@ -16,6 +18,7 @@ class UserSession {
   factory UserSession.fromJson(Map<String, dynamic> json, String username) {
     return UserSession(
       username: username,
+      email: (json["email"] ?? username).toString(),
       role: (json["role"] ?? "STUDENT").toString(),
       accessToken: (json["access"] ?? "").toString(),
       refreshToken: (json["refresh"] ?? "").toString(),

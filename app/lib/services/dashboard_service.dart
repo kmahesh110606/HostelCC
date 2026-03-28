@@ -37,43 +37,135 @@ class DashboardService {
         .toList();
   }
 
+  Future<List<AppNotificationItem>> getNotifications(String token) async {
+    final rows =
+        await apiClient.getList("/api/auth/notifications/", token: token);
+    return rows
+        .map((e) => AppNotificationItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<UserProfileItem> getMyProfile(String token) async {
+    final row = await apiClient.getMap("/api/auth/me/", token: token);
+    return UserProfileItem.fromJson(row);
+  }
+
   Future<void> submitComplaint({
     required String token,
     required int studentId,
     required String category,
     required String text,
   }) async {
-    await apiClient.post("/api/complaints/", {
-      "student": studentId,
-      "category": category,
-      "text": text,
-    }, token: token);
+    await apiClient.post(
+        "/api/complaints/",
+        {
+          "student": studentId,
+          "category": category,
+          "text": text,
+        },
+        token: token);
   }
 
   Future<void> submitFeedback({
     required String token,
-    required int studentId,
+    int? studentId,
+    required String weekDay,
+    required String mealTime,
     required String menuItem,
     required int rating,
     required String comment,
-    required String month,
   }) async {
-    await apiClient.post("/api/mess/feedback/", {
-      "student": studentId,
+    final payload = <String, dynamic>{
+      "week_day": weekDay,
+      "meal_time": mealTime,
       "menu_item": menuItem,
       "rating": rating,
       "comment": comment,
-      "month": month,
-    }, token: token);
+    };
+    if (studentId != null) {
+      payload["student"] = studentId;
+    }
+
+    await apiClient.post(
+      "/api/mess/feedback/",
+      payload,
+      token: token,
+    );
+  }
+
+  Future<List<MessFeedbackItem>> getMessFeedbacks(String token) async {
+    final rows = await apiClient.getList("/api/mess/feedback/", token: token);
+    return rows
+        .map((e) => MessFeedbackItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<MessFeedbackItem> replyToFeedback({
+    required String token,
+    required int feedbackId,
+    required String managerReply,
+  }) async {
+    final row = await apiClient.post(
+      "/api/mess/feedback/$feedbackId/reply/",
+      {"manager_reply": managerReply},
+      token: token,
+    );
+    return MessFeedbackItem.fromJson(row);
+  }
+
+  Future<ComplaintItem> addComplaintReply({
+    required String token,
+    required int complaintId,
+    required String text,
+  }) async {
+    await apiClient.post(
+      "/api/complaints/$complaintId/reply/",
+      {"text": text},
+      token: token,
+    );
+    final complaint = await apiClient.getMap(
+      "/api/complaints/$complaintId/",
+      token: token,
+    );
+    return ComplaintItem.fromJson(complaint);
+  }
+
+  Future<ComplaintItem> voteComplaint({
+    required String token,
+    required int complaintId,
+    required String direction,
+  }) async {
+    final updated = await apiClient.post(
+      "/api/complaints/$complaintId/vote/",
+      {"direction": direction},
+      token: token,
+    );
+    return ComplaintItem.fromJson(updated);
+  }
+
+  Future<ComplaintItem> setComplaintStatus({
+    required String token,
+    required int complaintId,
+    required String status,
+  }) async {
+    final updated = await apiClient.post(
+      "/api/complaints/$complaintId/set-status/",
+      {"status": status},
+      token: token,
+    );
+    return ComplaintItem.fromJson(updated);
   }
 
   Future<void> createBlock({
     required String token,
     required String blockName,
   }) async {
-    await apiClient.post("/api/hostels/blocks/", {
-      "block_name": blockName,
-    }, token: token);
+    await apiClient.post(
+        "/api/hostels/blocks/",
+        {
+          "block_name": blockName,
+        },
+        token: token);
   }
 
   Future<void> createCaterer({
@@ -82,11 +174,14 @@ class DashboardService {
     required String mealTypes,
     required int blockId,
   }) async {
-    await apiClient.post("/api/mess/caterers/", {
-      "name": name,
-      "meal_types": mealTypes,
-      "block": blockId,
-    }, token: token);
+    await apiClient.post(
+        "/api/mess/caterers/",
+        {
+          "name": name,
+          "meal_types": mealTypes,
+          "block": blockId,
+        },
+        token: token);
   }
 
   Future<void> createMenu({
@@ -97,13 +192,16 @@ class DashboardService {
     required String snacks,
     required String dinner,
   }) async {
-    await apiClient.post("/api/mess/menu/", {
-      "week_day": weekDay,
-      "breakfast_items": breakfast,
-      "lunch_items": lunch,
-      "snacks_items": snacks,
-      "dinner_items": dinner,
-    }, token: token);
+    await apiClient.post(
+        "/api/mess/menu/",
+        {
+          "week_day": weekDay,
+          "breakfast_items": breakfast,
+          "lunch_items": lunch,
+          "snacks_items": snacks,
+          "dinner_items": dinner,
+        },
+        token: token);
   }
 
   Future<void> markLaundrySubmission({
@@ -133,7 +231,24 @@ class DashboardService {
     required int studentId,
   }) {
     return apiClient.getMap(
-      "/api/laundry/schedules/qr/$studentId",
+      "/api/laundry/schedules/qr/$studentId/",
+      token: token,
+    );
+  }
+
+  Future<void> scanLaundryQr({
+    required String token,
+    required int studentId,
+    required String qrToken,
+    required String eventType,
+  }) async {
+    await apiClient.post(
+      "/api/laundry/schedules/scan/",
+      {
+        "student_id": studentId,
+        "qr_token": qrToken,
+        "event_type": eventType,
+      },
       token: token,
     );
   }
@@ -143,10 +258,37 @@ class DashboardService {
     required int studentId,
     required int optionId,
   }) async {
-    await apiClient.post("/api/mess/poll/vote/", {
-      "student": studentId,
-      "option": optionId,
-    }, token: token);
+    await apiClient.post(
+        "/api/mess/poll/vote/",
+        {
+          "student": studentId,
+          "option": optionId,
+        },
+        token: token);
+  }
+
+  Future<List<MessPollOptionItem>> getPollOptions(String token) async {
+    final rows = await apiClient.getList("/api/mess/poll/", token: token);
+    return rows
+        .map((e) => MessPollOptionItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> createPollOption({
+    required String token,
+    required String month,
+    required String itemName,
+    required String pollType,
+  }) async {
+    await apiClient.post(
+      "/api/mess/poll/",
+      {
+        "month": month,
+        "item_name": itemName,
+        "poll_type": pollType,
+      },
+      token: token,
+    );
   }
 
   Future<void> requestMessChange({
@@ -155,10 +297,43 @@ class DashboardService {
     required String requestedMess,
     required String month,
   }) async {
-    await apiClient.post("/api/mess/change/", {
-      "student": studentId,
-      "requested_mess": requestedMess,
-      "month": month,
-    }, token: token);
+    await apiClient.post(
+        "/api/mess/change/",
+        {
+          "student": studentId,
+          "requested_mess": requestedMess,
+          "month": month,
+        },
+        token: token);
+  }
+
+  Future<List<MessChangeRequestItem>> getMessChangeRequests(
+      String token) async {
+    final rows = await apiClient.getList("/api/mess/change/", token: token);
+    return rows
+        .map((e) => MessChangeRequestItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> approveMessChange({
+    required String token,
+    required int requestId,
+  }) async {
+    await apiClient.post(
+      "/api/mess/change/$requestId/approve/",
+      {},
+      token: token,
+    );
+  }
+
+  Future<void> rejectMessChange({
+    required String token,
+    required int requestId,
+  }) async {
+    await apiClient.post(
+      "/api/mess/change/$requestId/reject/",
+      {},
+      token: token,
+    );
   }
 }

@@ -2,24 +2,26 @@ import "package:flutter/material.dart";
 
 import "../../models/user_session.dart";
 import "../../services/auth_service.dart";
-import "otp_screen.dart";
+import "../../widgets/fluent_widgets.dart";
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
     required this.authService,
     required this.onLogin,
+    this.initialEmail,
     super.key,
   });
 
   final AuthService authService;
   final Future<void> Function(UserSession session) onLogin;
+  final String? initialEmail;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
@@ -27,8 +29,16 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    if ((widget.initialEmail ?? "").trim().isNotEmpty) {
+      _emailController.text = widget.initialEmail!.trim();
+    }
+  }
+
+  @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -42,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final session = await widget.authService.login(
-        _usernameController.text.trim(),
+        _emailController.text.trim(),
         _passwordController.text,
       );
       await widget.onLogin(session);
@@ -57,23 +67,6 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
-  }
-
-  Future<void> _goOtp() async {
-    final username = _usernameController.text.trim();
-    if (username.isEmpty) {
-      setState(() {
-        _error = "Enter username to continue with OTP.";
-      });
-      return;
-    }
-
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            OtpScreen(authService: widget.authService, username: username),
-      ),
-    );
   }
 
   @override
@@ -102,7 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const Text(
-                        "HostelCC Login",
+                        "HostelCC",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 24,
@@ -110,25 +103,29 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Color(0xFF0B3D91),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _usernameController,
-                        decoration: const InputDecoration(
-                          labelText: "Username",
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? "Username is required"
-                            : null,
+                      const SizedBox(height: 6),
+                      const Text(
+                        "Sign in with your hostel email and password."
+                        "\nCreate new accounts on the website only.",
+                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
+                      FluentTextField(
+                        controller: _emailController,
+                        labelText: "Email",
+                        hintText: "Enter your email",
+                        prefixIcon: Icons.email_outlined,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? "Email is required"
+                            : (!v.contains("@") ? "Enter a valid email" : null),
+                      ),
+                      const SizedBox(height: 12),
+                      FluentTextField(
                         controller: _passwordController,
+                        labelText: "Password",
+                        hintText: "Enter your password",
                         obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: "Password",
-                          border: OutlineInputBorder(),
-                        ),
+                        prefixIcon: Icons.lock_outline,
                         validator: (v) => (v == null || v.isEmpty)
                             ? "Password is required"
                             : null,
@@ -141,9 +138,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                       const SizedBox(height: 16),
-                      FilledButton(
+                      FilledButton.icon(
                         onPressed: _loading ? null : _login,
-                        child: _loading
+                        icon: const Icon(Icons.login),
+                        label: _loading
                             ? const SizedBox(
                                 height: 18,
                                 width: 18,
@@ -151,16 +149,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text("Login"),
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton(
-                        onPressed: _loading ? null : _goOtp,
-                        child: const Text("OTP / First-time Password Setup"),
+                            : const Text("Sign In"),
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        "Dev OTP is 110606",
+                        "Need a new account? Use the website signup flow.",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,

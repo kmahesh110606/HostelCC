@@ -1,17 +1,18 @@
 import "package:flutter/material.dart";
 
 import "../../services/auth_service.dart";
+import "../../widgets/fluent_widgets.dart";
 
 class CreatePasswordScreen extends StatefulWidget {
   const CreatePasswordScreen({
     required this.authService,
-    required this.username,
+    required this.email,
     required this.otpCode,
     super.key,
   });
 
   final AuthService authService;
-  final String username;
+  final String email;
   final String otpCode;
 
   @override
@@ -47,7 +48,7 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen> {
 
     try {
       await widget.authService.createFirstPassword(
-        username: widget.username,
+        username: widget.email,
         otpCode: widget.otpCode,
         newPassword: p1,
       );
@@ -83,22 +84,18 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            TextField(
+            FluentTextField(
               controller: _passwordController,
+              labelText: "New Password",
+              hintText: "Enter new password (min 8 characters)",
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: "New Password",
-                border: OutlineInputBorder(),
-              ),
             ),
             const SizedBox(height: 12),
-            TextField(
+            FluentTextField(
               controller: _confirmController,
+              labelText: "Confirm Password",
+              hintText: "Re-enter password",
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: "Confirm Password",
-                border: OutlineInputBorder(),
-              ),
             ),
             const SizedBox(height: 12),
             FilledButton(

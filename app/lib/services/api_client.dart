@@ -52,9 +52,28 @@ class ApiClient {
   }
 
   Map<String, dynamic> _parse(http.Response response) {
-    final dynamic decoded = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body);
+    dynamic decoded;
+    if (response.body.isEmpty) {
+      decoded = <String, dynamic>{};
+    } else {
+      try {
+        decoded = jsonDecode(response.body);
+      } on FormatException {
+        final isHtml = response.body.trimLeft().toLowerCase().startsWith("<!doctype html") ||
+            response.body.trimLeft().toLowerCase().startsWith("<html");
+        final location = response.headers["location"];
+        if (isHtml || location != null) {
+          final target = location != null ? " Redirected to: $location." : "";
+          throw Exception(
+            "API returned HTML instead of JSON (status ${response.statusCode})."
+            "$target Check API base URL and Django redirect/login settings.",
+          );
+        }
+        throw Exception(
+          "API returned non-JSON response (status ${response.statusCode}).",
+        );
+      }
+    }
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (decoded is Map<String, dynamic>) {
         return {"ok": true, "data": decoded};

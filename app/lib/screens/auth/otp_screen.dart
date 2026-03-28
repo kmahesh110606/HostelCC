@@ -1,17 +1,21 @@
 import "package:flutter/material.dart";
 
 import "../../services/auth_service.dart";
+import "../../widgets/fluent_widgets.dart";
 import "create_password_screen.dart";
+import "signup_details_screen.dart";
 
 class OtpScreen extends StatefulWidget {
   const OtpScreen({
     required this.authService,
-    required this.username,
+    required this.email,
+    this.isSignup = false,
     super.key,
   });
 
   final AuthService authService;
-  final String username;
+  final String email;
+  final bool isSignup;
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -34,7 +38,11 @@ class _OtpScreenState extends State<OtpScreen> {
       _message = null;
     });
     try {
-      await widget.authService.requestOtp(widget.username);
+      if (widget.isSignup) {
+        await widget.authService.requestSignupOtp(widget.email);
+      } else {
+        await widget.authService.requestOtp(widget.email);
+      }
       setState(() {
         _message = "OTP requested. Check email or use dev OTP.";
       });
@@ -59,7 +67,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
     try {
       final response = await widget.authService.verifyOtp(
-        widget.username,
+        widget.email,
         _otpController.text.trim(),
       );
       final data = response["data"] as Map<String, dynamic>;
@@ -70,13 +78,28 @@ class _OtpScreenState extends State<OtpScreen> {
         setState(() {
           _message = "Invalid OTP.";
         });
+      } else if (widget.isSignup) {
+        if (!mounted) return;
+        final session = await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SignupDetailsScreen(
+              authService: widget.authService,
+              email: widget.email,
+              otpCode: _otpController.text.trim(),
+            ),
+          ),
+        );
+        if (!mounted) return;
+        if (session != null) {
+          Navigator.of(context).pop(session);
+        }
       } else if (mustChange) {
         if (!mounted) return;
         await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CreatePasswordScreen(
               authService: widget.authService,
-              username: widget.username,
+              email: widget.email,
               otpCode: _otpController.text.trim(),
             ),
           ),
@@ -115,19 +138,16 @@ class _OtpScreenState extends State<OtpScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              "Username: ${widget.username}",
+              "Email: ${widget.email}",
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             const Text("Use OTP from email. Dev mode OTP: 110606"),
-            const SizedBox(height: 16),
-            TextField(
+            FluentTextField(
               controller: _otpController,
+              labelText: "OTP",
+              hintText: "Enter 6-digit OTP",
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "OTP",
-                border: OutlineInputBorder(),
-              ),
             ),
             const SizedBox(height: 12),
             FilledButton(
