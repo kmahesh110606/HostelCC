@@ -5,15 +5,19 @@ class NotificationAttachmentCache {
       return "";
     }
 
+    // If URL already has a scheme (http, https), return as-is
     final parsed = Uri.tryParse(trimmed);
     if (parsed != null && parsed.hasScheme) {
       return parsed.toString();
     }
 
+    // For relative paths, resolve against API base URL
     final baseUri = Uri.parse(apiBaseUrl);
     if (trimmed.startsWith("//")) {
       return "${baseUri.scheme}:$trimmed";
     }
+    
+    // Relative path: prepend base URL
     return baseUri.resolve(trimmed).toString();
   }
 

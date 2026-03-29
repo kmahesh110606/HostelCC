@@ -90,9 +90,8 @@ class ComplaintSerializer(serializers.ModelSerializer):
 
     def get_media_url(self, obj):
         if obj.media:
-            request = self.context.get("request")
-            url = obj.media.url
-            return request.build_absolute_uri(url) if request else url
+            # Return relative media URL so it works across all environments (localhost, 10.0.2.2, prod, etc.)
+            return obj.media.url
         return ""
 
     def get_can_delete(self, obj):

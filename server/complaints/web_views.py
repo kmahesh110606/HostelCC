@@ -1,10 +1,12 @@
+import csv
+import json
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
-import json
 
 from students.models import Student
 
@@ -292,3 +294,90 @@ def community_feed(request: HttpRequest) -> HttpResponse:
             "show_management_panel": request.user.role in {"SUPERVISOR", "WARDEN", "ADMIN"},
         },
     )
+
+
+@login_required
+def download_active_complaints_csv(request: HttpRequest) -> HttpResponse:
+    if request.user.role != "ADMIN":
+        messages.error(request, "Only admin can download complaints reports.")
+        return redirect("dashboard-router")
+
+    complaints = (
+        Complaint.objects.select_related("student", "student__block", "author")
+        .prefetch_related("replies", "replies__author")
+        .filter(status__in=[Complaint.Status.OPEN, Complaint.Status.IN_PROGRESS])
+        .order_by("-created_at")
+    )
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="complaints_open_in_progress.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "complaint_id",
+            "category",
+            "category_label",
+            "status",
+            "status_label",
+            "text",
+            "media_type",
+            "media_url",
+            "warden_tag",
+            "upvotes",
+            "downvotes",
+            "created_at",
+            "author_id",
+            "author_username",
+            "author_full_name",
+            "author_email",
+            "student_id",
+            "student_roll_no",
+            "student_name",
+            "student_block",
+            "student_room_no",
+            "reply_count",
+            "replies",
+        ]
+    )
+
+    for item in complaints:
+        author = item.author
+        student = item.student
+        replies = []
+        for reply in item.replies.all().order_by("created_at"):
+            reply_author = reply.author.get_full_name().strip() or reply.author.username
+            cleaned_text = " ".join((reply.text or "").splitlines()).strip()
+            replies.append(f"{reply.created_at.isoformat()} | {reply_author} | {cleaned_text}")
+
+        media_url = request.build_absolute_uri(item.media.url) if item.media else ""
+
+        writer.writerow(
+            [
+                item.id,
+                item.category,
+                item.get_category_display(),
+                item.status,
+                item.get_status_display(),
+                item.text,
+                item.media_type,
+                media_url,
+                item.warden_tag,
+                item.upvotes,
+                item.downvotes,
+                item.created_at.isoformat() if item.created_at else "",
+                author.id if author else "",
+                author.username if author else "",
+                author.get_full_name().strip() if author else "",
+                author.email if author else "",
+                student.id if student else "",
+                student.roll_no if student else "",
+                student.name if student else "",
+                student.block.block_name if student and student.block else "",
+                student.room_no if student else "",
+                len(replies),
+                json.dumps(replies),
+            ]
+        )
+
+    return response

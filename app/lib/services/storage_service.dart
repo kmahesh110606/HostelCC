@@ -8,6 +8,7 @@ class StorageService {
   static const _emailKey = "email";
   static const _themeModeKey = "theme_mode";
   static const _profileCacheKey = "profile_cache";
+  static const _dashboardCacheKey = "dashboard_cache";
 
   Future<void> saveSession({
     required String accessToken,
@@ -55,6 +56,16 @@ class StorageService {
     return prefs.getString(_profileCacheKey);
   }
 
+  Future<void> saveCachedDashboard(String dashboardJson) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_dashboardCacheKey, dashboardJson);
+  }
+
+  Future<String?> readCachedDashboard() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_dashboardCacheKey);
+  }
+
   Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessKey);
@@ -63,5 +74,6 @@ class StorageService {
     await prefs.remove(_roleKey);
     await prefs.remove(_emailKey);
     await prefs.remove(_profileCacheKey);
+    await prefs.remove(_dashboardCacheKey);
   }
 }

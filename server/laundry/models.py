@@ -2,6 +2,7 @@ import uuid
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -65,14 +66,29 @@ class LaundryEvent(models.Model):
 
 class LaundryRoomRange(models.Model):
     block_name = models.CharField(max_length=10, db_index=True)
-    day_of_week = models.CharField(max_length=3, choices=LaundrySchedule.DayChoices.choices)
+    day_of_week = models.CharField(max_length=3, choices=LaundrySchedule.DayChoices.choices, blank=True, null=True)
+    scheduled_date = models.DateField(blank=True, null=True, db_index=True)
     room_from = models.CharField(max_length=10)
     room_to = models.CharField(max_length=10)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["block_name", "day_of_week", "room_from"]
+        ordering = ["block_name", "scheduled_date", "day_of_week", "room_from"]
+
+    def clean(self):
+        super().clean()
+        if not self.scheduled_date and not self.day_of_week:
+            raise ValidationError("Provide either scheduled_date or day_of_week for a room range.")
+
+    @property
+    def schedule_label(self) -> str:
+        if self.scheduled_date:
+            return self.scheduled_date.isoformat()
+        if self.day_of_week:
+            return self.get_day_of_week_display()
+        return "-"
 
     def __str__(self):
-        return f"{self.block_name} {self.day_of_week}: {self.room_from}-{self.room_to}"
+        slot = self.scheduled_date.isoformat() if self.scheduled_date else self.day_of_week
+        return f"{self.block_name} {slot}: {self.room_from}-{self.room_to}"

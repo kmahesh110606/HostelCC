@@ -9,10 +9,12 @@ import "package:intl/intl.dart";
 import "package:qr_flutter/qr_flutter.dart";
 import "package:screen_brightness/screen_brightness.dart";
 import "package:syncfusion_flutter_pdfviewer/pdfviewer.dart";
+import "package:video_player/video_player.dart";
 
 import "../../models/app_models.dart";
 import "../../models/user_session.dart";
 import "../../screens/auth/change_password_screen.dart";
+import "../../screens/dashboard/laundry_qr_scanner_screen.dart";
 import "../../screens/dashboard/new_complaint_screen.dart";
 import "../../services/auth_service.dart";
 import "../../services/dashboard_service.dart";
@@ -119,10 +121,10 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
   static const double _tabBottomSafePadding = 132;
 
   bool _loading = true;
-  String? _error;
 
   int _selectedNavIndex = 0;
   String _selectedMenuType = _messTypes.first;
+  String _selectedMessMenuDay = "";
 
   String _communityQuery = "";
   String _communityCategoryFilter = "";
@@ -134,6 +136,7 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
   final TextEditingController _rateCommentController = TextEditingController();
   final TextEditingController _createPollItemController =
       TextEditingController();
+  late final PageController _messMenuPageController;
   final NotificationAttachmentCache _notificationAttachmentCache =
       NotificationAttachmentCache();
 
@@ -162,10 +165,12 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
   bool get _isAdmin => widget.session.role == "ADMIN";
   bool get _isMessManager => widget.session.role == "MESS_MANAGER";
   bool get _isLaundryPerson => widget.session.role == "LAUNDRY_PERSON";
+  bool get _isDepartmentStaff => widget.session.role == "DEPARTMENT_STAFF";
   bool get _canViewMessFeedback => _isMessManager || _isWarden;
   bool get _canManageMessPolls => _isMessManager || _isAdmin;
 
-  bool get _canCreateComplaint => _isStudent || _isWarden || _isAdmin;
+  bool get _canCreateComplaint =>
+      _isStudent || _isWarden || _isAdmin || _isDepartmentStaff;
 
   bool get _hasCommunityFilters =>
       _communityQuery.isNotEmpty ||
@@ -182,6 +187,16 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
       return dayCodes.first;
     }
     return dayCodes[dayIndex];
+  }
+
+  int _weekDayIndexForCode(String dayCode) {
+    final normalized = dayCode.trim().toUpperCase();
+    for (var index = 0; index < _weekDayOptions.length; index += 1) {
+      if (_weekDayOptions[index].key == normalized) {
+        return index;
+      }
+    }
+    return 0;
   }
 
   String _weekDayLabel(String code) {
@@ -296,6 +311,22 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
     }
   }
 
+  void _syncMessMenuDayWithMenus() {
+    final dayCodes = _weekDayOptions
+        .map((entry) => entry.key.trim().toUpperCase())
+        .where((day) => day.isNotEmpty)
+        .toSet();
+
+    final fallbackDay = dayCodes.contains(_currentWeekDayCode)
+        ? _currentWeekDayCode
+        : _weekDayOptions.first.key;
+
+    if (_selectedMessMenuDay.isEmpty ||
+        !dayCodes.contains(_selectedMessMenuDay)) {
+      _selectedMessMenuDay = fallbackDay;
+    }
+  }
+
   List<MessPollOptionItem> _pollOptionsForType(String pollType) {
     final normalizedType = pollType.trim().toUpperCase();
     final month = _currentMonth;
@@ -317,14 +348,21 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedMessMenuDay = _currentWeekDayCode;
+    _messMenuPageController = PageController(
+      initialPage: _weekDayIndexForCode(_selectedMessMenuDay),
+      viewportFraction: 0.94,
+    );
     _loadData();
   }
 
   @override
   void dispose() {
+    FocusManager.instance.primaryFocus?.unfocus();
     _communitySearchController.dispose();
     _rateCommentController.dispose();
     _createPollItemController.dispose();
+    _messMenuPageController.dispose();
     _notificationAttachmentCache.close();
     super.dispose();
   }
@@ -334,9 +372,10 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
       return;
     }
 
+    String? syncErrorMessage;
+
     setState(() {
       _loading = true;
-      _error = null;
     });
 
     try {
@@ -383,6 +422,18 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
 
       final profile = results[8] as UserProfileItem;
       final notifications = results[7] as List<AppNotificationItem>;
+      await _saveDashboardCache(
+        menus: results[0] as List<MessMenu>,
+        complaints: results[1] as List<ComplaintItem>,
+        schedules: schedules,
+        laundryQrText: laundryQrText,
+        caterers: results[3] as List<CatererItem>,
+        feedbacks: results[4] as List<MessFeedbackItem>,
+        pollOptions: results[5] as List<MessPollOptionItem>,
+        leastRatedItems: results[6] as List<LeastRatedMessItem>,
+        notifications: notifications,
+        profile: profile,
+      );
       await widget.storageService
           .saveCachedProfile(jsonEncode(profile.toJson()));
 
@@ -392,6 +443,7 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
 
       setState(() {
         _menus = results[0] as List<MessMenu>;
+        _syncMessMenuDayWithMenus();
         _syncRateSelectorsWithMenus();
         _complaints = results[1] as List<ComplaintItem>;
         _schedules = schedules;
@@ -406,29 +458,10 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
 
       unawaited(_prefetchNotificationAttachments(notifications));
     } catch (e) {
-      UserProfileItem? cachedProfile;
-      try {
-        final cached = await widget.storageService.readCachedProfile();
-        if (cached != null && cached.trim().isNotEmpty) {
-          cachedProfile = UserProfileItem.fromJson(
-            jsonDecode(cached) as Map<String, dynamic>,
-          );
-        }
-      } catch (_) {
-        cachedProfile = null;
-      }
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _error = e.toString();
-        _laundryQrText = "";
-        if (cachedProfile != null) {
-          _profile = cachedProfile;
-        }
-      });
+      final restoredFromCache = await _restoreDashboardCache();
+      syncErrorMessage = restoredFromCache
+          ? "Sync unsuccessful. Showing cached data."
+          : "Sync unsuccessful. No cached data is available yet.";
     } finally {
       if (mounted) {
         setState(() {
@@ -436,6 +469,336 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
         });
       }
     }
+
+    if (!mounted || syncErrorMessage == null) {
+      return;
+    }
+
+    await _showSyncErrorDialog(syncErrorMessage);
+  }
+
+  bool get _hasDashboardData {
+    return _profile != null ||
+        _menus.isNotEmpty ||
+        _complaints.isNotEmpty ||
+        _schedules.isNotEmpty ||
+        _caterers.isNotEmpty ||
+        _feedbacks.isNotEmpty ||
+        _pollOptions.isNotEmpty ||
+        _leastRatedItems.isNotEmpty ||
+        _notifications.isNotEmpty;
+  }
+
+  List<T> _decodeCachedList<T>(
+    dynamic raw,
+    T Function(Map<String, dynamic> json) fromJson,
+  ) {
+    if (raw is! List<dynamic>) {
+      return <T>[];
+    }
+
+    final values = <T>[];
+    for (final item in raw) {
+      if (item is Map) {
+        try {
+          values.add(fromJson(Map<String, dynamic>.from(item)));
+        } catch (_) {
+          // Skip malformed cache entries.
+        }
+      }
+    }
+    return values;
+  }
+
+  Map<String, dynamic> _messMenuToCache(MessMenu menu) {
+    return <String, dynamic>{
+      "mess_type": menu.messType,
+      "week_day": menu.weekDay,
+      "breakfast_items": menu.breakfast,
+      "lunch_items": menu.lunch,
+      "snacks_items": menu.snacks,
+      "dinner_items": menu.dinner,
+    };
+  }
+
+  Map<String, dynamic> _complaintReplyToCache(ComplaintReplyItem reply) {
+    return <String, dynamic>{
+      "id": reply.id,
+      "author_name": reply.authorName,
+      "text": reply.text,
+      "created_at": reply.createdAt?.toIso8601String(),
+    };
+  }
+
+  Map<String, dynamic> _complaintToCache(ComplaintItem complaint) {
+    return <String, dynamic>{
+      "id": complaint.id,
+      "student": complaint.studentId,
+      "author_name": complaint.authorName,
+      "student_name": complaint.studentName,
+      "registration_no": complaint.registrationNo,
+      "block_name": complaint.blockName,
+      "room_no": complaint.roomNo,
+      "category": complaint.category,
+      "text": complaint.text,
+      "media_url": complaint.mediaUrl,
+      "media_type": complaint.mediaType,
+      "status": complaint.status,
+      "status_label": complaint.statusLabel,
+      "user_vote": complaint.userVote,
+      "upvotes": complaint.upvotes,
+      "downvotes": complaint.downvotes,
+      "replies":
+          complaint.replies.map(_complaintReplyToCache).toList(growable: false),
+      "created_at": complaint.createdAt?.toIso8601String(),
+      "can_manage": complaint.canManage,
+      "can_delete": complaint.canDelete,
+    };
+  }
+
+  Map<String, dynamic> _scheduleToCache(LaundrySchedule schedule) {
+    return <String, dynamic>{
+      "id": schedule.id,
+      "student": schedule.studentId,
+      "day_of_week": schedule.dayCode,
+      "submission_status": schedule.submission,
+      "collection_status": schedule.collection,
+      "qr_token": schedule.qrToken,
+      "last_submission_at": schedule.lastSubmissionAt?.toIso8601String(),
+      "due_collection_by": schedule.dueCollectionBy?.toIso8601String(),
+    };
+  }
+
+  Map<String, dynamic> _catererToCache(CatererItem caterer) {
+    return <String, dynamic>{
+      "name": caterer.name,
+      "block_name": caterer.blockName,
+      "meal_types": caterer.mealTypes,
+    };
+  }
+
+  Map<String, dynamic> _feedbackToCache(MessFeedbackItem feedback) {
+    return <String, dynamic>{
+      "id": feedback.id,
+      "student": feedback.studentId,
+      "week_day": feedback.weekDay,
+      "meal_time": feedback.mealTime,
+      "menu_item": feedback.menuItem,
+      "rating": feedback.rating,
+      "comment": feedback.comment,
+      "month": feedback.month,
+      "manager_reply": feedback.managerReply,
+      "created_at": feedback.createdAt?.toIso8601String(),
+    };
+  }
+
+  Map<String, dynamic> _pollOptionToCache(MessPollOptionItem option) {
+    return <String, dynamic>{
+      "id": option.id,
+      "month": option.month,
+      "item_name": option.itemName,
+      "poll_type": option.pollType,
+      "votes": option.votes,
+    };
+  }
+
+  Map<String, dynamic> _leastRatedItemToCache(LeastRatedMessItem item) {
+    return <String, dynamic>{
+      "menu_item": item.menuItem,
+      "item_name": item.itemName,
+      "week_day": item.weekDay,
+      "meal_time": item.mealTime,
+      "avg_rating": item.avgRating,
+      "total": item.totalVotes,
+    };
+  }
+
+  Map<String, dynamic> _notificationToCache(AppNotificationItem notification) {
+    return <String, dynamic>{
+      "id": notification.id,
+      "title": notification.title,
+      "message": notification.message,
+      "poster_url": notification.posterUrl,
+      "level": notification.level,
+      "audience": notification.audience,
+      "created_by_name": notification.createdByName,
+      "created_at": notification.createdAt?.toIso8601String(),
+    };
+  }
+
+  Future<void> _saveDashboardCache({
+    required List<MessMenu> menus,
+    required List<ComplaintItem> complaints,
+    required List<LaundrySchedule> schedules,
+    required String laundryQrText,
+    required List<CatererItem> caterers,
+    required List<MessFeedbackItem> feedbacks,
+    required List<MessPollOptionItem> pollOptions,
+    required List<LeastRatedMessItem> leastRatedItems,
+    required List<AppNotificationItem> notifications,
+    required UserProfileItem profile,
+  }) async {
+    final payload = <String, dynamic>{
+      "menus": menus.map(_messMenuToCache).toList(growable: false),
+      "complaints": complaints.map(_complaintToCache).toList(growable: false),
+      "schedules": schedules.map(_scheduleToCache).toList(growable: false),
+      "laundry_qr_text": laundryQrText,
+      "caterers": caterers.map(_catererToCache).toList(growable: false),
+      "feedbacks": feedbacks.map(_feedbackToCache).toList(growable: false),
+      "poll_options":
+          pollOptions.map(_pollOptionToCache).toList(growable: false),
+      "least_rated_items":
+          leastRatedItems.map(_leastRatedItemToCache).toList(growable: false),
+      "notifications":
+          notifications.map(_notificationToCache).toList(growable: false),
+      "profile": profile.toJson(),
+      "cached_at": DateTime.now().toIso8601String(),
+    };
+
+    await widget.storageService.saveCachedDashboard(jsonEncode(payload));
+  }
+
+  Future<bool> _restoreDashboardCache() async {
+    UserProfileItem? profile;
+    List<MessMenu>? menus;
+    List<ComplaintItem>? complaints;
+    List<LaundrySchedule>? schedules;
+    List<CatererItem>? caterers;
+    List<MessFeedbackItem>? feedbacks;
+    List<MessPollOptionItem>? pollOptions;
+    List<LeastRatedMessItem>? leastRatedItems;
+    List<AppNotificationItem>? notifications;
+    String? laundryQrText;
+
+    try {
+      final dashboardRaw = await widget.storageService.readCachedDashboard();
+      if (dashboardRaw != null && dashboardRaw.trim().isNotEmpty) {
+        final decoded = jsonDecode(dashboardRaw);
+        if (decoded is Map) {
+          final data = Map<String, dynamic>.from(decoded);
+          menus = _decodeCachedList(data["menus"], MessMenu.fromJson);
+          complaints =
+              _decodeCachedList(data["complaints"], ComplaintItem.fromJson);
+          schedules =
+              _decodeCachedList(data["schedules"], LaundrySchedule.fromJson);
+          caterers = _decodeCachedList(data["caterers"], CatererItem.fromJson);
+          feedbacks =
+              _decodeCachedList(data["feedbacks"], MessFeedbackItem.fromJson);
+          pollOptions = _decodeCachedList(
+            data["poll_options"],
+            MessPollOptionItem.fromJson,
+          );
+          leastRatedItems = _decodeCachedList(
+            data["least_rated_items"],
+            LeastRatedMessItem.fromJson,
+          );
+          notifications = _decodeCachedList(
+            data["notifications"],
+            AppNotificationItem.fromJson,
+          );
+          laundryQrText = (data["laundry_qr_text"] ?? "").toString();
+
+          if (data["profile"] is Map<String, dynamic>) {
+            profile = UserProfileItem.fromJson(
+                data["profile"] as Map<String, dynamic>);
+          } else if (data["profile"] is Map) {
+            profile = UserProfileItem.fromJson(
+              Map<String, dynamic>.from(data["profile"] as Map),
+            );
+          }
+        }
+      }
+    } catch (_) {
+      // Fall back to profile-only cache below.
+    }
+
+    if (profile == null) {
+      try {
+        final cachedProfile = await widget.storageService.readCachedProfile();
+        if (cachedProfile != null && cachedProfile.trim().isNotEmpty) {
+          profile = UserProfileItem.fromJson(
+            jsonDecode(cachedProfile) as Map<String, dynamic>,
+          );
+        }
+      } catch (_) {
+        profile = null;
+      }
+    }
+
+    final hasAnyCache = profile != null ||
+        (menus?.isNotEmpty ?? false) ||
+        (complaints?.isNotEmpty ?? false) ||
+        (schedules?.isNotEmpty ?? false) ||
+        (caterers?.isNotEmpty ?? false) ||
+        (feedbacks?.isNotEmpty ?? false) ||
+        (pollOptions?.isNotEmpty ?? false) ||
+        (leastRatedItems?.isNotEmpty ?? false) ||
+        (notifications?.isNotEmpty ?? false) ||
+        (laundryQrText?.trim().isNotEmpty ?? false);
+
+    if (!hasAnyCache || !mounted) {
+      return false;
+    }
+
+    setState(() {
+      if (menus != null) {
+        _menus = menus;
+      }
+      if (complaints != null) {
+        _complaints = complaints;
+      }
+      if (schedules != null) {
+        _schedules = schedules;
+      }
+      if (caterers != null) {
+        _caterers = caterers;
+      }
+      if (feedbacks != null) {
+        _feedbacks = feedbacks;
+      }
+      if (pollOptions != null) {
+        _pollOptions = pollOptions;
+      }
+      if (leastRatedItems != null) {
+        _leastRatedItems = leastRatedItems;
+      }
+      if (notifications != null) {
+        _notifications = notifications;
+      }
+      if (laundryQrText != null) {
+        _laundryQrText = laundryQrText;
+      }
+      if (profile != null) {
+        _profile = profile;
+      }
+
+      _syncMessMenuDayWithMenus();
+      _syncRateSelectorsWithMenus();
+    });
+
+    return true;
+  }
+
+  Future<void> _showSyncErrorDialog(String message) async {
+    if (!mounted) {
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text("Sync Error"),
+          content: Text(message),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   String _formatDate(DateTime? value) {
@@ -591,6 +954,173 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
     }
   }
 
+  int _communityActiveFilterCount() {
+    var count = 0;
+    if (_communityCategoryFilter.isNotEmpty) {
+      count += 1;
+    }
+    if (_communityStatusFilter.isNotEmpty) {
+      count += 1;
+    }
+    if (_communitySort != "newest") {
+      count += 1;
+    }
+    return count;
+  }
+
+  Future<void> _openCommunityFilterSheet() async {
+    var category = _communityCategoryFilter;
+    var status = _communityStatusFilter;
+    var sort = _communitySort;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        final mediaQuery = MediaQuery.of(ctx);
+
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: mediaQuery.viewInsets.bottom + 16,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: mediaQuery.size.height * 0.75,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        "Filters",
+                        style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        "Refine community posts by category, status, and sort",
+                        style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: category,
+                        decoration: const InputDecoration(
+                          labelText: "Category",
+                          border: OutlineInputBorder(),
+                        ),
+                        items: [
+                          const DropdownMenuItem<String>(
+                            value: "",
+                            child: Text("All categories"),
+                          ),
+                          ..._categoryOptions.map(
+                            (option) => DropdownMenuItem<String>(
+                              value: option.key,
+                              child: Text(option.value),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setModalState(() {
+                            category = value ?? "";
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        initialValue: status,
+                        decoration: const InputDecoration(
+                          labelText: "Status",
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _statusFilters
+                            .map(
+                              (option) => DropdownMenuItem<String>(
+                                value: option.key,
+                                child: Text(option.value),
+                              ),
+                            )
+                            .toList(growable: false),
+                        onChanged: (value) {
+                          setModalState(() {
+                            status = value ?? "";
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        initialValue: sort,
+                        decoration: const InputDecoration(
+                          labelText: "Sort",
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _sortOptions
+                            .map(
+                              (option) => DropdownMenuItem<String>(
+                                value: option.key,
+                                child: Text(option.value),
+                              ),
+                            )
+                            .toList(growable: false),
+                        onChanged: (value) {
+                          if (value == null) {
+                            return;
+                          }
+                          setModalState(() {
+                            sort = value;
+                          });
+                        },
+                      ),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                Navigator.of(ctx).pop();
+                                await _clearCommunityFilters();
+                              },
+                              icon: const Icon(Icons.filter_alt_off_rounded),
+                              label: const Text("Reset"),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: () async {
+                                Navigator.of(ctx).pop();
+                                setState(() {
+                                  _communityCategoryFilter = category;
+                                  _communityStatusFilter = status;
+                                  _communitySort = sort;
+                                });
+                                await _applyCommunityFilters();
+                              },
+                              icon: const Icon(Icons.check_rounded),
+                              label: const Text("Apply"),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _replaceComplaint(ComplaintItem updated) {
     final index = _complaints.indexWhere((item) => item.id == updated.id);
     if (index < 0 || !mounted) {
@@ -642,11 +1172,27 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
       return const SizedBox.shrink();
     }
 
-    if (complaint.mediaType == "IMAGE") {
+    final resolvedUrl = _resolveComplaintMediaUrl(complaint.mediaUrl);
+    if (resolvedUrl.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final mediaType = complaint.mediaType.trim().toUpperCase();
+    final isVideo = mediaType == "VIDEO" || _looksLikeVideoUrl(resolvedUrl);
+
+    if (isVideo) {
+      return _InlineNetworkVideoPlayer(
+        url: resolvedUrl,
+        headers: _complaintMediaRequestHeaders(),
+      );
+    }
+
+    if (mediaType == "IMAGE") {
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: Image.network(
-          complaint.mediaUrl,
+          resolvedUrl,
+          headers: _complaintMediaRequestHeaders(),
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => Container(
             width: double.infinity,
@@ -668,8 +1214,46 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
         borderRadius: BorderRadius.circular(10),
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
       ),
-      child: SelectableText(complaint.mediaUrl),
+      child: SelectableText(resolvedUrl),
     );
+  }
+
+  String _resolveComplaintMediaUrl(String mediaUrl) {
+    final trimmed = mediaUrl.trim();
+    if (trimmed.isEmpty) {
+      return "";
+    }
+
+    final parsed = Uri.tryParse(trimmed);
+    if (parsed != null && parsed.hasScheme) {
+      return parsed.toString();
+    }
+
+    final baseUri = Uri.tryParse(widget.dashboardService.apiClient.baseUrl);
+    if (baseUri == null) {
+      return trimmed;
+    }
+    if (trimmed.startsWith("//")) {
+      return "${baseUri.scheme}:$trimmed";
+    }
+    return baseUri.resolve(trimmed).toString();
+  }
+
+  Map<String, String> _complaintMediaRequestHeaders() {
+    final token = widget.session.accessToken.trim();
+    if (token.isEmpty) {
+      return const <String, String>{};
+    }
+    return <String, String>{"Authorization": "Bearer $token"};
+  }
+
+  bool _looksLikeVideoUrl(String url) {
+    final path = (Uri.tryParse(url)?.path ?? url).toLowerCase();
+    return path.endsWith(".mp4") ||
+        path.endsWith(".mov") ||
+        path.endsWith(".webm") ||
+        path.endsWith(".m4v") ||
+        path.endsWith(".3gp");
   }
 
   Future<void> _openComplaintDetails(ComplaintItem complaint) async {
@@ -789,6 +1373,8 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             OutlinedButton.icon(
                               onPressed: busy
@@ -838,7 +1424,7 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                               OutlinedButton.icon(
                                 onPressed: busy ? null : runDelete,
                                 icon: const Icon(FluentIcons.delete_24_regular),
-                                label: const Text("Delete"),
+                                label: const Text("Delete", softWrap: false),
                               ),
                           ],
                         ),
@@ -1227,19 +1813,27 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+            Padding(
+              padding: const EdgeInsets.only(left: 4, top: 4),
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.primary,
+                    ),
+              ),
             ),
             const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
             ),
             const SizedBox(height: 10),
             child,
@@ -1287,18 +1881,28 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
     final profile = _profile;
     final student = profile?.student;
     final displayName = profile?.fullName.isNotEmpty == true
-        ? profile!.fullName
+        ? profile?.fullName ?? ""
         : widget.session.username;
     final displayEmail = profile?.email.isNotEmpty == true
-        ? profile!.email
+        ? profile?.email ?? ""
         : widget.session.email;
-    final phone =
-        "${profile?.phoneCountryCode ?? ""} ${profile?.phoneNumber ?? ""}"
-            .trim();
+    final phoneCountryCode = (profile?.phoneCountryCode ?? "").trim();
+    final phoneNumber = (profile?.phoneNumber ?? "").trim();
+    final phone = phoneNumber.isNotEmpty
+        ? "${phoneCountryCode.isNotEmpty ? "$phoneCountryCode " : ""}$phoneNumber"
+            .trim()
+        : "";
 
-    return <Widget>[
+    bool hasValue(String? value) {
+      final normalized = (value ?? "").trim();
+      if (normalized.isEmpty) {
+        return false;
+      }
+      return normalized.toLowerCase() != "null";
+    }
+
+    final rows = <Widget>[
       _detailRow(label: "Full Name", value: _displayValue(displayName)),
-      _detailRow(label: "Email", value: _displayValue(displayEmail)),
       _detailRow(
         label: "Username",
         value: _displayValue(profile?.username ?? widget.session.username),
@@ -1307,22 +1911,32 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
         label: "Role",
         value: _formatEnumLabel(profile?.role ?? widget.session.role),
       ),
-      _detailRow(
-        label: "Phone",
-        value: _displayValue(phone),
-      ),
-      _detailRow(
-        label: "Department",
-        value: _displayValue(profile?.department ?? ""),
-      ),
-      _detailRow(
-        label: "Job Title",
-        value: _displayValue(profile?.jobTitle ?? ""),
-      ),
-      _detailRow(
-        label: "Assigned Mess",
-        value: _displayValue(profile?.assignedMessName ?? ""),
-      ),
+    ];
+
+    if (hasValue(displayEmail)) {
+      rows.add(_detailRow(label: "Email", value: displayEmail.trim()));
+    }
+    if (hasValue(phone)) {
+      rows.add(_detailRow(label: "Phone", value: phone));
+    }
+    if (hasValue(profile?.department)) {
+      rows.add(
+        _detailRow(
+          label: "Department",
+          value: (profile?.department ?? "").trim(),
+        ),
+      );
+    }
+    if (hasValue(profile?.jobTitle)) {
+      rows.add(
+        _detailRow(
+          label: "Job Title",
+          value: (profile?.jobTitle ?? "").trim(),
+        ),
+      );
+    }
+
+    rows.addAll([
       _detailRow(
         label: "Email Verified",
         value: _boolLabel(profile?.isEmailVerified),
@@ -1337,7 +1951,7 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
       ),
       const Divider(height: 18),
       Text(
-        "Student Information",
+        "Student Details",
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -1364,10 +1978,16 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
         value: _displayValue(student?.roomNo ?? ""),
       ),
       _detailRow(
-        label: "Mess Allotment",
+        label: "Assigned Mess",
         value: _displayValue(student?.messAllotment ?? ""),
       ),
-    ];
+      _detailRow(
+        label: "Allotted Caterer",
+        value: _displayValue(student?.messCatererName ?? ""),
+      ),
+    ]);
+
+    return rows;
   }
 
   Future<void> _openProfileSheet() async {
@@ -1375,12 +1995,10 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      
       builder: (ctx) {
         final mediaQuery = MediaQuery.of(ctx);
-        final themeLabel = widget.themeMode == ThemeMode.dark
-            ? "Use Light Theme"
-            : "Use Dark Theme";
+        final themeLabel =
+            widget.themeMode == ThemeMode.dark ? "Light Theme" : "Dark Theme";
 
         Future<void> runProfileAction(String action) async {
           Navigator.of(ctx).pop();
@@ -1434,7 +2052,12 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                               onPressed: () =>
                                   runProfileAction("change_password"),
                               icon: const Icon(FluentIcons.password_24_regular),
-                              label: const Text("Change Password"),
+                              label: const Text(
+                                "Change Password",
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.fade,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -1446,7 +2069,12 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                                     ? FluentIcons.weather_sunny_24_regular
                                     : FluentIcons.weather_moon_24_regular,
                               ),
-                              label: Text(themeLabel),
+                              label: Text(
+                                themeLabel,
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.fade,
+                              ),
                             ),
                           ),
                         ],
@@ -1475,9 +2103,9 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
     final profile = _profile;
     final student = profile?.student;
     final displayName = (profile?.fullName ?? "").trim().isNotEmpty
-        ? profile!.fullName.trim()
+        ? (profile?.fullName ?? "").trim()
         : (student?.name ?? "").trim().isNotEmpty
-            ? student!.name.trim()
+            ? (student?.name ?? "").trim()
             : widget.session.username;
     final registrationNo = (student?.rollNo ?? "").trim();
 
@@ -1497,18 +2125,25 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                     children: [
                       Text(
                         "Hi, $displayName",
-                        style:
-                            Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : const Color(0xFF0B3D91),
+                            ),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         "Registration Number: ${registrationNo.isEmpty ? "-" : registrationNo}",
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                       ),
                     ],
                   ),
@@ -1517,28 +2152,43 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          _sectionCard(
-            title: "Notifications",
-            subtitle:
-                "Tap a notification to view full description and attachment",
-            child: Column(
-              children: _notifications.isEmpty
-                  ? const [
-                      Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text("No notifications available."),
-                      ),
-                    ]
-                  : _notifications.map(
-                      (notification) {
-                        final hasAttachment =
-                            notification.posterUrl.trim().isNotEmpty;
-                        final message = notification.message.trim().isEmpty
-                            ? "No description provided."
-                            : notification.message.trim();
+          Padding(
+            padding: const EdgeInsets.only(left: 4, top: 4),
+            child: Text(
+              "Notifications",
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : const Color(0xFF0B3D91),
+                  ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Column(
+            children: _notifications.isEmpty
+                ? const [
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text("No notifications available."),
+                    ),
+                  ]
+                : _notifications.map(
+                    (notification) {
+                      final hasAttachment =
+                          notification.posterUrl.trim().isNotEmpty;
 
-                        return ListTile(
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: ListTile(
                           onTap: () => _openNotificationDetails(notification),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          tileColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withAlpha(120),
                           leading: Icon(
                             _notificationLevelIcon(notification.level),
                           ),
@@ -1549,13 +2199,12 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           subtitle: Text(
-                            "${hasAttachment ? "Attachment included\n" : ""}$message\n${_formatDate(notification.createdAt)}",
+                            "${hasAttachment ? "Attachment included • " : ""}${_formatDate(notification.createdAt)}",
                           ),
-                          isThreeLine: true,
-                        );
-                      },
-                    ).toList(growable: false),
-            ),
+                        ),
+                      );
+                    },
+                  ).toList(growable: false),
           ),
         ],
       ),
@@ -1563,247 +2212,126 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
   }
 
   Widget _communityTab() {
+    final tabPadding = _tabContentPadding(context);
+    final activeFilterCount = _communityActiveFilterCount();
+    final accentText = const Color(0xFF8FB3D9);
+
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView(
-        padding: _tabContentPadding(context),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: tabPadding,
         children: [
-          _sectionCard(
-            title: "Community Threads",
-            subtitle: _hasCommunityFilters
-                ? "Filtered complaint feed"
-                : "Search and discuss student complaints",
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+            child: Row(
               children: [
-                FluentTextField(
-                  controller: _communitySearchController,
-                  labelText: "Search posts",
-                  hintText: "Search complaint text or author",
-                  prefixIcon: Icons.search_rounded,
-                  textInputAction: TextInputAction.search,
-                  onEditingComplete: _applyCommunityFilters,
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF101214),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: const Color(0xFF2A2F36),
+                      ),
+                    ),
+                    child: TextField(
+                      controller: _communitySearchController,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (_) => _applyCommunityFilters(),
+                      style: const TextStyle(color: Color(0xFFE6EEF7)),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: "Search posts",
+                        hintStyle: const TextStyle(color: Color(0xFF6C7B8F)),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 11,
+                        ),
+                        prefixIcon: const Icon(
+                          FluentIcons.search_24_regular,
+                          size: 18,
+                          color: Color(0xFF7F93AA),
+                        ),
+                        suffixIcon:
+                            _communitySearchController.text.trim().isEmpty
+                                ? null
+                                : IconButton(
+                                    onPressed: () {
+                                      _communitySearchController.clear();
+                                      _clearCommunityFilters();
+                                    },
+                                    icon: const Icon(
+                                      FluentIcons.dismiss_24_regular,
+                                      size: 18,
+                                      color: Color(0xFF7F93AA),
+                                    ),
+                                    tooltip: "Clear search",
+                                  ),
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    SizedBox(
-                      width: 220,
-                      child: DropdownButtonFormField<String>(
-                        key: ValueKey<String>(
-                          "community-category-$_communityCategoryFilter",
-                        ),
-                        initialValue: _communityCategoryFilter,
-                        decoration: const InputDecoration(
-                          labelText: "Category",
-                          border: OutlineInputBorder(),
-                        ),
-                        items: [
-                          const DropdownMenuItem<String>(
-                            value: "",
-                            child: Text("All categories"),
-                          ),
-                          ..._categoryOptions.map(
-                            (option) => DropdownMenuItem<String>(
-                              value: option.key,
-                              child: Text(option.value),
-                            ),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            _communityCategoryFilter = value ?? "";
-                          });
-                        },
-                      ),
-                    ),
-                    SizedBox(
-                      width: 190,
-                      child: DropdownButtonFormField<String>(
-                        key: ValueKey<String>(
-                          "community-status-$_communityStatusFilter",
-                        ),
-                        initialValue: _communityStatusFilter,
-                        decoration: const InputDecoration(
-                          labelText: "Status",
-                          border: OutlineInputBorder(),
-                        ),
-                        items: _statusFilters
-                            .map(
-                              (option) => DropdownMenuItem<String>(
-                                value: option.key,
-                                child: Text(option.value),
-                              ),
-                            )
-                            .toList(growable: false),
-                        onChanged: (value) {
-                          setState(() {
-                            _communityStatusFilter = value ?? "";
-                          });
-                        },
-                      ),
-                    ),
-                    SizedBox(
-                      width: 190,
-                      child: DropdownButtonFormField<String>(
-                        key: ValueKey<String>("community-sort-$_communitySort"),
-                        initialValue: _communitySort,
-                        decoration: const InputDecoration(
-                          labelText: "Sort",
-                          border: OutlineInputBorder(),
-                        ),
-                        items: _sortOptions
-                            .map(
-                              (option) => DropdownMenuItem<String>(
-                                value: option.key,
-                                child: Text(option.value),
-                              ),
-                            )
-                            .toList(growable: false),
-                        onChanged: (value) {
-                          if (value == null) {
-                            return;
-                          }
-                          setState(() {
-                            _communitySort = value;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: _canCreateComplaint ? _openNewComplaintPage : null,
+                  style: TextButton.styleFrom(
+                    foregroundColor: accentText,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    minimumSize: const Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(FluentIcons.add_24_regular, size: 18),
+                  label: const Text("New"),
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: _applyCommunityFilters,
-                      icon: const Icon(Icons.search_rounded),
-                      label: const Text("Search"),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _clearCommunityFilters,
-                      icon: const Icon(Icons.filter_alt_off_rounded),
-                      label: const Text("Clear"),
-                    ),
-                    FilledButton.icon(
-                      onPressed:
-                          _canCreateComplaint ? _openNewComplaintPage : null,
-                      icon: const Icon(Icons.add_comment_rounded),
-                      label: const Text("New Complaint"),
-                    ),
-                  ],
+                const SizedBox(width: 2),
+                TextButton.icon(
+                  onPressed: _openCommunityFilterSheet,
+                  style: TextButton.styleFrom(
+                    foregroundColor: accentText,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    minimumSize: const Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(FluentIcons.filter_24_regular, size: 18),
+                  label: Text(
+                    activeFilterCount > 0
+                        ? "Filter ($activeFilterCount)"
+                        : "Filter",
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 10),
-          ..._complaints.map((complaint) {
-            final status = complaint.status.toUpperCase();
-            final statusLabel = complaint.statusLabel.isNotEmpty
-                ? complaint.statusLabel
-                : status;
-            final voteBusy = _isCommunityVoteBusy(complaint.id);
-
-            Color statusColor;
-            IconData statusIcon;
-            if (status == "OPEN") {
-              statusColor = Colors.orange;
-              statusIcon = FluentIcons.error_circle_24_regular;
-            } else if (status == "IN_PROGRESS") {
-              statusColor = const Color(0xFF0078D4);
-              statusIcon = Icons.timelapse_rounded;
-            } else {
-              statusColor = Colors.green;
-              statusIcon = FluentIcons.checkmark_circle_24_filled;
-            }
-
-            return Card(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => _openComplaintDetails(complaint),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(statusIcon, color: statusColor),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _authorLabel(complaint),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          const Icon(FluentIcons.chevron_right_20_regular),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                          "${_categoryLabel(complaint.category)} - $statusLabel"),
-                      const SizedBox(height: 6),
-                      Text(
-                        complaint.text,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: voteBusy
-                                ? null
-                                : () => _voteFromCommunityCard(
-                                      complaint: complaint,
-                                      direction: "up",
-                                    ),
-                            icon: Icon(
-                              complaint.isUpvotedByMe
-                                  ? FluentIcons.thumb_like_24_filled
-                                  : FluentIcons.thumb_like_24_regular,
-                              color: complaint.isUpvotedByMe
-                                  ? _activeVoteColor
-                                  : null,
-                            ),
-                            label: Text("${complaint.upvotes}"),
-                          ),
-                          const SizedBox(width: 8),
-                          OutlinedButton.icon(
-                            onPressed: voteBusy
-                                ? null
-                                : () => _voteFromCommunityCard(
-                                      complaint: complaint,
-                                      direction: "down",
-                                    ),
-                            icon: Icon(
-                              complaint.isDownvotedByMe
-                                  ? FluentIcons.thumb_dislike_24_filled
-                                  : FluentIcons.thumb_dislike_24_regular,
-                              color: complaint.isDownvotedByMe
-                                  ? _activeVoteColor
-                                  : null,
-                            ),
-                            label: Text("${complaint.downvotes}"),
-                          ),
-                          const Spacer(),
-                          const Icon(FluentIcons.chat_24_regular, size: 18),
-                          const SizedBox(width: 4),
-                          Text("${complaint.replies.length}"),
-                        ],
-                      ),
-                    ],
-                  ),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, top: 4),
+            child: Text(
+              "Community Threads",
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _hasCommunityFilters
+                ? "Filtered complaint feed"
+                : "Search and discuss student complaints",
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
-              ),
-            );
-          }),
+          ),
+          const SizedBox(height: 10),
           if (_complaints.isEmpty)
             Center(
               child: Padding(
@@ -1814,7 +2342,153 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                       : "No complaints available.",
                 ),
               ),
-            ),
+            )
+          else
+            ..._complaints.map((complaint) {
+              final status = complaint.status.toUpperCase();
+              final statusLabel = complaint.statusLabel.isNotEmpty
+                  ? complaint.statusLabel
+                  : status;
+              final voteBusy = _isCommunityVoteBusy(complaint.id);
+
+              Color statusColor;
+              IconData statusIcon;
+              if (status == "OPEN") {
+                statusColor = Colors.orange;
+                statusIcon = FluentIcons.error_circle_24_regular;
+              } else if (status == "IN_PROGRESS") {
+                statusColor = const Color(0xFF0078D4);
+                statusIcon = FluentIcons.clock_24_regular;
+              } else {
+                statusColor = Colors.green;
+                statusIcon = FluentIcons.checkmark_circle_24_filled;
+              }
+
+              return Card(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _openComplaintDetails(complaint),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(statusIcon, color: statusColor),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _authorLabel(complaint),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const Icon(FluentIcons.chevron_right_20_regular),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                            "${_categoryLabel(complaint.category)} - $statusLabel"),
+                        const SizedBox(height: 6),
+                        Text(
+                          complaint.text,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (complaint.mediaUrl.trim().isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          _mediaPreview(complaint),
+                        ],
+                        const SizedBox(height: 10),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              TextButton.icon(
+                                onPressed: voteBusy
+                                    ? null
+                                    : () => _voteFromCommunityCard(
+                                          complaint: complaint,
+                                          direction: "up",
+                                        ),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 4,
+                                  ),
+                                  minimumSize: const Size(0, 0),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                icon: Icon(
+                                  complaint.isUpvotedByMe
+                                      ? FluentIcons.thumb_like_24_filled
+                                      : FluentIcons.thumb_like_24_regular,
+                                  size: 18,
+                                  color: complaint.isUpvotedByMe
+                                      ? _activeVoteColor
+                                      : null,
+                                ),
+                                label: Text("${complaint.upvotes}"),
+                              ),
+                              const SizedBox(width: 10),
+                              TextButton.icon(
+                                onPressed: voteBusy
+                                    ? null
+                                    : () => _voteFromCommunityCard(
+                                          complaint: complaint,
+                                          direction: "down",
+                                        ),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 4,
+                                  ),
+                                  minimumSize: const Size(0, 0),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                icon: Icon(
+                                  complaint.isDownvotedByMe
+                                      ? FluentIcons.thumb_dislike_24_filled
+                                      : FluentIcons.thumb_dislike_24_regular,
+                                  size: 18,
+                                  color: complaint.isDownvotedByMe
+                                      ? _activeVoteColor
+                                      : null,
+                                ),
+                                label: Text("${complaint.downvotes}"),
+                              ),
+                              const SizedBox(width: 10),
+                              TextButton.icon(
+                                onPressed: () =>
+                                    _openComplaintDetails(complaint),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 4,
+                                  ),
+                                  minimumSize: const Size(0, 0),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                icon: const Icon(
+                                  FluentIcons.chat_24_regular,
+                                  size: 18,
+                                ),
+                                label: Text("${complaint.replies.length}"),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
         ],
       ),
     );
@@ -1868,48 +2542,179 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                   const SizedBox(height: 10),
                 ],
                 if (_menus.isEmpty)
-                  const Text("No menu entries available.")
+                  Text(
+                    _isStudent &&
+                            _profile?.student?.messAllotment
+                                    .trim()
+                                    .toUpperCase() ==
+                                "FOODPARK"
+                        ? "Food Park has no fixed weekly menu."
+                        : "No menu entries available.",
+                  )
                 else
-                  ..._weekDayOptions.map((dayEntry) {
-                    final menu = menuByDay[dayEntry.key];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            dayEntry.value,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 6),
-                          if (menu == null)
-                            const Text(
-                                "Menu is not configured for this day yet.")
-                          else ...[
-                            Text(
-                              "Breakfast: ${menu.breakfast.trim().isEmpty ? "No items listed" : menu.breakfast}",
-                            ),
-                            Text(
-                              "Lunch: ${menu.lunch.trim().isEmpty ? "No items listed" : menu.lunch}",
-                            ),
-                            Text(
-                              "Snacks: ${menu.snacks.trim().isEmpty ? "No items listed" : menu.snacks}",
-                            ),
-                            Text(
-                              "Dinner: ${menu.dinner.trim().isEmpty ? "No items listed" : menu.dinner}",
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
-                  }),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cardWidth =
+                          (constraints.maxWidth - 6).clamp(280.0, 560.0);
+                      return SizedBox(
+                        height: 370,
+                        child: PageView.builder(
+                          controller: _messMenuPageController,
+                          pageSnapping: true,
+                          physics: const BouncingScrollPhysics(),
+                          itemCount: _weekDayOptions.length,
+                          onPageChanged: (index) {
+                            final dayCode = _weekDayOptions[index].key;
+                            if (_selectedMessMenuDay == dayCode) {
+                              return;
+                            }
+                            setState(() {
+                              _selectedMessMenuDay = dayCode;
+                            });
+                          },
+                          itemBuilder: (context, index) {
+                            final dayEntry = _weekDayOptions[index];
+                            final dayMenu = menuByDay[dayEntry.key];
+                            final mealRows = <({String label, String value})>[
+                              (
+                                label: "Breakfast",
+                                value: dayMenu?.breakfast ?? "",
+                              ),
+                              (
+                                label: "Lunch",
+                                value: dayMenu?.lunch ?? "",
+                              ),
+                              (
+                                label: "Snacks",
+                                value: dayMenu?.snacks ?? "",
+                              ),
+                              (
+                                label: "Dinner",
+                                value: dayMenu?.dinner ?? "",
+                              ),
+                            ];
+
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 10),
+                              child: Container(
+                                width: cardWidth,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  color: Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? const Color(0xFF1A1A1A)
+                                      : const Color(0xFFFAFAFA),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Theme.of(context)
+                                          .shadowColor
+                                          .withValues(alpha: 0.12),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _weekDayLabel(dayEntry.key),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                              fontWeight: FontWeight.w800),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Expanded(
+                                      child: dayMenu == null
+                                          ? const Align(
+                                              alignment: Alignment.topLeft,
+                                              child: Text(
+                                                "Menu is not configured for this day yet.",
+                                              ),
+                                            )
+                                          : SingleChildScrollView(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: mealRows.map((meal) {
+                                                  final mealValue =
+                                                      meal.value.trim().isEmpty
+                                                          ? "No items listed"
+                                                          : meal.value.trim();
+                                                  return Container(
+                                                    width: double.infinity,
+                                                    margin:
+                                                        const EdgeInsets.only(
+                                                      bottom: 8,
+                                                    ),
+                                                    padding:
+                                                        const EdgeInsets.all(8),
+                                                    decoration: BoxDecoration(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                        8,
+                                                      ),
+                                                      color: Theme.of(context)
+                                                                  .brightness ==
+                                                              Brightness.dark
+                                                          ? const Color(
+                                                              0xFF252525)
+                                                          : const Color(
+                                                              0xFFF5F5F5),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color:
+                                                              Theme.of(context)
+                                                                  .shadowColor
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.08),
+                                                          blurRadius: 4,
+                                                          offset: const Offset(
+                                                              0, 1),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          meal.label,
+                                                          style:
+                                                              Theme.of(context)
+                                                                  .textTheme
+                                                                  .bodyMedium
+                                                                  ?.copyWith(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700,
+                                                                  ),
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 3,
+                                                        ),
+                                                        Text(mealValue),
+                                                      ],
+                                                    ),
+                                                  );
+                                                }).toList(growable: false),
+                                              ),
+                                            ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
               ],
             ),
           ),
@@ -2039,23 +2844,45 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(5, (index) {
-                      final value = index + 1;
-                      return IconButton(
-                        icon: Icon(
-                            Icons.star,
-                            color: _selectedRating >= value ? Colors.amber : Colors.grey,
-                            size: 32,
+                        final value = index + 1;
+                        final selected = _selectedRating >= value;
+
+                        return Semantics(
+                          button: true,
+                          selected: selected,
+                          label: "Rate $value star${value == 1 ? "" : "s"}",
+                          child: IconButton(
+                            tooltip: "$value star${value == 1 ? "" : "s"}",
+                            onPressed: _messActionBusy
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _selectedRating = value;
+                                    });
+                                  },
+                            icon: Icon(
+                              selected
+                                  ? Icons.star_rounded
+                                  : Icons.star_border_rounded,
+                              color: selected ? Colors.amber : Colors.grey,
+                              size: 34,
+                            ),
                           ),
-                        onPressed: _messActionBusy
-                        ? null
-                        : () {
-                      setState(() {
-                        _selectedRating = value;
-                        });
-                        },
-                      );
-                    }),
-                  ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _selectedRating == 0
+                          ? "Tap stars to rate"
+                          : "$_selectedRating/5 selected",
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
                     const SizedBox(height: 10),
                     FluentTextField(
                       controller: _rateCommentController,
@@ -2336,10 +3163,53 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
       child: ListView(
         padding: _tabContentPadding(context),
         children: [
+          if (_isLaundryPerson || _isAdmin)
+            _sectionCard(
+              title: "QR Code Scanner",
+              subtitle: "Scan student laundry QR codes",
+              child: Column(
+                children: [
+                  const Text(
+                    "Scan QR codes or search by registration number to log laundry submissions and collections.",
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () async {
+                        try {
+                          await Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) => LaundryQRScannerScreen(
+                                session: widget.session,
+                                dashboardService: widget.dashboardService,
+                              ),
+                            ),
+                          );
+                          await _loadData();
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("Error: $e"),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.qr_code_scanner),
+                      label: const Text("Open Scanner"),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           _sectionCard(
             title: "Laundry Schedule",
             subtitle: _isLaundryPerson
-                ? "Mark submission and collection"
+                ? "View submission and collection status"
                 : "Track laundry status",
             child: Column(
               children: _schedules.isEmpty
@@ -2366,29 +3236,6 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                                 Text(
                                   "Collection: ${schedule.collection ? "Done" : "Pending"}",
                                 ),
-                                if (_isLaundryPerson || _isAdmin) ...[
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      FilledButton(
-                                        onPressed: schedule.submission
-                                            ? null
-                                            : () =>
-                                                _markSubmission(schedule.id),
-                                        child: const Text("Mark Submission"),
-                                      ),
-                                      OutlinedButton(
-                                        onPressed: schedule.collection
-                                            ? null
-                                            : () =>
-                                                _markCollection(schedule.id),
-                                        child: const Text("Mark Collection"),
-                                      ),
-                                    ],
-                                  ),
-                                ],
                               ],
                             ),
                           ),
@@ -2745,13 +3592,13 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                 final blank = day == null;
 
                 final cellColor = highlight
-                    ? const Color(0x232AA44F)
+                    ? const Color(0x233D8FB2)
                     : (isDark
                         ? const Color(0xFF1A1E23)
                         : const Color(0xFFFFFFFF));
                 final borderColor = isToday
                     ? const Color(0xFF1483E3)
-                    : (highlight ? const Color(0xFF2AA44F) : edgeColor);
+                    : (highlight ? const Color(0xFF3D8FB2) : edgeColor);
 
                 return Container(
                   decoration: BoxDecoration(
@@ -2767,7 +3614,7 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                     blank ? "" : "$day",
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: highlight
-                          ? const Color(0xFF138A2E)
+                          ? const Color(0xFF2B8BC3)
                           : colorScheme.onSurface,
                       fontWeight: FontWeight.w700,
                     ),
@@ -2787,7 +3634,7 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    "Green dates are your room's assigned laundry dates this month.",
+                    "Blue dates are your room's assigned laundry dates this month.",
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -3015,6 +3862,7 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                             if (_selectedNavIndex == index) {
                               return;
                             }
+                            FocusManager.instance.primaryFocus?.unfocus();
                             setState(() {
                               _selectedNavIndex = index;
                             });
@@ -3104,16 +3952,16 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
         : const Color(0xFF0C2D66).withAlpha(24);
     final titleBarIconColor = isDark ? Colors.white : _activeNavColor;
 
-    final showMessTab = !_isLaundryPerson;
-    final showLaundryTab = !_isMessManager;
+    final showMessTab = !_isLaundryPerson && !_isDepartmentStaff;
+    final showLaundryTab = !_isMessManager && !_isDepartmentStaff;
     final showAdminTab = _isAdmin;
 
-    final pages = <Widget>[
-      _homeTab(),
-      _communityTab(),
-      if (showMessTab) _messTab(),
-      if (showLaundryTab) _laundryTab(),
-      if (showAdminTab) _adminTab(),
+    final pageBuilders = <Widget Function()>[
+      _homeTab,
+      _communityTab,
+      if (showMessTab) _messTab,
+      if (showLaundryTab) _laundryTab,
+      if (showAdminTab) _adminTab,
     ];
 
     final navItems = <_DashboardNavItem>[
@@ -3147,8 +3995,9 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
         ),
     ];
 
-    assert(navItems.length == pages.length);
+    assert(navItems.length == pageBuilders.length);
     final selectedIndex = _selectedNavIndex.clamp(0, navItems.length - 1);
+    final selectedPage = pageBuilders[selectedIndex]();
 
     return Scaffold(
       extendBody: true,
@@ -3198,11 +4047,9 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
           ),
         ],
       ),
-      body: _loading
+      body: _loading && !_hasDashboardData
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text(_error!))
-              : pages[selectedIndex],
+          : selectedPage,
       bottomNavigationBar: _buildFloatingNavBar(
         items: navItems,
         selectedIndex: selectedIndex,
@@ -3221,6 +4068,133 @@ class _DashboardNavItem {
   final String label;
   final IconData regularIcon;
   final IconData filledIcon;
+}
+
+class _InlineNetworkVideoPlayer extends StatefulWidget {
+  const _InlineNetworkVideoPlayer({
+    required this.url,
+    required this.headers,
+  });
+
+  final String url;
+  final Map<String, String> headers;
+
+  @override
+  State<_InlineNetworkVideoPlayer> createState() =>
+      _InlineNetworkVideoPlayerState();
+}
+
+class _InlineNetworkVideoPlayerState extends State<_InlineNetworkVideoPlayer> {
+  VideoPlayerController? _controller;
+  Future<void>? _initializeFuture;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(
+      Uri.parse(widget.url),
+      httpHeaders: widget.headers,
+    );
+    _initializeFuture = _controller!.initialize().then((_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {});
+    }).catchError((_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _hasError = true;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _togglePlayPause() {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) {
+      return;
+    }
+    if (controller.value.isPlaying) {
+      controller.pause();
+    } else {
+      controller.play();
+    }
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (controller == null) {
+      return const SizedBox.shrink();
+    }
+
+    if (_hasError) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        ),
+        child: const Text("Video preview unavailable"),
+      );
+    }
+
+    return FutureBuilder<void>(
+      future: _initializeFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done ||
+            !controller.value.isInitialized) {
+          return Container(
+            height: 220,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            ),
+            child: const CircularProgressIndicator(),
+          );
+        }
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              AspectRatio(
+                aspectRatio: controller.value.aspectRatio > 0
+                    ? controller.value.aspectRatio
+                    : 16 / 9,
+                child: VideoPlayer(controller),
+              ),
+              Material(
+                color: Colors.black45,
+                shape: const CircleBorder(),
+                child: IconButton(
+                  onPressed: _togglePlayPause,
+                  icon: Icon(
+                    controller.value.isPlaying
+                        ? FluentIcons.pause_24_regular
+                        : FluentIcons.play_24_filled,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _NotificationDetailsScreen extends StatefulWidget {
@@ -3257,7 +4231,7 @@ class _NotificationDetailsScreenState
   void initState() {
     super.initState();
     if (_hasAttachment) {
-      unawaited(_loadAttachment(forceDownload: false));
+      unawaited(_loadAttachment());
     }
   }
 
@@ -3269,16 +4243,14 @@ class _NotificationDetailsScreenState
     return <String, String>{"Authorization": "Bearer $token"};
   }
 
-  Future<void> _loadAttachment({required bool forceDownload}) async {
+  Future<void> _loadAttachment() async {
     if (!_hasAttachment) {
       return;
     }
 
     setState(() {
       _loadingAttachment = true;
-      if (forceDownload) {
-        _attachmentError = null;
-      }
+      _attachmentError = null;
     });
 
     try {
@@ -3288,30 +4260,13 @@ class _NotificationDetailsScreenState
         apiBaseUrl: widget.apiBaseUrl,
       );
 
-      // For initial rendering, only use locally cached content.
-      // Download should happen only when user explicitly retries.
       final resolvedPath = cachedPath ??
-          (forceDownload
-              ? await widget.attachmentCache.ensureCached(
-                  notificationId: widget.notification.id,
-                  attachmentUrl: _attachmentUrl,
-                  apiBaseUrl: widget.apiBaseUrl,
-                  headers: _requestHeaders(),
-                )
-              : null);
-
-      if (resolvedPath == null) {
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _cachedAttachmentPath = null;
-          _cachedAttachmentBytes = null;
-          _attachmentError =
-              "Attachment is not cached on this device yet. Connect to internet and retry download.";
-        });
-        return;
-      }
+          await widget.attachmentCache.ensureCached(
+            notificationId: widget.notification.id,
+            attachmentUrl: _attachmentUrl,
+            apiBaseUrl: widget.apiBaseUrl,
+            headers: _requestHeaders(),
+          );
 
       final bytes = await widget.attachmentCache.readCachedBytes(resolvedPath);
       if (!mounted) {
@@ -3370,55 +4325,23 @@ class _NotificationDetailsScreenState
         );
       }
 
-      final resolvedUrl = widget.attachmentCache.resolveAttachmentUrl(
-        _attachmentUrl,
-        widget.apiBaseUrl,
-      );
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Attachment is not available offline yet. Connect to internet and retry download.",
-          ),
-          if (_attachmentError != null && _attachmentError!.trim().isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                _attachmentError!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                ),
-              ),
-            ),
-          if (resolvedUrl.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: SelectableText(resolvedUrl),
-            ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _loadingAttachment
-                ? null
-                : () => _loadAttachment(forceDownload: true),
-            icon: const Icon(Icons.download_rounded),
-            label:
-                Text(_loadingAttachment ? "Downloading..." : "Retry Download"),
-          ),
-        ],
-      );
+      return const Text("Error loading attachment, view in website.");
     }
 
     final typeHint = _cachedAttachmentPath ?? _attachmentUrl;
     final isPdf = _isPdfFile(typeHint);
     final shouldRenderAsImage = !isPdf;
+    final bytes = _cachedAttachmentBytes;
+    if (bytes == null) {
+      return const Text("Error loading attachment, view in website.");
+    }
 
     if (isPdf) {
       return SizedBox(
         height: 560,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: SfPdfViewer.memory(_cachedAttachmentBytes!),
+          child: SfPdfViewer.memory(bytes),
         ),
       );
     }
@@ -3434,7 +4357,7 @@ class _NotificationDetailsScreenState
               minScale: 1,
               maxScale: 4,
               child: Image.memory(
-                _cachedAttachmentBytes!,
+                bytes,
                 fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => const Center(
                   child: Padding(

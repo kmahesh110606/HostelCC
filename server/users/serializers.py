@@ -195,6 +195,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "block_name": student.block.block_name if student.block else "",
             "room_no": student.room_no,
             "mess_allotment": student.mess_allotment,
+            "mess_caterer_name": student.mess_caterer.name if student.mess_caterer else "",
         }
 
 
@@ -228,7 +229,5 @@ class AppNotificationSerializer(serializers.ModelSerializer):
     def get_poster_url(self, obj):
         if not obj.poster:
             return ""
-        request = self.context.get("request")
-        if request:
-            return request.build_absolute_uri(obj.poster.url)
+        # Return relative media URL so it works across all environments (localhost, 10.0.2.2, prod, etc.)
         return obj.poster.url

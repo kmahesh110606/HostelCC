@@ -1,4 +1,7 @@
+import "dart:io";
+
 import "package:flutter/material.dart";
+import "package:image_picker/image_picker.dart";
 
 import "../../services/dashboard_service.dart";
 import "../../widgets/fluent_widgets.dart";
@@ -36,8 +39,10 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
   ];
 
   final TextEditingController _complaintController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
 
   String _selectedCategory = _categories.first.key;
+  XFile? _selectedMedia;
   bool _submitting = false;
 
   @override
@@ -71,6 +76,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
         token: widget.accessToken,
         category: _selectedCategory,
         text: complaintText,
+        mediaFilePath: _selectedMedia?.path,
       );
       if (!mounted) {
         return;
@@ -84,6 +90,40 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
           _submitting = false;
         });
       }
+    }
+  }
+
+  Future<void> _pickImage() async {
+    if (_submitting) {
+      return;
+    }
+    try {
+      final picked = await _picker.pickImage(source: ImageSource.gallery);
+      if (picked == null) {
+        return;
+      }
+      setState(() {
+        _selectedMedia = picked;
+      });
+    } catch (e) {
+      _toast(e.toString());
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    if (_submitting) {
+      return;
+    }
+    try {
+      final picked = await _picker.pickVideo(source: ImageSource.gallery);
+      if (picked == null) {
+        return;
+      }
+      setState(() {
+        _selectedMedia = picked;
+      });
+    } catch (e) {
+      _toast(e.toString());
     }
   }
 
@@ -150,6 +190,55 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
                     maxLines: 9,
                     enabled: !_submitting,
                   ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton(
+                        onPressed: _submitting ? null : _pickImage,
+                        child: const Text("Upload Image"),
+                      ),
+                      OutlinedButton(
+                        onPressed: _submitting ? null : _pickVideo,
+                        child: const Text("Upload Video"),
+                      ),
+                      if (_selectedMedia != null)
+                        OutlinedButton(
+                          onPressed: _submitting
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _selectedMedia = null;
+                                  });
+                                },
+                          child: const Text("Remove"),
+                        ),
+                    ],
+                  ),
+                  if (_selectedMedia != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      "Selected: ${_selectedMedia!.name}",
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    if (_selectedMedia!.path.toLowerCase().endsWith(".png") ||
+                        _selectedMedia!.path.toLowerCase().endsWith(".jpg") ||
+                        _selectedMedia!.path.toLowerCase().endsWith(".jpeg") ||
+                        _selectedMedia!.path.toLowerCase().endsWith(".webp") ||
+                        _selectedMedia!.path.toLowerCase().endsWith(".gif")) ...[
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.file(
+                          File(_selectedMedia!.path),
+                          height: 140,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ],
+                  ],
                   const SizedBox(height: 14),
                   FilledButton.icon(
                     onPressed: _submitting ? null : _submit,

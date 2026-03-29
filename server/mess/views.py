@@ -11,6 +11,7 @@ from rest_framework.throttling import ScopedRateThrottle
 
 from users.permissions import IsMessManager
 from students.models import Student
+from students.utils import resolve_student_for_user
 from mess.options import canonical_mess_type
 
 from .models import Caterer, Feedback, MenuPollOption, MenuPollVote, MessChangeRequest, MessMenu
@@ -35,6 +36,7 @@ def _parse_feedback_menu_item(menu_item: str):
 class MessMenuViewSet(viewsets.ModelViewSet):
     queryset = MessMenu.objects.all().order_by("mess_type", "week_day")
     serializer_class = MessMenuSerializer
+    _veg_fallback_types = {"NON_VEG", "SPECIAL"}
 
     def get_permissions(self):
         if self.action in ["create", "update", "partial_update", "destroy"]:
@@ -49,16 +51,24 @@ class MessMenuViewSet(viewsets.ModelViewSet):
             student = Student.objects.select_related("block").filter(user=request.user).first()
             if not student:
                 return Response([])
-            requested_mess_type = student.mess_allotment if student else ""
+            requested_mess_type = canonical_mess_type(student.mess_allotment)
+            if not requested_mess_type:
+                return Response([])
+
+        if requested_mess_type == "FOODPARK":
+            return Response([])
 
         cache_key = f"mess_menu_{requested_mess_type or 'all'}_{request.user.role}"
         cached = cache.get(cache_key)
         if cached:
             return Response(cached)
 
-        queryset = self.filter_queryset(self.get_queryset())
+        base_queryset = self.filter_queryset(self.get_queryset())
+        queryset = base_queryset
         if requested_mess_type:
             queryset = queryset.filter(mess_type=requested_mess_type)
+            if requested_mess_type in self._veg_fallback_types and not queryset.exists():
+                queryset = base_queryset.filter(mess_type="VEG")
         elif request.user.role != "STUDENT":
             queryset = queryset.filter(mess_type="VEG")
 
@@ -81,10 +91,14 @@ class CatererViewSet(viewsets.ReadOnlyModelViewSet):
         mess_type = canonical_mess_type(self.request.query_params.get("mess_type"))
 
         if self.request.user.role == "STUDENT":
-            student = Student.objects.select_related("block").filter(user=self.request.user).first()
+            student = resolve_student_for_user(self.request.user)
             if student:
-                queryset = queryset.filter(block=student.block, meal_types=student.mess_allotment)
+                student_mess_type = canonical_mess_type(student.mess_allotment)
+                if not student_mess_type:
+                    return queryset.none()
+                queryset = queryset.filter(block=student.block, meal_types=student_mess_type)
                 return queryset
+            return queryset.none()
 
         if block_name:
             queryset = queryset.filter(block__block_name=block_name)
@@ -232,6 +246,27 @@ class PollViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.Gener
 class MessChangeRequestViewSet(viewsets.ModelViewSet):
     queryset = MessChangeRequest.objects.select_related("student").all().order_by("-created_at")
     serializer_class = MessChangeRequestSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.request.user.role == "STUDENT":
+            student = resolve_student_for_user(self.request.user)
+            if not student:
+                return queryset.none()
+            return queryset.filter(student=student)
+        return queryset
+
+    def perform_create(self, serializer):
+        if self.request.user.role != "STUDENT":
+            raise PermissionDenied("Only students can request mess change.")
+
+        student = resolve_student_for_user(self.request.user)
+        if not student:
+            raise PermissionDenied("Only mapped students can request mess change.")
+        if not student.mess_change_unlocked:
+            raise ValidationError({"detail": "Mess change is currently locked."})
+
+        serializer.save(student=student)
 
     def get_permissions(self):
         if self.action in ["approve", "reject"]:

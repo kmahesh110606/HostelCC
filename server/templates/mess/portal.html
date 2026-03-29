@@ -40,10 +40,25 @@
     transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
   }
 
+  .day-pill:hover,
+  .day-pill:focus-visible {
+    border-color: color-mix(in srgb, var(--line) 55%, var(--primary) 45%);
+    background: color-mix(in srgb, var(--panel) 90%, var(--line) 10%);
+    color: var(--text);
+    outline: none;
+  }
+
   .day-pill.active {
     border-color: var(--primary);
     background: color-mix(in srgb, var(--primary) 12%, var(--panel));
     color: var(--primary);
+  }
+
+  .day-pill.active:hover,
+  .day-pill.active:focus-visible {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 16%, var(--panel));
+    color: var(--primary-dark);
   }
 
   .day-panel {

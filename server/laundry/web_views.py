@@ -1,4 +1,6 @@
 import calendar
+import csv
+import io
 import json
 import re
 from datetime import date
@@ -7,13 +9,18 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.utils.dateparse import parse_date
 
-from .models import LaundryRoomRange, LaundrySchedule
+from .models import LaundryEvent, LaundryRoomRange, LaundrySchedule
 from students.utils import resolve_student_for_user
 
 
 def _is_laundry_manager_or_admin(user) -> bool:
     return user.role in {"LAUNDRY_PERSON", "LAUNDRY_MANAGER", "ADMIN"}
+
+
+def _is_admin(user) -> bool:
+    return getattr(user, "role", "") == "ADMIN"
 
 
 def _room_number_as_int(value: str):
@@ -54,16 +61,71 @@ def _infer_student_day_from_room_ranges(student):
     if not student or not student.block:
         return None
 
-    rules = LaundryRoomRange.objects.filter(is_active=True, block_name__iexact=student.block.block_name)
-    matching_days = {
-        rule.day_of_week
-        for rule in rules
-        if _room_in_rule(student.room_no, rule.room_from, rule.room_to)
-    }
-    if not matching_days:
+    rules = LaundryRoomRange.objects.filter(
+        is_active=True,
+        block_name__iexact=student.block.block_name,
+    )
+    matching_rules = [rule for rule in rules if _room_in_rule(student.room_no, rule.room_from, rule.room_to)]
+    if not matching_rules:
         return None
 
-    return sorted(matching_days, key=lambda code: _DAY_SORT_ORDER.get(code, 99))[0]
+    matching_days = {
+        rule.day_of_week
+        for rule in matching_rules
+        if rule.day_of_week
+    }
+    if matching_days:
+        return sorted(matching_days, key=lambda code: _DAY_SORT_ORDER.get(code, 99))[0]
+
+    dated_rules = sorted(
+        [rule for rule in matching_rules if rule.scheduled_date],
+        key=lambda rule: (rule.scheduled_date < date.today(), rule.scheduled_date),
+    )
+    if not dated_rules:
+        return None
+
+    weekday_code = {
+        0: LaundrySchedule.DayChoices.MON,
+        1: LaundrySchedule.DayChoices.TUE,
+        2: LaundrySchedule.DayChoices.WED,
+        3: LaundrySchedule.DayChoices.THU,
+        4: LaundrySchedule.DayChoices.FRI,
+        5: LaundrySchedule.DayChoices.SAT,
+        6: LaundrySchedule.DayChoices.SUN,
+    }
+    return weekday_code[dated_rules[0].scheduled_date.weekday()]
+
+
+def _matching_room_rules_for_date(block_name: str, target_date: date, preloaded_rules=None):
+    if preloaded_rules is None:
+        block_rules = list(LaundryRoomRange.objects.filter(is_active=True, block_name__iexact=block_name))
+    else:
+        block_rules = list(preloaded_rules)
+
+    exact_rules = [rule for rule in block_rules if rule.scheduled_date == target_date]
+    if exact_rules:
+        return exact_rules
+
+    weekday_code = {
+        0: LaundrySchedule.DayChoices.MON,
+        1: LaundrySchedule.DayChoices.TUE,
+        2: LaundrySchedule.DayChoices.WED,
+        3: LaundrySchedule.DayChoices.THU,
+        4: LaundrySchedule.DayChoices.FRI,
+        5: LaundrySchedule.DayChoices.SAT,
+        6: LaundrySchedule.DayChoices.SUN,
+    }[target_date.weekday()]
+    return [rule for rule in block_rules if rule.scheduled_date is None and rule.day_of_week == weekday_code]
+
+
+def _parse_day_code(raw_value: str | None):
+    value = (raw_value or "").strip().upper()
+    if not value:
+        return None
+    valid_days = {choice[0] for choice in LaundrySchedule.DayChoices.choices}
+    if value in valid_days:
+        return value
+    return None
 
 
 def _get_or_create_schedule_for_student(student):
@@ -114,15 +176,14 @@ def _build_student_month_days(student_schedule, room_rules):
     }
 
     highlight_days = set()
+    room_no = student_schedule.student.room_no
     if room_rules:
-        room_no = student_schedule.student.room_no
+        block_name = student_schedule.student.block.block_name if student_schedule.student.block else ""
         for day in range(1, last_day + 1):
             current = date(year, month, day)
-            code = day_code_map[current.weekday()]
-            for rule in room_rules:
-                if rule.day_of_week == code and _room_in_rule(room_no, rule.room_from, rule.room_to):
-                    highlight_days.add(day)
-                    break
+            matching_rules = _matching_room_rules_for_date(block_name, current, preloaded_rules=room_rules)
+            if any(_room_in_rule(room_no, rule.room_from, rule.room_to) for rule in matching_rules):
+                highlight_days.add(day)
     else:
         for day in range(1, last_day + 1):
             current = date(year, month, day)
@@ -158,22 +219,84 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
         action = request.POST.get("action", "").strip()
         if action == "add_room_range" and is_laundry_manager:
             block_name = request.POST.get("block_name", "").strip().upper()
-            day_of_week = request.POST.get("day_of_week", "").strip().upper()
+            scheduled_date_text = request.POST.get("scheduled_date", "").strip()
+            scheduled_date = parse_date(scheduled_date_text) if scheduled_date_text else None
+            day_of_week = request.POST.get("day_of_week", "").strip().upper() or None
             room_from = request.POST.get("room_from", "").strip().upper()
             room_to = request.POST.get("room_to", "").strip().upper()
 
             valid_days = {choice[0] for choice in LaundrySchedule.DayChoices.choices}
-            if not block_name or day_of_week not in valid_days or not room_from or not room_to:
-                messages.error(request, "Please provide block, day, and both room limits.")
+            if day_of_week and day_of_week not in valid_days:
+                messages.error(request, "Invalid weekday selected.")
+            elif not block_name or not room_from or not room_to:
+                messages.error(request, "Please provide block and both room limits.")
+            elif not scheduled_date and not day_of_week:
+                messages.error(request, "Please provide either an exact date or a weekday.")
             else:
                 LaundryRoomRange.objects.create(
                     block_name=block_name,
+                    day_of_week=day_of_week,
+                    scheduled_date=scheduled_date,
+                    room_from=room_from,
+                    room_to=room_to,
+                    is_active=True,
+                )
+                if scheduled_date:
+                    messages.success(request, "Date-wise room range schedule added.")
+                else:
+                    messages.success(request, "Weekday room range schedule added.")
+            return redirect("laundry-portal")
+
+        if action == "bulk_upload_room_ranges" and is_laundry_manager:
+            uploaded = request.FILES.get("room_ranges_csv")
+            default_block = request.POST.get("default_block_name", "").strip().upper()
+            if not uploaded:
+                messages.error(request, "Please upload a CSV file.")
+                return redirect("laundry-portal")
+
+            try:
+                content = uploaded.read().decode("utf-8-sig")
+            except UnicodeDecodeError:
+                messages.error(request, "CSV must be UTF-8 encoded.")
+                return redirect("laundry-portal")
+
+            reader = csv.DictReader(io.StringIO(content))
+            if not reader.fieldnames:
+                messages.error(request, "CSV is missing headers.")
+                return redirect("laundry-portal")
+
+            created_count = 0
+            error_rows = []
+            for row_index, row in enumerate(reader, start=2):
+                block_name = (row.get("block_name") or default_block or "").strip().upper()
+                room_from = (row.get("room_from") or "").strip().upper()
+                room_to = (row.get("room_to") or "").strip().upper()
+                scheduled_date_text = (row.get("scheduled_date") or row.get("date") or "").strip()
+                scheduled_date = parse_date(scheduled_date_text) if scheduled_date_text else None
+                day_of_week = _parse_day_code(row.get("day_of_week"))
+
+                if not block_name or not room_from or not room_to:
+                    error_rows.append(f"Row {row_index}: block_name/room_from/room_to required.")
+                    continue
+                if not scheduled_date and not day_of_week:
+                    error_rows.append(f"Row {row_index}: provide scheduled_date (or date) or day_of_week.")
+                    continue
+
+                LaundryRoomRange.objects.create(
+                    block_name=block_name,
+                    scheduled_date=scheduled_date,
                     day_of_week=day_of_week,
                     room_from=room_from,
                     room_to=room_to,
                     is_active=True,
                 )
-                messages.success(request, "Room range schedule added.")
+                created_count += 1
+
+            if created_count:
+                messages.success(request, f"Bulk upload complete. Added {created_count} room-range slots.")
+            if error_rows:
+                preview = " ".join(error_rows[:5])
+                messages.error(request, f"Some rows were skipped. {preview}")
             return redirect("laundry-portal")
 
         if action == "delete_room_range" and is_laundry_manager:
@@ -208,7 +331,7 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
     room_ranges = all_room_ranges
     if block_filter:
         room_ranges = room_ranges.filter(block_name=block_filter)
-    room_ranges = room_ranges.order_by("block_name", "day_of_week", "room_from")
+    room_ranges = room_ranges.order_by("block_name", "scheduled_date", "day_of_week", "room_from")
 
     student_qr_text = ""
     if student_schedule:
@@ -264,3 +387,137 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
             "schedule_year": schedule_year,
         },
     )
+
+
+@login_required
+def download_laundry_logs_csv(request: HttpRequest) -> HttpResponse:
+    if not _is_admin(request.user):
+        messages.error(request, "Only admin can download laundry logs.")
+        return redirect("dashboard-router")
+
+    logs = (
+        LaundryEvent.objects.select_related(
+            "student",
+            "student__block",
+            "schedule",
+            "scanned_by",
+        )
+        .all()
+        .order_by("-created_at")
+    )
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="laundry_logs_{date.today().isoformat()}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "event_id",
+            "event_type",
+            "event_created_at",
+            "student_id",
+            "student_roll_no",
+            "student_name",
+            "student_block",
+            "student_room_no",
+            "schedule_day",
+            "schedule_submission_status",
+            "schedule_collection_status",
+            "schedule_last_submission_at",
+            "schedule_due_collection_by",
+            "schedule_qr_token",
+            "scanned_by_username",
+            "scanned_by_email",
+            "scanned_by_role",
+        ]
+    )
+
+    for item in logs:
+        student = item.student
+        schedule = item.schedule
+        scanned_by = item.scanned_by
+        writer.writerow(
+            [
+                item.id,
+                item.event_type,
+                item.created_at.isoformat() if item.created_at else "",
+                student.id if student else "",
+                student.roll_no if student else "",
+                student.name if student else "",
+                student.block.block_name if student and student.block else "",
+                student.room_no if student else "",
+                schedule.get_day_of_week_display() if schedule else "",
+                schedule.submission_status if schedule else "",
+                schedule.collection_status if schedule else "",
+                schedule.last_submission_at.isoformat() if schedule and schedule.last_submission_at else "",
+                schedule.due_collection_by.isoformat() if schedule and schedule.due_collection_by else "",
+                schedule.qr_token if schedule else "",
+                scanned_by.username if scanned_by else "",
+                scanned_by.email if scanned_by else "",
+                scanned_by.role if scanned_by else "",
+            ]
+        )
+
+    return response
+
+
+@login_required
+def download_laundry_schedule_csv(request: HttpRequest) -> HttpResponse:
+    if not _is_admin(request.user):
+        messages.error(request, "Only admin can download laundry schedules.")
+        return redirect("dashboard-router")
+
+    schedules = (
+        LaundrySchedule.objects.select_related("student", "student__block", "student__user")
+        .all()
+        .order_by("day_of_week", "student__roll_no")
+    )
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="laundry_day_wise_schedule_{date.today().isoformat()}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "schedule_id",
+            "day_code",
+            "day_label",
+            "student_id",
+            "student_roll_no",
+            "student_name",
+            "student_block",
+            "student_room_no",
+            "student_email",
+            "submission_status",
+            "collection_status",
+            "last_submission_at",
+            "due_collection_by",
+            "holidays",
+            "qr_token",
+        ]
+    )
+
+    for item in schedules:
+        student = item.student
+        student_user = student.user if student else None
+        writer.writerow(
+            [
+                item.id,
+                item.day_of_week,
+                item.get_day_of_week_display(),
+                student.id if student else "",
+                student.roll_no if student else "",
+                student.name if student else "",
+                student.block.block_name if student and student.block else "",
+                student.room_no if student else "",
+                student_user.email if student_user else "",
+                item.submission_status,
+                item.collection_status,
+                item.last_submission_at.isoformat() if item.last_submission_at else "",
+                item.due_collection_by.isoformat() if item.due_collection_by else "",
+                json.dumps(item.holidays or []),
+                item.qr_token,
+            ]
+        )
+
+    return response

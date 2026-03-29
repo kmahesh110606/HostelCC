@@ -3,6 +3,7 @@ import re
 from datetime import date
 
 from django.core.cache import cache
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -59,16 +60,42 @@ def _infer_student_day_from_room_ranges(student):
     if not student or not student.block:
         return None
 
-    rules = LaundryRoomRange.objects.filter(is_active=True, block_name__iexact=student.block.block_name)
-    matching_days = {
-        rule.day_of_week
-        for rule in rules
-        if _room_in_rule(student.room_no, rule.room_from, rule.room_to)
-    }
-    if not matching_days:
+    rules = LaundryRoomRange.objects.filter(
+        is_active=True,
+        block_name__iexact=student.block.block_name,
+    )
+    matching_rules = [rule for rule in rules if _room_in_rule(student.room_no, rule.room_from, rule.room_to)]
+    if not matching_rules:
         return None
 
-    return sorted(matching_days, key=lambda code: _DAY_SORT_ORDER.get(code, 99))[0]
+    matching_days = {
+        rule.day_of_week
+        for rule in matching_rules
+        if rule.day_of_week
+    }
+    if matching_days:
+        return sorted(matching_days, key=lambda code: _DAY_SORT_ORDER.get(code, 99))[0]
+
+    dated_rules = sorted(
+        [rule for rule in matching_rules if rule.scheduled_date],
+        key=lambda rule: (
+            rule.scheduled_date < timezone.localdate(),
+            rule.scheduled_date,
+        ),
+    )
+    if not dated_rules:
+        return None
+
+    weekday_code = {
+        0: LaundrySchedule.DayChoices.MON,
+        1: LaundrySchedule.DayChoices.TUE,
+        2: LaundrySchedule.DayChoices.WED,
+        3: LaundrySchedule.DayChoices.THU,
+        4: LaundrySchedule.DayChoices.FRI,
+        5: LaundrySchedule.DayChoices.SAT,
+        6: LaundrySchedule.DayChoices.SUN,
+    }
+    return weekday_code[dated_rules[0].scheduled_date.weekday()]
 
 
 def _get_or_create_schedule_for_student(student):
@@ -108,7 +135,24 @@ def _today_day_code() -> str:
         5: LaundrySchedule.DayChoices.SAT,
         6: LaundrySchedule.DayChoices.SUN,
     }
-    return day_map[date.today().weekday()]
+    return day_map[timezone.localdate().weekday()]
+
+
+def _matching_room_rules_for_date(block_name: str, target_date: date):
+    block_rules = LaundryRoomRange.objects.filter(is_active=True, block_name__iexact=block_name)
+    exact_rules = block_rules.filter(scheduled_date=target_date)
+    if exact_rules.exists():
+        return list(exact_rules)
+    weekday_code = {
+        0: LaundrySchedule.DayChoices.MON,
+        1: LaundrySchedule.DayChoices.TUE,
+        2: LaundrySchedule.DayChoices.WED,
+        3: LaundrySchedule.DayChoices.THU,
+        4: LaundrySchedule.DayChoices.FRI,
+        5: LaundrySchedule.DayChoices.SAT,
+        6: LaundrySchedule.DayChoices.SUN,
+    }[target_date.weekday()]
+    return list(block_rules.filter(scheduled_date__isnull=True, day_of_week=weekday_code))
 
 
 def _parse_qr_text_payload(qr_text: str) -> dict[str, str] | None:
@@ -160,6 +204,7 @@ def _parse_qr_text_payload(qr_text: str) -> dict[str, str] | None:
 
 def _is_submission_allowed_for_today(schedule: LaundrySchedule) -> tuple[bool, str]:
     today_code = _today_day_code()
+    today_date = timezone.localdate()
     student = schedule.student
     student_room = _normalize_upper(student.room_no)
     student_block = _normalize_upper(student.block.block_name if student.block else "")
@@ -167,18 +212,24 @@ def _is_submission_allowed_for_today(schedule: LaundrySchedule) -> tuple[bool, s
     if student_block:
         block_rules_qs = LaundryRoomRange.objects.filter(is_active=True, block_name__iexact=student_block)
         if block_rules_qs.exists():
-            today_rules = list(block_rules_qs.filter(day_of_week=today_code))
+            today_rules = _matching_room_rules_for_date(student_block, today_date)
             if not today_rules:
                 return (
                     False,
-                    f"Submission not allowed. No laundry slot is configured for block {student_block} today ({today_code}).",
+                    (
+                        "Submission not allowed. No laundry slot is configured for "
+                        f"block {student_block} on {today_date.isoformat()}."
+                    ),
                 )
             for rule in today_rules:
                 if _room_in_rule(student_room, rule.room_from, rule.room_to):
                     return True, ""
             return (
                 False,
-                f"Submission not allowed today for room {student.room_no} in block {student_block}.",
+                (
+                    "Submission not allowed for room "
+                    f"{student.room_no} in block {student_block} on {today_date.isoformat()}."
+                ),
             )
 
     if schedule.day_of_week != today_code:

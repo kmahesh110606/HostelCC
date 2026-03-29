@@ -37,7 +37,7 @@
       </div>
       <div>
         <label>Allotted Mess Caterer</label>
-        <input value="{% if student and student_mess_caterers %}{{ student_mess_caterers|join:', ' }}{% else %}N/A{% endif %}" disabled />
+        <input value="{% if student and student.mess_caterer %}{{ student.mess_caterer.name }}{% else %}N/A{% endif %}" disabled />
       </div>
     </div>
 
@@ -45,20 +45,20 @@
     <div style="margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px;">
       <h3 style="margin-bottom: 6px;">Monthly Mess Change</h3>
       {% if student.mess_change_unlocked %}
-      <p class="muted">Admin has unlocked your profile this month. Pick your new mess and submit once.</p>
+      <p class="muted">Admin has unlocked your profile this month. Pick a caterer from your block and current mess type, then submit once.</p>
       <form method="post" style="display: grid; gap: 10px; max-width: 360px; margin-top: 10px;">
         {% csrf_token %}
         <input type="hidden" name="action" value="update_mess_choice" />
         <div>
-          <label for="mess_allotment">Choose Mess Type</label>
-          <select id="mess_allotment" name="mess_allotment" required>
-            <option value="">Select mess type</option>
-            {% for m in editable_mess_types %}
-            <option value="{{ m }}" {% if student.mess_allotment == m %}selected{% endif %}>{{ m }}</option>
+          <label for="requested_caterer_id">Choose Caterer</label>
+          <select id="requested_caterer_id" name="requested_caterer_id" required>
+            <option value="">Select caterer</option>
+            {% for c in available_mess_caterers %}
+            <option value="{{ c.id }}" {% if student.mess_caterer and student.mess_caterer.id == c.id %}selected{% endif %}>{{ c.name }}</option>
             {% endfor %}
           </select>
         </div>
-        <button type="submit">Save Mess Preference</button>
+        <button type="submit">Save Caterer Preference</button>
       </form>
       {% else %}
       <p class="muted">Mess change is locked. Admin can unlock your profile during the monthly change window.</p>

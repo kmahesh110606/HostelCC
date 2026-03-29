@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from hostels.models import HostelBlock, Room
-from mess.options import DEFAULT_MESS_TYPE, MESS_TYPE_CHOICES
+from mess.options import DEFAULT_MESS_TYPE, MESS_TYPE_CHOICES, canonical_mess_type
 
 
 class Student(models.Model):
@@ -29,14 +29,43 @@ class Student(models.Model):
     def __str__(self) -> str:
         return f"{self.roll_no} - {self.name}"
 
+    def _get_default_caterer(self):
+        if not self.block_id:
+            return None
+
+        from mess.models import Caterer
+
+        normalized_mess_type = canonical_mess_type(self.mess_allotment) or DEFAULT_MESS_TYPE
+        caterer = (
+            Caterer.objects.filter(block_id=self.block_id, meal_types=normalized_mess_type)
+            .order_by("name", "id")
+            .first()
+        )
+
+        if caterer:
+            return caterer
+
+        return Caterer.objects.filter(block_id=self.block_id).order_by("name", "id").first()
+
     def clean(self):
         super().clean()
-        if self.mess_caterer_id and self.block_id and self.mess_caterer.block_id != self.block_id:
-            raise ValidationError({"mess_caterer": "Selected caterer must belong to the student's block."})
+        normalized_mess_type = canonical_mess_type(self.mess_allotment) or DEFAULT_MESS_TYPE
+        self.mess_allotment = normalized_mess_type
+
+        if self.mess_caterer_id and self.block_id:
+            if self.mess_caterer.block_id != self.block_id:
+                raise ValidationError({"mess_caterer": "Selected caterer must belong to the student's block."})
 
     def save(self, *args, **kwargs):
+        self.mess_allotment = canonical_mess_type(self.mess_allotment) or DEFAULT_MESS_TYPE
+
         if self.mess_caterer_id:
             if self.block_id and self.mess_caterer.block_id != self.block_id:
                 raise ValidationError({"mess_caterer": "Selected caterer must belong to the student's block."})
             self.mess_allotment = self.mess_caterer.meal_types
+        else:
+            self.mess_caterer = self._get_default_caterer()
+            if self.mess_caterer:
+                self.mess_allotment = self.mess_caterer.meal_types
+
         super().save(*args, **kwargs)

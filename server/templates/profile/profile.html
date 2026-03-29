@@ -112,8 +112,8 @@
           <div>
             <p class="muted">Allotted Mess Caterer</p>
             <p style="font-weight: 600; color: var(--text);">
-              {% if student_mess_caterers %}
-              {{ student_mess_caterers|join:", " }}
+              {% if student.mess_caterer %}
+              {{ student.mess_caterer.name }}
               {% else %}
               N/A
               {% endif %}

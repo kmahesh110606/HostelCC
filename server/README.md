@@ -51,6 +51,7 @@ CSV columns:
 - Deployment automation is available in `server/azure/deploy-container-app.ps1`.
 - Full instructions are in `server/azure/README.md`.
 - This deploys Django to Azure Container Apps with PostgreSQL and Redis.
+- Day-to-day operations (start/stop/rebuild/redeploy/troubleshooting) are in `server/DEPLOYMENT_RUNBOOK.md`.
 
 ## OTP Configuration
 - You do not need Azure hosting first. Configure OTP through environment variables in any environment (local, Docker, Azure).

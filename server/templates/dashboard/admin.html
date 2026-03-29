@@ -52,5 +52,48 @@
     <h2>Community</h2>
     <p class="muted">Review complaints and moderation updates.</p>
   </a>
+
+  <a class="tab dashboard-card" href="{% url 'laundry-export-logs' %}">
+    <i class="ms-Icon ms-Icon--Download"></i>
+    <h2>Laundry Logs CSV</h2>
+    <p class="muted">Download all laundry submission and collection scans.</p>
+  </a>
+
+  <a class="tab dashboard-card" href="{% url 'laundry-export-day-schedule' %}">
+    <i class="ms-Icon ms-Icon--Calendar"></i>
+    <h2>Laundry Day Schedule CSV</h2>
+    <p class="muted">Download day-wise laundry schedule for all students.</p>
+  </a>
+
+  <a class="tab dashboard-card" href="{% url 'complaints-export-active' %}">
+    <i class="ms-Icon ms-Icon--IncidentTriangle"></i>
+    <h2>Active Complaints CSV</h2>
+    <p class="muted">Download unresolved and in-progress complaints with details.</p>
+  </a>
+
+  <div class="tab dashboard-card" style="padding: 16px; align-content: start;">
+    <i class="ms-Icon ms-Icon--People"></i>
+    <h2>Mess Students CSV</h2>
+    <p class="muted" style="text-align:center;">Filter by mess name and type, then export all student details.</p>
+    <form method="get" action="{% url 'mess-export-students' %}" style="width:100%; display:grid; gap:8px;">
+      <label for="caterer"><small>Caterer (Mess Name)</small></label>
+      <select id="caterer" name="caterer">
+        <option value="">All</option>
+        {% for mess_name in mess_names %}
+          <option value="{{ mess_name }}">{{ mess_name }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="mess_type"><small>Mess Type</small></label>
+      <select id="mess_type" name="mess_type">
+        <option value="">All</option>
+        {% for mess_type in mess_types %}
+          <option value="{{ mess_type }}">{{ mess_type }}</option>
+        {% endfor %}
+      </select>
+
+      <button type="submit">Download CSV</button>
+    </form>
+  </div>
 </div>
 {% endblock %}

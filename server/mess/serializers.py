@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
-from mess.options import canonical_mess_type
+from mess.options import DEFAULT_MESS_TYPE, canonical_mess_type
+from students.utils import resolve_student_for_user
 
 from .models import Caterer, Feedback, MenuPollOption, MenuPollVote, MessChangeRequest, MessMenu
 
@@ -78,7 +79,51 @@ class MenuPollVoteSerializer(serializers.ModelSerializer):
 
 
 class MessChangeRequestSerializer(serializers.ModelSerializer):
+    requested_caterer_name = serializers.CharField(source="requested_mess", read_only=True)
+    requested_caterer_id = serializers.IntegerField(write_only=True, required=True)
+
     class Meta:
         model = MessChangeRequest
-        fields = ["id", "student", "requested_mess", "month", "status", "created_at"]
-        read_only_fields = ["status", "created_at"]
+        fields = [
+            "id",
+            "student",
+            "requested_mess",
+            "requested_caterer_id",
+            "requested_caterer_name",
+            "month",
+            "status",
+            "created_at",
+        ]
+        read_only_fields = ["student", "requested_mess", "status", "created_at"]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        student = resolve_student_for_user(user)
+
+        if not student:
+            raise serializers.ValidationError("Only mapped students can request mess change.")
+
+        requested_caterer_id = attrs.get("requested_caterer_id")
+        normalized_type = canonical_mess_type(student.mess_allotment) or DEFAULT_MESS_TYPE
+        selected_caterer = Caterer.objects.filter(
+            id=requested_caterer_id,
+            block_id=student.block_id,
+            meal_types=normalized_type,
+        ).first()
+        if not selected_caterer:
+            raise serializers.ValidationError(
+                {
+                    "requested_caterer_id": (
+                        "Selected caterer is not available for your block and mess type."
+                    )
+                }
+            )
+
+        attrs["student"] = student
+        attrs["requested_mess"] = selected_caterer.name
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop("requested_caterer_id", None)
+        return super().create(validated_data)

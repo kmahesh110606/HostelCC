@@ -23,12 +23,14 @@ class HostelCCApp extends StatefulWidget {
 
 class _HostelCCAppState extends State<HostelCCApp> {
   static const String _apiFromEnv = String.fromEnvironment("API_BASE_URL");
+  static const String _defaultProdApiBaseUrl =
+      "https://hostelcc-api.salmonwave-06a7b54c.centralindia.azurecontainerapps.io";
 
   static String _resolveApiBaseUrl() {
     if (_apiFromEnv.isNotEmpty) return _apiFromEnv;
     if (kIsWeb) return "http://localhost:8080";
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return "http://10.0.2.2:8080";
+      return _defaultProdApiBaseUrl;
     }
     return "http://127.0.0.1:8080";
   }

@@ -4,8 +4,8 @@
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
-  --ring: 0 0 0 4px rgba(0, 120, 212, 0.16);
-  --surface-soft: color-mix(in srgb, var(--panel) 86%, var(--primary) 14%);
+  --ring: 0 0 0 3px rgba(26, 26, 26, 0.12);
+  --surface-soft: color-mix(in srgb, var(--panel) 90%, var(--line) 10%);
 }
 
 /* Core typography + rhythm */
@@ -79,7 +79,7 @@ select {
 input:hover:not(:focus):not(:disabled),
 textarea:hover:not(:focus):not(:disabled),
 select:hover:not(:focus):not(:disabled) {
-  border-color: color-mix(in srgb, var(--primary-light) 60%, var(--line) 40%);
+  border-color: color-mix(in srgb, var(--line) 55%, #4a4a4a 45%);
 }
 
 input:focus,
@@ -233,14 +233,14 @@ input[type="submit"],
   background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 92%, #ffffff 8%), color-mix(in srgb, var(--primary-dark) 75%, var(--primary) 25%));
   border-color: color-mix(in srgb, var(--primary-dark) 60%, var(--primary) 40%);
   color: #ffffff;
-  box-shadow: 0 8px 18px rgba(0, 120, 212, 0.24);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
 }
 
 button:hover:not(:disabled),
 input[type="submit"]:hover:not(:disabled),
 .button:not(.secondary):not(.danger):not(.success):not(.linklike):hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(0, 120, 212, 0.3);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.18);
 }
 
 button:active:not(:disabled),
@@ -261,9 +261,11 @@ button.secondary {
 .button.secondary:hover,
 input[type="reset"]:hover,
 button.secondary:hover {
+  background: color-mix(in srgb, var(--panel) 88%, var(--line) 12%);
   border-color: var(--primary);
-  color: var(--primary);
+  color: var(--text);
   transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
 
 .button.danger,

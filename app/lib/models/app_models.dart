@@ -97,6 +97,7 @@ class MessChangeRequestItem {
     required this.id,
     required this.studentId,
     required this.requestedMess,
+    required this.requestedCatererName,
     required this.month,
     required this.status,
     required this.createdAt,
@@ -105,6 +106,7 @@ class MessChangeRequestItem {
   final int id;
   final int? studentId;
   final String requestedMess;
+  final String requestedCatererName;
   final String month;
   final String status;
   final DateTime? createdAt;
@@ -114,6 +116,9 @@ class MessChangeRequestItem {
         id: (json["id"] ?? 0) as int,
         studentId: json["student"] is int ? json["student"] as int : null,
         requestedMess: (json["requested_mess"] ?? "").toString(),
+        requestedCatererName:
+            (json["requested_caterer_name"] ?? json["requested_mess"] ?? "")
+                .toString(),
         month: (json["month"] ?? "").toString(),
         status: (json["status"] ?? "").toString(),
         createdAt: json["created_at"] != null
@@ -430,28 +435,63 @@ class UserProfileItem {
 
   int? get studentId => student?.id;
 
-  factory UserProfileItem.fromJson(Map<String, dynamic> json) =>
-      UserProfileItem(
-        id: (json["id"] ?? 0) as int,
-        username: (json["username"] ?? "").toString(),
-        email: (json["email"] ?? "").toString(),
-        firstName: (json["first_name"] ?? "").toString(),
-        lastName: (json["last_name"] ?? "").toString(),
-        fullName: (json["full_name"] ?? "").toString(),
-        role: (json["role"] ?? "").toString(),
-        phoneCountryCode: (json["phone_country_code"] ?? "").toString(),
-        phoneNumber: (json["phone_number"] ?? "").toString(),
-        jobTitle: (json["job_title"] ?? "").toString(),
-        department: (json["department"] ?? "").toString(),
-        assignedMessName: (json["assigned_mess_name"] ?? "").toString(),
-        mustChangePassword: json["must_change_password"] == true,
-        isEmailVerified: json["is_email_verified"] == true,
-        isActive: json["is_active"] == true,
-        student: json["student"] is Map<String, dynamic>
-            ? UserProfileStudentItem.fromJson(
-                json["student"] as Map<String, dynamic>)
-            : null,
-      );
+  static ({String countryCode, String phoneNumber}) _parsePhoneParts(
+    Map<String, dynamic> json,
+  ) {
+    final rawCountry = (json["phone_country_code"] ?? "").toString().trim();
+    var rawNumber =
+        (json["phone_number"] ?? json["phone"] ?? json["mobile"] ?? "")
+            .toString()
+            .trim();
+
+    var countryCode = rawCountry;
+
+    if (rawNumber.isEmpty && rawCountry.contains(" ")) {
+      final split = rawCountry.split(RegExp(r"\s+"));
+      if (split.length >= 2) {
+        countryCode = split.first.trim();
+        rawNumber = split.sublist(1).join(" ").trim();
+      }
+    }
+
+    final compactCountry = rawCountry.replaceAll(RegExp(r"\s+"), "");
+    final looksLikeFullNumber = RegExp(r"^\+?\d{7,}$").hasMatch(compactCountry);
+    final looksLikeDialCodeOnly =
+        RegExp(r"^\+?\d{1,4}$").hasMatch(compactCountry);
+
+    if (rawNumber.isEmpty && looksLikeFullNumber && !looksLikeDialCodeOnly) {
+      rawNumber = compactCountry;
+      countryCode = "";
+    }
+
+    return (countryCode: countryCode, phoneNumber: rawNumber);
+  }
+
+  factory UserProfileItem.fromJson(Map<String, dynamic> json) => (() {
+        final phoneParts = _parsePhoneParts(json);
+
+        return UserProfileItem(
+          id: (json["id"] ?? 0) as int,
+          username: (json["username"] ?? "").toString(),
+          email: (json["email"] ?? "").toString(),
+          firstName: (json["first_name"] ?? "").toString(),
+          lastName: (json["last_name"] ?? "").toString(),
+          fullName: (json["full_name"] ?? "").toString(),
+          role: (json["role"] ?? "").toString(),
+          phoneCountryCode: phoneParts.countryCode,
+          phoneNumber: phoneParts.phoneNumber,
+          jobTitle: (json["job_title"] ?? "").toString(),
+          department: (json["department"] ?? "").toString(),
+          assignedMessName: (json["assigned_mess_name"] ?? "").toString(),
+          mustChangePassword: json["must_change_password"] == true,
+          isEmailVerified: json["is_email_verified"] == true,
+          isActive: json["is_active"] == true,
+          student: json["student"] is Map<String, dynamic>
+              ? UserProfileStudentItem.fromJson(
+                  json["student"] as Map<String, dynamic>)
+              : null,
+        );
+      })();
 
   Map<String, dynamic> toJson() => {
         "id": id,
@@ -481,6 +521,7 @@ class UserProfileStudentItem {
     required this.blockName,
     required this.roomNo,
     required this.messAllotment,
+    required this.messCatererName,
   });
 
   final int id;
@@ -489,6 +530,7 @@ class UserProfileStudentItem {
   final String blockName;
   final String roomNo;
   final String messAllotment;
+  final String messCatererName;
 
   factory UserProfileStudentItem.fromJson(Map<String, dynamic> json) =>
       UserProfileStudentItem(
@@ -498,6 +540,7 @@ class UserProfileStudentItem {
         blockName: (json["block_name"] ?? "").toString(),
         roomNo: (json["room_no"] ?? "").toString(),
         messAllotment: (json["mess_allotment"] ?? "").toString(),
+        messCatererName: (json["mess_caterer_name"] ?? "").toString(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -507,5 +550,6 @@ class UserProfileStudentItem {
         "block_name": blockName,
         "room_no": roomNo,
         "mess_allotment": messAllotment,
+        "mess_caterer_name": messCatererName,
       };
 }

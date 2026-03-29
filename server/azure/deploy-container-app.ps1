@@ -68,6 +68,30 @@ function Try-AzTsv {
     }
 }
 
+function Ensure-ProviderRegistered {
+    param([string]$Namespace)
+
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        try {
+            & az provider register --namespace $Namespace --output none 2>$null
+            $state = Try-AzTsv provider show --namespace $Namespace --query registrationState --output tsv
+            if ($state -eq "Registered") {
+                return
+            }
+        }
+        catch {
+        }
+
+        Write-Warning "Provider '$Namespace' registration attempt $attempt not ready; retrying in 10 seconds ..."
+        Start-Sleep -Seconds 10
+    }
+
+    $finalState = Try-AzTsv provider show --namespace $Namespace --query registrationState --output tsv
+    if ($finalState -ne "Registered") {
+        throw "Azure resource provider '$Namespace' is not registered. Current state: '$finalState'."
+    }
+}
+
 Ensure-Command "az"
 
 if (-not $AcrName) {
@@ -104,10 +128,11 @@ Invoke-Az account set --subscription $SubscriptionId
 
 Write-Host "Installing containerapp extension and registering providers ..."
 Invoke-Az extension add --name containerapp --upgrade --yes
-Invoke-Az provider register --namespace Microsoft.App
-Invoke-Az provider register --namespace Microsoft.OperationalInsights
-Invoke-Az provider register --namespace Microsoft.DBforPostgreSQL
-Invoke-Az provider register --namespace Microsoft.Cache
+Ensure-ProviderRegistered -Namespace "Microsoft.App"
+Ensure-ProviderRegistered -Namespace "Microsoft.OperationalInsights"
+Ensure-ProviderRegistered -Namespace "Microsoft.DBforPostgreSQL"
+Ensure-ProviderRegistered -Namespace "Microsoft.Cache"
+Ensure-ProviderRegistered -Namespace "Microsoft.ContainerRegistry"
 
 Write-Host "Creating resource group $ResourceGroup in $Location ..."
 Invoke-Az group create --name $ResourceGroup --location $Location --output none
@@ -123,13 +148,27 @@ if (-not $existingWorkspace) {
     Invoke-Az monitor log-analytics workspace create --resource-group $ResourceGroup --workspace-name $logWorkspaceName --location $Location --output none
 }
 
-$workspaceId = (& az monitor log-analytics workspace show --resource-group $ResourceGroup --workspace-name $logWorkspaceName --query customerId --output tsv)
-$workspaceKey = (& az monitor log-analytics workspace get-shared-keys --resource-group $ResourceGroup --workspace-name $logWorkspaceName --query primarySharedKey --output tsv)
+$workspaceId = Try-AzTsv monitor log-analytics workspace show --resource-group $ResourceGroup --workspace-name $logWorkspaceName --query customerId --output tsv
+$workspaceKey = $null
+for ($attempt = 1; $attempt -le 5; $attempt++) {
+    $workspaceKey = Try-AzTsv monitor log-analytics workspace get-shared-keys --resource-group $ResourceGroup --workspace-name $logWorkspaceName --query primarySharedKey --output tsv
+    if ($workspaceKey) {
+        break
+    }
+    Write-Warning "Log Analytics key fetch attempt $attempt failed; retrying in 10 seconds ..."
+    Start-Sleep -Seconds 10
+}
 
 $existingEnv = Try-AzTsv containerapp env show --name $ContainerAppEnvName --resource-group $ResourceGroup --query name --output tsv
 if (-not $existingEnv) {
     Write-Host "Creating Container Apps environment $ContainerAppEnvName ..."
-    Invoke-Az containerapp env create --name $ContainerAppEnvName --resource-group $ResourceGroup --location $Location --logs-workspace-id $workspaceId --logs-workspace-key $workspaceKey --output none
+    if ($workspaceId -and $workspaceKey) {
+        Invoke-Az containerapp env create --name $ContainerAppEnvName --resource-group $ResourceGroup --location $Location --logs-workspace-id $workspaceId --logs-workspace-key $workspaceKey --output none
+    }
+    else {
+        Write-Warning "Could not resolve Log Analytics workspace credentials. Creating environment with auto-generated logging workspace."
+        Invoke-Az containerapp env create --name $ContainerAppEnvName --resource-group $ResourceGroup --location $Location --output none
+    }
 }
 
 $existingAcr = Try-AzTsv acr show --name $AcrName --resource-group $ResourceGroup --query name --output tsv
@@ -144,7 +183,40 @@ $serverDir = Resolve-Path (Join-Path $PSScriptRoot "..")
 Push-Location $serverDir
 try {
     Write-Host "Building and pushing image to ACR ..."
-    Invoke-Az acr build --registry $AcrName --image "$ImageName`:$ImageTag" . --output none
+    $remoteBuildSucceeded = $true
+    try {
+        Invoke-Az acr build --registry $AcrName --image "$ImageName`:$ImageTag" . --output none
+    }
+    catch {
+        $remoteBuildSucceeded = $false
+        Write-Warning "ACR remote build failed. Falling back to local Docker build and push."
+    }
+
+    if (-not $remoteBuildSucceeded) {
+        Ensure-Command "docker"
+
+        $acrLoginServerForPush = (& az acr show --name $AcrName --resource-group $ResourceGroup --query loginServer --output tsv)
+        if (-not $acrLoginServerForPush) {
+            throw "Could not resolve ACR login server for '$AcrName'."
+        }
+
+        Invoke-Az acr login --name $AcrName --output none
+
+        & docker build -t "$ImageName`:$ImageTag" .
+        if ($LASTEXITCODE -ne 0) {
+            throw "Local Docker build failed."
+        }
+
+        & docker tag "$ImageName`:$ImageTag" "$acrLoginServerForPush/$ImageName`:$ImageTag"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Docker tag failed."
+        }
+
+        & docker push "$acrLoginServerForPush/$ImageName`:$ImageTag"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Docker push failed."
+        }
+    }
 }
 finally {
     Pop-Location
@@ -169,10 +241,21 @@ if (-not $existingRedis) {
 }
 
 $acrLoginServer = (& az acr show --name $AcrName --resource-group $ResourceGroup --query loginServer --output tsv)
-$acrUsername = (& az acr credential show --name $AcrName --query username --output tsv)
-$acrPassword = (& az acr credential show --name $AcrName --query passwords[0].value --output tsv)
+$acrUsername = Try-AzTsv acr credential show --name $AcrName --query username --output tsv
+$acrPassword = Try-AzTsv acr credential show --name $AcrName --query passwords[0].value --output tsv
 
-$redisPrimaryKey = (& az redis list-keys --name $RedisName --resource-group $ResourceGroup --query primaryKey --output tsv)
+$redisPrimaryKey = $null
+for ($attempt = 1; $attempt -le 5; $attempt++) {
+    $redisPrimaryKey = Try-AzTsv redis list-keys --name $RedisName --resource-group $ResourceGroup --query primaryKey --output tsv
+    if ($redisPrimaryKey) {
+        break
+    }
+    Write-Warning "Redis key fetch attempt $attempt failed; retrying in 15 seconds ..."
+    Start-Sleep -Seconds 15
+}
+if (-not $redisPrimaryKey) {
+    throw "Could not retrieve Redis primary key for '$RedisName'."
+}
 $redisUrl = "rediss://:$redisPrimaryKey@$RedisName.redis.cache.windows.net:6380/1"
 
 $imageRef = "$acrLoginServer/$ImageName`:$ImageTag"
@@ -217,11 +300,31 @@ if ($EmailHostPassword) {
 $existingContainerApp = Try-AzTsv containerapp show --name $ContainerAppName --resource-group $ResourceGroup --query name --output tsv
 if (-not $existingContainerApp) {
     Write-Host "Creating Azure Container App $ContainerAppName ..."
-    Invoke-Az containerapp create --name $ContainerAppName --resource-group $ResourceGroup --environment $ContainerAppEnvName --image $imageRef --ingress external --target-port 8000 --registry-server $acrLoginServer --registry-username $acrUsername --registry-password $acrPassword --cpu 1.0 --memory 2Gi --min-replicas 2 --max-replicas 10 --secrets $secrets --env-vars $envVars --output none
+    if ($acrUsername -and $acrPassword) {
+        Invoke-Az containerapp create --name $ContainerAppName --resource-group $ResourceGroup --environment $ContainerAppEnvName --image $imageRef --ingress external --target-port 8000 --registry-server $acrLoginServer --registry-username $acrUsername --registry-password $acrPassword --cpu 1.0 --memory 2Gi --min-replicas 2 --max-replicas 10 --secrets $secrets --env-vars $envVars --output none
+    }
+    else {
+        Write-Warning "ACR admin credentials unavailable. Using system-assigned identity for image pull."
+        Invoke-Az containerapp create --name $ContainerAppName --resource-group $ResourceGroup --environment $ContainerAppEnvName --image $imageRef --ingress external --target-port 8000 --registry-server $acrLoginServer --registry-identity system --system-assigned --cpu 1.0 --memory 2Gi --min-replicas 2 --max-replicas 10 --secrets $secrets --env-vars $envVars --output none
+
+        $principalId = Try-AzTsv containerapp show --name $ContainerAppName --resource-group $ResourceGroup --query identity.principalId --output tsv
+        $acrId = Try-AzTsv acr show --name $AcrName --resource-group $ResourceGroup --query id --output tsv
+        if (-not $principalId -or -not $acrId) {
+            throw "Could not resolve managed identity or ACR ID for AcrPull role assignment."
+        }
+
+        Write-Host "Assigning AcrPull role to Container App managed identity ..."
+        & az role assignment create --assignee-object-id $principalId --assignee-principal-type ServicePrincipal --role AcrPull --scope $acrId --output none 2>$null
+    }
 } else {
     Write-Host "Updating Azure Container App $ContainerAppName ..."
     Invoke-Az containerapp secret set --name $ContainerAppName --resource-group $ResourceGroup --secrets $secrets --output none
-    Invoke-Az containerapp update --name $ContainerAppName --resource-group $ResourceGroup --image $imageRef --set-env-vars $envVars --output none
+    if ($acrUsername -and $acrPassword) {
+        Invoke-Az containerapp update --name $ContainerAppName --resource-group $ResourceGroup --image $imageRef --set-env-vars $envVars --registry-server $acrLoginServer --registry-username $acrUsername --registry-password $acrPassword --output none
+    }
+    else {
+        Invoke-Az containerapp update --name $ContainerAppName --resource-group $ResourceGroup --image $imageRef --set-env-vars $envVars --registry-server $acrLoginServer --registry-identity system --output none
+    }
 }
 
 $fqdn = (& az containerapp show --name $ContainerAppName --resource-group $ResourceGroup --query properties.configuration.ingress.fqdn --output tsv)

@@ -108,14 +108,31 @@ class DashboardService {
     required String token,
     required String category,
     required String text,
+    String? mediaFilePath,
   }) async {
-    await apiClient.post(
+    final hasMedia = mediaFilePath != null && mediaFilePath.trim().isNotEmpty;
+    if (hasMedia) {
+      await apiClient.postMultipart(
         "/api/complaints/",
         {
           "category": category,
           "text": text,
         },
-        token: token);
+        token: token,
+        fileFieldName: "media",
+        filePath: mediaFilePath.trim(),
+      );
+      return;
+    }
+
+    await apiClient.post(
+      "/api/complaints/",
+      {
+        "category": category,
+        "text": text,
+      },
+      token: token,
+    );
   }
 
   Future<void> deleteComplaint({
@@ -304,7 +321,7 @@ class DashboardService {
     );
   }
 
-  Future<void> scanLaundryQr({
+  Future<Map<String, dynamic>> scanLaundryQr({
     required String token,
     int? studentId,
     String? qrToken,
@@ -331,11 +348,13 @@ class DashboardService {
       throw ArgumentError("Provide qrText or both studentId and qrToken.");
     }
 
-    await apiClient.post(
+    final response = await apiClient.post(
       "/api/laundry/schedules/scan/",
       payload,
       token: token,
     );
+
+    return _unwrapDataMap(response);
   }
 
   Future<void> votePoll({
@@ -399,15 +418,13 @@ class DashboardService {
 
   Future<void> requestMessChange({
     required String token,
-    required int studentId,
-    required String requestedMess,
+    required int requestedCatererId,
     required String month,
   }) async {
     await apiClient.post(
         "/api/mess/change/",
         {
-          "student": studentId,
-          "requested_mess": requestedMess,
+          "requested_caterer_id": requestedCatererId,
           "month": month,
         },
         token: token);

@@ -14,9 +14,9 @@ from mess.options import (
     build_block_mess_types_payload,
     canonical_mess_type,
     get_all_caterer_names,
-    get_allowed_caterers_for_block_and_type,
     get_allowed_mess_types_for_block,
 )
+from mess.models import Caterer
 from .models import AppNotification, OTPChallenge
 from students.models import Student
 from students.utils import resolve_student_for_user
@@ -420,21 +420,31 @@ def profile_page(request: HttpRequest) -> HttpResponse:
                 messages.error(request, "Mess change is currently locked. Contact admin.")
                 return redirect("profile")
 
-            new_mess = canonical_mess_type(request.POST.get("mess_allotment", ""))
-            if not new_mess:
-                messages.error(request, "Please select a mess option.")
+            raw_caterer_id = (request.POST.get("requested_caterer_id") or "").strip()
+            if not raw_caterer_id:
+                messages.error(request, "Please select a caterer.")
                 return redirect("profile")
 
-            block_name = student.block.block_name if student.block else ""
-            allowed_mess_types = get_allowed_mess_types_for_block(block_name)
-            if new_mess not in allowed_mess_types:
-                messages.error(request, f"Invalid mess type for block {block_name}.")
+            try:
+                requested_caterer_id = int(raw_caterer_id)
+            except ValueError:
+                messages.error(request, "Invalid caterer selection.")
                 return redirect("profile")
 
-            student.mess_allotment = new_mess
+            selected_caterer = Caterer.objects.filter(
+                id=requested_caterer_id,
+                block_id=student.block_id,
+                meal_types=student.mess_allotment,
+            ).first()
+            if not selected_caterer:
+                messages.error(request, "Selected caterer is not available for your block and mess type.")
+                return redirect("profile")
+
+            student.mess_caterer = selected_caterer
+            student.mess_allotment = selected_caterer.meal_types
             student.mess_change_unlocked = False
-            student.save(update_fields=["mess_allotment", "mess_change_unlocked"])
-            messages.success(request, "Mess allotment updated successfully.")
+            student.save(update_fields=["mess_caterer", "mess_allotment", "mess_change_unlocked"])
+            messages.success(request, "Mess caterer updated successfully.")
             return redirect("profile")
 
         if action == "set_mess_unlock":
@@ -458,12 +468,13 @@ def profile_page(request: HttpRequest) -> HttpResponse:
                 messages.success(request, f"Locked mess change for {target.roll_no}.")
             return redirect("profile")
 
-    editable_mess_types = []
-    student_mess_caterers = []
+    available_mess_caterers = []
     if student:
-        block_name = student.block.block_name if student.block else ""
-        editable_mess_types = get_allowed_mess_types_for_block(block_name)
-        student_mess_caterers = get_allowed_caterers_for_block_and_type(block_name, student.mess_allotment)
+        available_mess_caterers = list(
+            Caterer.objects.filter(block_id=student.block_id, meal_types=student.mess_allotment).order_by(
+                "name", "id"
+            )
+        )
 
     students_for_admin = []
     if request.user.role == User.Role.ADMIN:
@@ -474,8 +485,7 @@ def profile_page(request: HttpRequest) -> HttpResponse:
         "profile/detail.html",
         {
             "student": student,
-            "editable_mess_types": editable_mess_types,
-            "student_mess_caterers": student_mess_caterers,
+            "available_mess_caterers": available_mess_caterers,
             "students_for_admin": students_for_admin,
         },
     )
@@ -505,7 +515,12 @@ def dashboard_router(request: HttpRequest) -> HttpResponse:
     notifications = AppNotification.objects.filter(is_active=True).filter(
         audience__in=[AppNotification.Audience.ALL, request.user.role]
     )[:6]
-    return render(request, template, {"notifications": notifications})
+    context = {"notifications": notifications}
+    if request.user.role == User.Role.ADMIN:
+        context["mess_names"] = get_all_caterer_names()
+        context["mess_types"] = list(MESS_TYPES.keys())
+
+    return render(request, template, context)
 
 
 @login_required

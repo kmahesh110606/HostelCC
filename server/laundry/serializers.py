@@ -30,7 +30,23 @@ class LaundryEventSerializer(serializers.ModelSerializer):
 
 
 class LaundryRoomRangeSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        day_of_week = attrs.get("day_of_week", getattr(self.instance, "day_of_week", None))
+        scheduled_date = attrs.get("scheduled_date", getattr(self.instance, "scheduled_date", None))
+        if not day_of_week and not scheduled_date:
+            raise serializers.ValidationError("Provide either scheduled_date or day_of_week.")
+        return attrs
+
     class Meta:
         model = LaundryRoomRange
-        fields = ["id", "block_name", "day_of_week", "room_from", "room_to", "is_active", "created_at"]
+        fields = [
+            "id",
+            "block_name",
+            "day_of_week",
+            "scheduled_date",
+            "room_from",
+            "room_to",
+            "is_active",
+            "created_at",
+        ]
         read_only_fields = ["created_at"]

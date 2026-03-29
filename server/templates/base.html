@@ -326,8 +326,8 @@
     }
 
     .messages li {
-      border: 1px solid rgba(0, 120, 212, 0.2);
-      background: rgba(0, 120, 212, 0.08);
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--panel) 92%, var(--line) 8%);
       border-radius: 8px;
       padding: 12px 14px;
       color: var(--text);
@@ -400,7 +400,7 @@
     textarea:focus {
       outline: none;
       border-color: var(--primary) !important;
-      box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1) !important;
+      box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.08) !important;
     }
 
     button,
@@ -425,7 +425,7 @@
     .button:hover {
       background: var(--primary-dark);
       border-color: var(--primary-dark);
-      box-shadow: 0 4px 12px rgba(0, 120, 212, 0.2);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
     }
 
     .button.secondary {
@@ -435,9 +435,10 @@
     }
 
     .button.secondary:hover {
-      background: var(--line);
-      border-color: var(--primary);
-      color: var(--primary);
+      background: color-mix(in srgb, var(--panel) 88%, var(--line) 12%);
+      border-color: color-mix(in srgb, var(--line) 60%, var(--primary) 40%);
+      color: var(--text);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
 
     .error {

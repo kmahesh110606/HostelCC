@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  file_selector_windows
   screen_brightness_windows
   syncfusion_pdfviewer_windows
   url_launcher_windows

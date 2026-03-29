@@ -10,17 +10,18 @@ class HostelCCTheme {
   static const Color lightLine = Color(0xFFE1E1E1);
 
   // Dark mode colors
-  static const Color darkBg = Color(0xFF121212);
-  static const Color darkPanel = Color(0xFF1F1F1F);
+  static const Color darkBg = Color(0xFF000000);
+  static const Color darkPanel = Color(0xFF0A0A0A);
   static const Color darkText = Color(0xFFFFFFFF);
-  static const Color darkMuted = Color(0xFFA6A6A6);
-  static const Color darkLine = Color(0xFF373737);
+  static const Color darkMuted = Color(0xFF9FB3C8);
+  static const Color darkLine = Color(0xFF26425D);
 
-  // Primary brand colors - Bold Blue Gradient
-  static const Color primaryDark = Color(0xFF001F3F); // Deep Navy
-  static const Color primary = Color(0xFF0078D4); // Microsoft Blue
-  static const Color primaryLight = Color(0xFF107C10); // Fluent Green accent
-  static const Color accent = Color(0xFF5B9BD5); // Light Blue
+  // Primary brand colors
+  static const Color primaryDark = Color(0xFF0052CC);
+  static const Color primary = Color(0xFF0052CC);
+  static const Color primaryLight = Color(0xFF2969E3);
+  static const Color primaryDull = Color(0xFF5B7C99);
+  static const Color accent = Color(0xFF5EAFC7);
 
   // Status colors
   static const Color success = Color(0xFF107C10);
@@ -58,10 +59,9 @@ class HostelCCTheme {
       ),
       cardTheme: CardThemeData(
         color: lightPanel,
-        elevation: 0,
+        elevation: 0.8,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: const BorderSide(color: lightLine, width: 1),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -85,7 +85,8 @@ class HostelCCTheme {
           fontWeight: FontWeight.w500,
         ),
         hintStyle: TextStyle(color: lightMuted.withAlpha(128)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -159,7 +160,8 @@ class HostelCCTheme {
         labelColor: primary,
         unselectedLabelColor: lightMuted,
         labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+        unselectedLabelStyle:
+            const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
         indicator: const UnderlineTabIndicator(
           borderSide: BorderSide(color: primary, width: 3),
         ),
@@ -191,9 +193,11 @@ class HostelCCTheme {
       brightness: Brightness.dark,
       scaffoldBackgroundColor: darkBg,
       colorScheme: const ColorScheme.dark(
-        primary: primary,
+        primary: primaryDull,
         secondary: accent,
         surface: darkPanel,
+        surfaceContainerHighest: Color(0xFF1A1A1A),
+        onSurfaceVariant: darkMuted,
         error: error,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
@@ -214,22 +218,21 @@ class HostelCCTheme {
       ),
       cardTheme: CardThemeData(
         color: darkPanel,
-        elevation: 0,
+        elevation: 0.8,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: const BorderSide(color: darkLine, width: 1),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFF2A2A2A),
+        fillColor: const Color(0xFF161616),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: darkLine),
+          borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: darkLine),
+          borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -241,11 +244,12 @@ class HostelCCTheme {
           fontWeight: FontWeight.w500,
         ),
         hintStyle: TextStyle(color: darkMuted.withAlpha(128)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primary,
+          backgroundColor: primaryDull,
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -258,7 +262,7 @@ class HostelCCTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: primary,
+          foregroundColor: primaryDull,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -312,12 +316,13 @@ class HostelCCTheme {
         ),
       ),
       tabBarTheme: TabBarThemeData(
-        labelColor: primary,
+        labelColor: primaryDull,
         unselectedLabelColor: darkMuted,
         labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+        unselectedLabelStyle:
+            const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
         indicator: const UnderlineTabIndicator(
-          borderSide: BorderSide(color: primary, width: 3),
+          borderSide: BorderSide(color: primaryDull, width: 3),
         ),
         indicatorSize: TabBarIndicatorSize.label,
       ),

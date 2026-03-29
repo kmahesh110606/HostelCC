@@ -1,4 +1,5 @@
 from datetime import datetime
+import csv
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -14,6 +15,7 @@ from .models import Caterer, Feedback, MenuPollOption, MenuPollVote, MessMenu
 
 MEAL_SLOTS = ["breakfast", "lunch", "snacks", "dinner"]
 WEEK_DAY_ORDER = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+VEG_FALLBACK_TYPES = {"NON_VEG", "SPECIAL"}
 WEEK_DAY_LABELS = {
     "MON": "Monday",
     "TUE": "Tuesday",
@@ -69,7 +71,7 @@ def mess_portal(request: HttpRequest) -> HttpResponse:
     month = datetime.now().strftime("%Y-%m")
     selected_mess_type = "VEG"
     if student:
-        selected_mess_type = student.mess_allotment
+        selected_mess_type = canonical_mess_type(student.mess_allotment) or "VEG"
     else:
         selected_mess_type = canonical_mess_type(request.GET.get("mess_type")) or "VEG"
 
@@ -137,7 +139,12 @@ def mess_portal(request: HttpRequest) -> HttpResponse:
                 messages.success(request, "Vote submitted.")
             return redirect("mess-portal")
 
-    menus = MessMenu.objects.filter(mess_type=selected_mess_type).order_by("week_day")
+    if selected_mess_type == "FOODPARK":
+        menus = MessMenu.objects.none()
+    else:
+        menus = MessMenu.objects.filter(mess_type=selected_mess_type).order_by("week_day")
+        if selected_mess_type in VEG_FALLBACK_TYPES and not menus.exists():
+            menus = MessMenu.objects.filter(mess_type="VEG").order_by("week_day")
     menu_map = {
         menu.week_day: {
             "breakfast": _split_items(menu.breakfast_items),
@@ -215,3 +222,87 @@ def mess_portal(request: HttpRequest) -> HttpResponse:
             "staff_feedback": staff_feedback,
         },
     )
+
+
+@login_required
+def download_mess_students_csv(request: HttpRequest) -> HttpResponse:
+    if request.user.role != "ADMIN":
+        messages.error(request, "Only admin can download mess student reports.")
+        return redirect("dashboard-router")
+
+    mess_name_filter = (
+        request.GET.get("caterer")
+        or request.GET.get("mess_name")
+        or request.GET.get("mess")
+        or ""
+    ).strip()
+    mess_type_filter = canonical_mess_type(
+        request.GET.get("mess_type") or request.GET.get("meal_type") or request.GET.get("type")
+    )
+
+    students = Student.objects.select_related("block", "room", "user", "mess_caterer", "mess_caterer__block").all()
+    if mess_name_filter:
+        students = students.filter(mess_caterer__name__iexact=mess_name_filter)
+    if mess_type_filter:
+        students = students.filter(mess_allotment=mess_type_filter)
+
+    students = students.order_by("mess_allotment", "mess_caterer__name", "roll_no")
+
+    file_parts = ["mess_students"]
+    if mess_name_filter:
+        safe_name = "_".join(mess_name_filter.split())
+        file_parts.append(safe_name)
+    if mess_type_filter:
+        file_parts.append(mess_type_filter.lower())
+    file_parts.append(datetime.now().strftime("%Y-%m-%d"))
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{"_".join(file_parts)}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "student_id",
+            "roll_no",
+            "name",
+            "block",
+            "room_no",
+            "room_id",
+            "mess_type",
+            "mess_type_label",
+            "mess_name",
+            "mess_block",
+            "mess_change_unlocked",
+            "user_id",
+            "username",
+            "email",
+            "phone_country_code",
+            "phone_number",
+        ]
+    )
+
+    for student in students:
+        user = student.user
+        caterer = student.mess_caterer
+        writer.writerow(
+            [
+                student.id,
+                student.roll_no,
+                student.name,
+                student.block.block_name if student.block else "",
+                student.room_no,
+                student.room_id or "",
+                student.mess_allotment,
+                student.get_mess_allotment_display(),
+                caterer.name if caterer else "",
+                caterer.block.block_name if caterer and caterer.block else "",
+                student.mess_change_unlocked,
+                user.id if user else "",
+                user.username if user else "",
+                user.email if user else "",
+                user.phone_country_code if user else "",
+                user.phone_number if user else "",
+            ]
+        )
+
+    return response

@@ -6,33 +6,66 @@ class ApiClient {
   ApiClient({required this.baseUrl});
 
   final String baseUrl;
+  static const Duration _requestTimeout = Duration(seconds: 15);
 
   Future<Map<String, dynamic>> post(
     String path,
     Map<String, dynamic> body, {
     String? token,
   }) async {
-    final response = await http.post(
-      Uri.parse("$baseUrl$path"),
-      headers: _headers(token),
-      body: jsonEncode(body),
-    );
+    final response = await http
+        .post(
+          Uri.parse("$baseUrl$path"),
+          headers: _headers(token),
+          body: jsonEncode(body),
+        )
+        .timeout(_requestTimeout);
+    return _parse(response);
+  }
+
+  Future<Map<String, dynamic>> postMultipart(
+    String path,
+    Map<String, String> fields, {
+    String? token,
+    String? fileFieldName,
+    String? filePath,
+  }) async {
+    final request = http.MultipartRequest("POST", Uri.parse("$baseUrl$path"));
+
+    request.headers.addAll(_multipartHeaders(token));
+    request.fields.addAll(fields);
+
+    final hasFile = fileFieldName != null &&
+        fileFieldName.isNotEmpty &&
+        filePath != null &&
+        filePath.isNotEmpty;
+    if (hasFile) {
+      request.files
+          .add(await http.MultipartFile.fromPath(fileFieldName, filePath));
+    }
+
+    final streamed = await request.send().timeout(_requestTimeout);
+    final response = await http.Response.fromStream(streamed);
     return _parse(response);
   }
 
   Future<void> delete(String path, {String? token}) async {
-    final response = await http.delete(
-      Uri.parse("$baseUrl$path"),
-      headers: _headers(token),
-    );
+    final response = await http
+        .delete(
+          Uri.parse("$baseUrl$path"),
+          headers: _headers(token),
+        )
+        .timeout(_requestTimeout);
     _parse(response);
   }
 
   Future<List<dynamic>> getList(String path, {String? token}) async {
-    final response = await http.get(
-      Uri.parse("$baseUrl$path"),
-      headers: _headers(token),
-    );
+    final response = await http
+        .get(
+          Uri.parse("$baseUrl$path"),
+          headers: _headers(token),
+        )
+        .timeout(_requestTimeout);
     final parsed = _parse(response);
     if (parsed["data"] is List<dynamic>) {
       return parsed["data"] as List<dynamic>;
@@ -41,10 +74,12 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> getMap(String path, {String? token}) async {
-    final response = await http.get(
-      Uri.parse("$baseUrl$path"),
-      headers: _headers(token),
-    );
+    final response = await http
+        .get(
+          Uri.parse("$baseUrl$path"),
+          headers: _headers(token),
+        )
+        .timeout(_requestTimeout);
     final parsed = _parse(response);
     if (parsed["data"] is Map<String, dynamic>) {
       return parsed["data"] as Map<String, dynamic>;
@@ -55,6 +90,12 @@ class ApiClient {
   Map<String, String> _headers(String? token) {
     return {
       "Content-Type": "application/json",
+      if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
+    };
+  }
+
+  Map<String, String> _multipartHeaders(String? token) {
+    return {
       if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
     };
   }

@@ -95,7 +95,7 @@
   
   .complaint-card:hover {
     border-color: var(--primary-light);
-    box-shadow: 0 4px 12px rgba(91, 155, 213, 0.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
   
   .complaint-header {
@@ -158,13 +158,37 @@
   .vote-button:hover {
     border-color: var(--primary);
     color: var(--primary);
-    background: rgba(0, 120, 212, 0.05);
+    background: color-mix(in srgb, var(--panel) 92%, var(--line) 8%);
+  }
+
+  .vote-button.upvote-btn:hover {
+    border-color: rgba(16, 124, 16, 0.5);
+    color: #107c10;
+    background: rgba(16, 124, 16, 0.12);
+  }
+
+  .vote-button.downvote-btn:hover {
+    border-color: rgba(232, 17, 35, 0.5);
+    color: #e81123;
+    background: rgba(232, 17, 35, 0.11);
   }
   
   .vote-button.active {
-    background: rgba(0, 120, 212, 0.1);
+    background: color-mix(in srgb, var(--panel) 90%, var(--line) 10%);
     color: var(--primary);
     border-color: var(--primary);
+  }
+
+  .vote-button.upvote-btn.active {
+    border-color: rgba(16, 124, 16, 0.58);
+    color: #107c10;
+    background: rgba(16, 124, 16, 0.16);
+  }
+
+  .vote-button.downvote-btn.active {
+    border-color: rgba(232, 17, 35, 0.58);
+    color: #e81123;
+    background: rgba(232, 17, 35, 0.14);
   }
 </style>
 

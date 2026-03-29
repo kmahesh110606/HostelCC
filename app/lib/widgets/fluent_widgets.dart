@@ -18,7 +18,7 @@ class FluentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Card(
@@ -28,7 +28,7 @@ class FluentCard extends StatelessWidget {
           side: BorderSide(
             color: selected
                 ? Theme.of(context).primaryColor
-                : (isDark ? const Color(0xFF373737) : const Color(0xFFE1E1E1)),
+                : colorScheme.outlineVariant,
             width: selected ? 2 : 1,
           ),
         ),
@@ -114,8 +114,11 @@ class FluentTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     final bgColor = backgroundColor ??
-        (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0));
+        (isDark
+            ? colorScheme.surfaceContainerHighest
+            : const Color(0xFFF0F0F0));
     final textCol = textColor ??
         (isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1A1A1A));
 
@@ -125,7 +128,7 @@ class FluentTag extends StatelessWidget {
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? const Color(0xFF373737) : const Color(0xFFE1E1E1),
+          color: isDark ? colorScheme.outlineVariant : const Color(0xFFE1E1E1),
         ),
       ),
       child: Row(
@@ -328,6 +331,7 @@ class _FluentTextFieldState extends State<FluentTextField> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return TextFormField(
       controller: widget.controller,
@@ -358,13 +362,15 @@ class _FluentTextFieldState extends State<FluentTextField> {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(
-            color: isDark ? const Color(0xFF373737) : const Color(0xFFE1E1E1),
+            color:
+                isDark ? colorScheme.outlineVariant : const Color(0xFFE1E1E1),
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(
-            color: isDark ? const Color(0xFF373737) : const Color(0xFFE1E1E1),
+            color:
+                isDark ? colorScheme.outlineVariant : const Color(0xFFE1E1E1),
           ),
         ),
         focusedBorder: OutlineInputBorder(
@@ -390,8 +396,10 @@ class _FluentTextFieldState extends State<FluentTextField> {
         ),
         filled: true,
         fillColor: widget.enabled
-            ? (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF8F8F8))
-            : (isDark ? const Color(0xFF1A1A1A) : const Color(0xFFEEEEEE)),
+            ? (isDark
+                ? colorScheme.surfaceContainerHighest
+                : const Color(0xFFF8F8F8))
+            : (isDark ? colorScheme.surface : const Color(0xFFEEEEEE)),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       ),
