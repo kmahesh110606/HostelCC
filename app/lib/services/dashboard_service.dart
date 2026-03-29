@@ -6,15 +6,69 @@ class DashboardService {
 
   final ApiClient apiClient;
 
-  Future<List<MessMenu>> getMenus(String token) async {
-    final rows = await apiClient.getList("/api/mess/menu/", token: token);
+  Map<String, dynamic> _unwrapDataMap(Map<String, dynamic> response) {
+    final data = response["data"];
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    return response;
+  }
+
+  String _buildPath(String basePath, Map<String, String> params) {
+    if (params.isEmpty) {
+      return basePath;
+    }
+    final query = params.entries
+        .map(
+          (entry) =>
+              "${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(entry.value)}",
+        )
+        .join("&");
+    return "$basePath?$query";
+  }
+
+  void _addQueryParam(
+    Map<String, String> params,
+    String key,
+    String? value,
+  ) {
+    final trimmed = value?.trim() ?? "";
+    if (trimmed.isNotEmpty) {
+      params[key] = trimmed;
+    }
+  }
+
+  Future<List<MessMenu>> getMenus(String token, {String? messType}) async {
+    final path = (messType != null && messType.trim().isNotEmpty)
+        ? "/api/mess/menu/?mess_type=${Uri.encodeQueryComponent(messType.trim())}"
+        : "/api/mess/menu/";
+    final rows = await apiClient.getList(path, token: token);
     return rows
         .map((e) => MessMenu.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
-  Future<List<ComplaintItem>> getComplaints(String token) async {
-    final rows = await apiClient.getList("/api/complaints/", token: token);
+  Future<List<ComplaintItem>> getComplaints(
+    String token, {
+    String? query,
+    String? category,
+    String? mediaType,
+    String? status,
+    String? block,
+    String? sort,
+  }) async {
+    final params = <String, String>{};
+    _addQueryParam(params, "q", query);
+    _addQueryParam(params, "category", category);
+    _addQueryParam(params, "media_type", mediaType);
+    _addQueryParam(params, "status", status);
+    _addQueryParam(params, "block", block);
+    _addQueryParam(params, "sort", sort);
+
+    final rows = await apiClient.getList(
+      _buildPath("/api/complaints/", params),
+      token: token,
+    );
     return rows
         .map((e) => ComplaintItem.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -52,18 +106,26 @@ class DashboardService {
 
   Future<void> submitComplaint({
     required String token,
-    required int studentId,
     required String category,
     required String text,
   }) async {
     await apiClient.post(
         "/api/complaints/",
         {
-          "student": studentId,
           "category": category,
           "text": text,
         },
         token: token);
+  }
+
+  Future<void> deleteComplaint({
+    required String token,
+    required int complaintId,
+  }) async {
+    await apiClient.delete(
+      "/api/complaints/$complaintId/",
+      token: token,
+    );
   }
 
   Future<void> submitFeedback({
@@ -110,7 +172,7 @@ class DashboardService {
       {"manager_reply": managerReply},
       token: token,
     );
-    return MessFeedbackItem.fromJson(row);
+    return MessFeedbackItem.fromJson(_unwrapDataMap(row));
   }
 
   Future<ComplaintItem> addComplaintReply({
@@ -135,12 +197,16 @@ class DashboardService {
     required int complaintId,
     required String direction,
   }) async {
-    final updated = await apiClient.post(
+    await apiClient.post(
       "/api/complaints/$complaintId/vote/",
       {"direction": direction},
       token: token,
     );
-    return ComplaintItem.fromJson(updated);
+    final complaint = await apiClient.getMap(
+      "/api/complaints/$complaintId/",
+      token: token,
+    );
+    return ComplaintItem.fromJson(complaint);
   }
 
   Future<ComplaintItem> setComplaintStatus({
@@ -153,7 +219,7 @@ class DashboardService {
       {"status": status},
       token: token,
     );
-    return ComplaintItem.fromJson(updated);
+    return ComplaintItem.fromJson(_unwrapDataMap(updated));
   }
 
   Future<void> createBlock({
@@ -186,6 +252,7 @@ class DashboardService {
 
   Future<void> createMenu({
     required String token,
+    required String messType,
     required String weekDay,
     required String breakfast,
     required String lunch,
@@ -195,6 +262,7 @@ class DashboardService {
     await apiClient.post(
         "/api/mess/menu/",
         {
+          "mess_type": messType,
           "week_day": weekDay,
           "breakfast_items": breakfast,
           "lunch_items": lunch,
@@ -238,39 +306,77 @@ class DashboardService {
 
   Future<void> scanLaundryQr({
     required String token,
-    required int studentId,
-    required String qrToken,
+    int? studentId,
+    String? qrToken,
+    String? qrText,
     required String eventType,
   }) async {
+    final payload = <String, dynamic>{"event_type": eventType};
+
+    final cleanedQrText = (qrText ?? "").trim();
+    final cleanedQrToken = (qrToken ?? "").trim();
+    if (cleanedQrText.isNotEmpty) {
+      payload["qr_text"] = cleanedQrText;
+    }
+    if (studentId != null) {
+      payload["student_id"] = studentId;
+    }
+    if (cleanedQrToken.isNotEmpty) {
+      payload["qr_token"] = cleanedQrToken;
+    }
+
+    if (!payload.containsKey("qr_text") &&
+        (!payload.containsKey("student_id") ||
+            !payload.containsKey("qr_token"))) {
+      throw ArgumentError("Provide qrText or both studentId and qrToken.");
+    }
+
     await apiClient.post(
       "/api/laundry/schedules/scan/",
-      {
-        "student_id": studentId,
-        "qr_token": qrToken,
-        "event_type": eventType,
-      },
+      payload,
       token: token,
     );
   }
 
   Future<void> votePoll({
     required String token,
-    required int studentId,
     required int optionId,
   }) async {
     await apiClient.post(
         "/api/mess/poll/vote/",
         {
-          "student": studentId,
           "option": optionId,
         },
         token: token);
   }
 
-  Future<List<MessPollOptionItem>> getPollOptions(String token) async {
-    final rows = await apiClient.getList("/api/mess/poll/", token: token);
+  Future<List<MessPollOptionItem>> getPollOptions(
+    String token, {
+    String? month,
+  }) async {
+    final params = <String, String>{};
+    _addQueryParam(params, "month", month);
+
+    final rows = await apiClient.getList(
+      _buildPath("/api/mess/poll/", params),
+      token: token,
+    );
     return rows
         .map((e) => MessPollOptionItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<LeastRatedMessItem>> getLeastRatedMessItems(
+    String token, {
+    int limit = 10,
+  }) async {
+    final rows = await apiClient.getList(
+      "/api/mess/feedback/least-rated/?limit=$limit",
+      token: token,
+    );
+
+    return rows
+        .map((e) => LeastRatedMessItem.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 

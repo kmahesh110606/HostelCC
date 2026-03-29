@@ -1,8 +1,56 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="tabs">
-  <section class="tab"><span class="label">Tag</span><h2>Manager of XYZ Caterer</h2><p class="muted">Role badge appears in feedback interactions.</p></section>
-  <section class="tab"><span class="label">Feedback</span><h2>Menu Feedback Replies</h2><p class="muted">Respond to item-level monthly ratings and comments.</p></section>
-  <section class="tab"><span class="label">Notifications</span><h2>Incoming Reviews</h2><p class="muted">Use feedback endpoint to track new submissions.</p></section>
+<style>
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+  }
+
+  .dashboard-card {
+    text-decoration: none;
+    color: inherit;
+    display: grid;
+    place-items: center;
+    gap: 8px;
+    min-height: 180px;
+  }
+
+  .dashboard-card .ms-Icon {
+    font-size: 30px;
+    color: var(--primary);
+  }
+</style>
+
+<div class="dashboard-grid">
+  <a class="tab dashboard-card" href="/notifications/">
+    <i class="ms-Icon ms-Icon--Ringer"></i>
+    <h2>Notifications</h2>
+    {% with n=notifications|first %}
+      {% if n %}
+      <p class="muted"><strong>{{ n.title }}</strong> - {{ n.created_at|date:'d M, h:i A' }}</p>
+      {% else %}
+      <p class="muted">No alerts right now.</p>
+      {% endif %}
+    {% endwith %}
+  </a>
+
+  <a class="tab dashboard-card" href="/mess/">
+    <i class="ms-Icon ms-Icon--EatDrink"></i>
+    <h2>Mess Panel</h2>
+    <p class="muted">Manage menus, create polls, and review feedback.</p>
+  </a>
+
+  <a class="tab dashboard-card" href="/community/">
+    <i class="ms-Icon ms-Icon--Comment"></i>
+    <h2>Community</h2>
+    <p class="muted">Monitor complaints tied to mess services.</p>
+  </a>
+
+  <a class="tab dashboard-card" href="/profile/">
+    <i class="ms-Icon ms-Icon--Contact"></i>
+    <h2>Profile</h2>
+    <p class="muted">View role assignment and account details.</p>
+  </a>
 </div>
 {% endblock %}

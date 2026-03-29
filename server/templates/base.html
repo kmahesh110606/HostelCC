@@ -1,79 +1,318 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hostel Management</title>
+  <title>HostelCC</title>
+  <link rel="stylesheet" href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.001/assets/icons/fabric-icons.css">
+  <link rel="stylesheet" href="https://static2.sharepointonline.com/files/fabric/assets/icons/fabric-icons.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/office-ui-fabric-core/11.0.0/css/fabric.min.css">
   <style>
     :root {
-      --bg: #eef3fb;
-      --panel: #ffffff;
-      --text: #142235;
-      --accent: #124ea6;
-      --accent-dark: #0d3a7c;
-      --warn: #f08c00;
-      --ok: #237a4c;
-      --line: #cfdaea;
-      --muted: #4f6280;
+      /* Light Mode */
+      --light-bg: #FAFAFA;
+      --light-bg-gradient: linear-gradient(135deg, #F5F8FF 0%, #FAFAFA 100%);
+      --light-panel: #FFFFFF;
+      --light-text: #1A1A1A;
+      --light-muted: #5A5A5A;
+      --light-line: #E1E1E1;
+      
+      /* Dark Mode */
+      --dark-bg: #121212;
+      --dark-bg-gradient: linear-gradient(135deg, #1A1A1A 0%, #121212 100%);
+      --dark-panel: #1F1F1F;
+      --dark-text: #FFFFFF;
+      --dark-muted: #A6A6A6;
+      --dark-line: #373737;
+      
+      /* Brand Colors - Microsoft Fluent */
+      --primary-dark: #001F3F;
+      --primary: #0078D4;
+      --primary-light: #5B9BD5;
+      --success: #107C10;
+      --warning: #FFB900;
+      --error: #E81123;
+      --info: #0078D4;
+      
+      /* Active mode (light by default) */
+      --bg: var(--light-bg);
+      --bg-gradient: var(--light-bg-gradient);
+      --panel: var(--light-panel);
+      --text: var(--light-text);
+      --muted: var(--light-muted);
+      --line: var(--light-line);
     }
+    
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: var(--dark-bg);
+        --bg-gradient: var(--dark-bg-gradient);
+        --panel: var(--dark-panel);
+        --text: var(--dark-text);
+        --muted: var(--dark-muted);
+        --line: var(--dark-line);
+      }
+    }
+    
+    html[data-theme="dark"] {
+      --bg: var(--dark-bg);
+      --bg-gradient: var(--dark-bg-gradient);
+      --panel: var(--dark-panel);
+      --text: var(--dark-text);
+      --muted: var(--dark-muted);
+      --line: var(--dark-line);
+    }
+    
+    html[data-theme="light"] {
+      --bg: var(--light-bg);
+      --bg-gradient: var(--light-bg-gradient);
+      --panel: var(--light-panel);
+      --text: var(--light-text);
+      --muted: var(--light-muted);
+      --line: var(--light-line);
+    }
+
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg-gradient);
       color: var(--text);
+      transition: background 0.3s ease, color 0.3s ease;
     }
+    
     .navbar {
       background: var(--panel);
       border-bottom: 1px solid var(--line);
-      padding: 14px 0;
+      padding: 12px 0;
       position: sticky;
       top: 0;
       z-index: 10;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
+    
     .nav-inner {
-      max-width: 1100px;
+      max-width: 1680px;
       margin: 0 auto;
-      padding: 0 16px;
+      padding: 0 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 20px;
     }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .nav-item {
+      min-width: 78px;
+      min-height: 56px;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      text-align: center;
+      line-height: 1.1;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 10px;
+      text-decoration: none;
+    }
+
+    .nav-item i {
+      font-size: 16px;
+    }
+
+    .nav-item .ms-Icon,
+    .role-badge .ms-Icon,
+    .theme-toggle .ms-Icon,
+    .nav-toggle .ms-Icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.1em;
+      height: 1.1em;
+      font-family: 'FabricMDL2Icons', 'FabricMDL2Icons-0', 'Segoe MDL2 Assets', sans-serif !important;
+      speak: none;
+    }
+
+    .role-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .nav-toggle {
+      display: none;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 8px;
+      min-width: 44px;
+      min-height: 44px;
+      font-size: 18px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ms-Icon {
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .ms-Icon::before {
+      content: '';
+      display: inline-block;
+      width: 1em;
+      height: 1em;
+      background-color: currentColor;
+      -webkit-mask-image: var(--icon-url);
+      mask-image: var(--icon-url);
+      -webkit-mask-size: contain;
+      mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      mask-position: center;
+    }
+
+    .ms-Icon--GlobalNavButton { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/list.svg'); }
+    .ms-Icon--Home { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/house-door.svg'); }
+    .ms-Icon--Comment { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/chat-text.svg'); }
+    .ms-Icon--CommentSolid { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/chat-left-dots-fill.svg'); }
+    .ms-Icon--EatDrink { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/cup-hot.svg'); }
+    .ms-Icon--Product { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/basket2.svg'); }
+    .ms-Icon--Ringer { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/bell.svg'); }
+    .ms-Icon--Contact { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/person-circle.svg'); }
+    .ms-Icon--Shield { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/shield-check.svg'); }
+    .ms-Icon--SignOut { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/box-arrow-right.svg'); }
+    .ms-Icon--ClearNight { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/moon-stars.svg'); }
+    .ms-Icon--ClearDay { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/sun.svg'); }
+    .ms-Icon--Filter { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/funnel.svg'); }
+    .ms-Icon--Add { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/plus-circle.svg'); }
+    .ms-Icon--Delete { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/trash.svg'); }
+    .ms-Icon--Send { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/send.svg'); }
+    .ms-Icon--QRCode { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/qr-code.svg'); }
+    .ms-Icon--AllApps { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/grid-3x3-gap.svg'); }
+    .ms-Icon--Tag { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/tag.svg'); }
+    .ms-Icon--Pinned { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/pin-angle.svg'); }
+    .ms-Icon--DateTime2 { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/clock.svg'); }
+    .ms-Icon--Up { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/arrow-up-circle.svg'); }
+    .ms-Icon--Down { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/arrow-down-circle.svg'); }
+    .ms-Icon--CompletedSolid { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/check-circle-fill.svg'); }
+    .ms-Icon--ChromeClose { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/x-lg.svg'); }
+    .ms-Icon--Calendar { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/calendar-event.svg'); }
+    .ms-Icon--Recent { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/clock-history.svg'); }
+    .ms-Icon--Clock { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/alarm.svg'); }
+    .ms-Icon--Print { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/printer.svg'); }
+    .ms-Icon--CalendarWeek { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/calendar-week.svg'); }
+    .ms-Icon--CheckboxComposite { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/check2-square.svg'); }
+    .ms-Icon--Settings { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/gear.svg'); }
+    .ms-Icon--Accept { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/check2.svg'); }
+    .ms-Icon--People { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/people.svg'); }
+    .ms-Icon--Like { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/hand-thumbs-up.svg'); }
+    .ms-Icon--Dislike { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/hand-thumbs-down.svg'); }
+    .ms-Icon--ViewList { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/list-ul.svg'); }
+    
+    .nav-inner > div:first-child h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0;
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary-light));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .nav-inner > div:first-child p {
+      font-size: 12px;
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    
+    .theme-toggle {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.2s ease;
+    }
+    
+    .theme-toggle:hover {
+      background: var(--line);
+      border-color: var(--primary);
+    }
+
     .shell {
-      max-width: 1100px;
-      margin: 18px auto;
-      padding: 0 16px;
+      max-width: 1680px;
+      margin: 20px auto;
+      padding: 0 24px;
     }
+    
     .tabs {
-      margin-top: 16px;
+      margin-top: 20px;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 12px;
     }
+    
     .tab {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 18px;
-      min-height: 120px;
-      box-shadow: 0 2px 10px rgba(17, 38, 68, 0.04);
+      border-radius: 8px;
+      padding: 20px;
+      min-height: 140px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      transition: all 0.2s ease;
+      text-align: center;
     }
+    
+    .tab:hover {
+      border-color: var(--primary-light);
+      box-shadow: 0 4px 16px rgba(91, 155, 213, 0.12);
+    }
+    
     .label {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      background: #e8f0fc;
-      color: var(--accent);
-      margin-bottom: 8px;
-      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      border-radius: 0;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      border: 0;
     }
-    h1, h2, p { margin: 0 0 10px; }
-    .muted { color: var(--muted); font-size: 14px; }
+    
+    h1 { font-size: 32px; font-weight: 700; margin: 0 0 12px; }
+    h2 { font-size: 24px; font-weight: 700; margin: 0 0 10px; }
+    h3 { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
+    h4 { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+    p { margin: 0 0 10px; line-height: 1.6; }
+    
+    .muted { color: var(--muted); font-size: 14px; font-weight: 500; }
 
     .row {
       display: flex;
-      gap: 10px;
+      gap: 12px;
       align-items: center;
       flex-wrap: wrap;
     }
@@ -87,27 +326,39 @@
     }
 
     .messages li {
-      border: 1px solid var(--line);
-      background: #f7faff;
+      border: 1px solid rgba(0, 120, 212, 0.2);
+      background: rgba(0, 120, 212, 0.08);
       border-radius: 8px;
-      padding: 10px 12px;
+      padding: 12px 14px;
       color: var(--text);
       font-size: 14px;
+      font-weight: 500;
     }
 
     .auth-wrap {
-      margin-top: 24px;
+      margin-top: 30px;
       display: flex;
       justify-content: center;
+      align-items: center;
+      min-height: calc(100vh - 100px);
     }
 
     .auth-panel {
       width: 100%;
-      max-width: 520px;
-      padding: 4px;
-      background: transparent;
-      border: 0;
-      box-shadow: none;
+      max-width: 500px;
+      padding: 30px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      align-items: end;
+      margin-bottom: 8px;
     }
 
     label {
@@ -115,72 +366,116 @@
       margin-bottom: 8px;
       font-size: 13px;
       font-weight: 600;
-      color: #294566;
+      color: var(--text);
     }
 
     input[type="text"],
     input[type="email"],
     input[type="password"],
     input[type="number"],
+    input[type="file"],
+    input[type="tel"],
+    input[type="url"],
+    input[type="search"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    input:not([type]),
     select,
     textarea {
       width: 100%;
-      border: 1px solid #b9c9de;
-      border-radius: 8px;
-      padding: 11px 12px;
+      border: 1px solid var(--line) !important;
+      border-radius: 10px !important;
+      padding: 12px !important;
       font-size: 15px;
       color: var(--text);
-      background: #ffffff;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-      margin-bottom: 14px;
+      background: var(--panel) !important;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      min-height: 42px;
     }
 
     input:focus,
     select:focus,
     textarea:focus {
       outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(18, 78, 166, 0.14);
+      border-color: var(--primary) !important;
+      box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1) !important;
     }
 
     button,
     .button {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       text-decoration: none;
-      padding: 10px 14px;
-      border-radius: 8px;
-      border: 1px solid var(--accent);
+      padding: 11px 18px;
+      border-radius: 6px;
+      border: 1px solid var(--primary);
       color: #ffffff;
-      background: var(--accent);
+      background: var(--primary);
       font-weight: 600;
+      font-size: 14px;
       cursor: pointer;
+      transition: all 0.2s ease;
     }
 
     button:hover,
     .button:hover {
-      background: var(--accent-dark);
-      border-color: var(--accent-dark);
+      background: var(--primary-dark);
+      border-color: var(--primary-dark);
+      box-shadow: 0 4px 12px rgba(0, 120, 212, 0.2);
     }
 
     .button.secondary {
       color: var(--text);
-      background: #ffffff;
+      background: var(--panel);
       border-color: var(--line);
     }
 
     .button.secondary:hover {
-      background: #f5f8ff;
-      border-color: #b9c9de;
+      background: var(--line);
+      border-color: var(--primary);
+      color: var(--primary);
     }
 
     .error {
-      background: #fff4f4;
-      color: #8c2f2f;
-      border: 1px solid #f2c1c1;
+      background: rgba(232, 17, 35, 0.1);
+      color: #E81123;
+      border: 1px solid rgba(232, 17, 35, 0.2);
       border-radius: 8px;
-      padding: 10px 12px;
+      padding: 12px 14px;
       margin-bottom: 14px;
       font-size: 14px;
+      font-weight: 500;
+    }
+
+    .success {
+      background: rgba(16, 124, 16, 0.1);
+      color: #107C10;
+      border: 1px solid rgba(16, 124, 16, 0.2);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .success-text {
+      color: var(--success);
+    }
+
+    .warning-text {
+      color: var(--warning);
+    }
+
+    .error-text {
+      color: var(--error);
+    }
+
+    .info-text {
+      color: var(--info);
     }
 
     .hint {
@@ -188,47 +483,111 @@
       font-size: 13px;
       margin-top: -6px;
       margin-bottom: 12px;
+      font-weight: 500;
     }
 
     .linklike {
       margin-left: 8px;
-      color: var(--accent);
+      color: var(--primary);
       background: transparent;
       border: 0;
       padding-left: 0;
       padding-right: 0;
+      font-weight: 600;
     }
 
     .linklike:hover {
-      color: var(--accent-dark);
-      background: transparent;
-      border: 0;
+      color: var(--primary-dark);
       text-decoration: underline;
     }
 
-    @media (max-width: 700px) {
+    @media (max-width: 768px) {
       .nav-inner {
-        flex-direction: column;
-        align-items: flex-start;
+        flex-wrap: wrap;
+        align-items: center;
         gap: 12px;
+        padding: 0 16px;
+      }
+
+      .nav-toggle {
+        display: inline-flex;
+      }
+
+      .nav-links {
+        width: 100%;
+        display: none;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .nav-links.is-open {
+        display: grid;
+      }
+
+      .nav-item {
+        width: 100%;
+      }
+      
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      
+      .tabs {
+        grid-template-columns: 1fr;
+      }
+      
+      .auth-panel {
+        padding: 20px;
+        margin: 16px;
       }
     }
   </style>
+  <link rel="stylesheet" href="{% static 'forms.css' %}">
 </head>
 <body>
   <div class="navbar">
     <div class="nav-inner">
       <div>
-        <h1>Hostel Management System</h1>
-        <p class="muted">Role dashboard with secure API-backed modules</p>
+        <h1>HostelCC</h1>
+        <p class="muted">Campus Living Platform</p>
       </div>
       {% if user.is_authenticated %}
-      <div class="row">
-        <a class="button secondary" href="/profile/">Profile</a>
-        <a class="button secondary" href="/community/">Community</a>
-        <span class="label">{{ user.role }}</span>
-        <a class="button" href="/accounts/logout/">Logout</a>
+      <button class="nav-toggle" id="navToggle" type="button" title="Toggle menu">
+        <i class="ms-Icon ms-Icon--GlobalNavButton"></i>
+      </button>
+      <div class="nav-links" id="navLinks">
+        <a class="button secondary nav-item" href="/" title="Home">
+          <i class="ms-Icon ms-Icon--Home"></i><span>Home</span>
+        </a>
+        <a class="button secondary nav-item" href="/community/" title="Community">
+          <i class="ms-Icon ms-Icon--Comment"></i><span>Community</span>
+        </a>
+        <a class="button secondary nav-item" href="/mess/" title="Mess">
+          <i class="ms-Icon ms-Icon--EatDrink"></i><span>Mess</span>
+        </a>
+        <a class="button secondary nav-item" href="/laundry/" title="Laundry">
+          <i class="ms-Icon ms-Icon--Product"></i><span>Laundry</span>
+        </a>
+        <a class="button secondary nav-item" href="/notifications/" title="Notifications">
+          <i class="ms-Icon ms-Icon--Ringer"></i><span>Notifications</span>
+        </a>
+        <a class="button secondary nav-item" href="/profile/" title="View Profile">
+          <i class="ms-Icon ms-Icon--Contact"></i><span>Profile</span>
+        </a>
+        <span class="role-badge">
+          <i class="ms-Icon ms-Icon--Shield"></i>
+          {{ user.role }}
+        </span>
+        <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">
+          <i class="ms-Icon ms-Icon--ClearNight"></i>
+        </button>
+        <a class="button" href="/accounts/logout/" title="Logout">
+          <i class="ms-Icon ms-Icon--SignOut"></i> Logout
+        </a>
       </div>
+      {% else %}
+      <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">
+        <i class="ms-Icon ms-Icon--ClearNight"></i>
+      </button>
       {% endif %}
     </div>
   </div>
@@ -242,5 +601,56 @@
     {% endif %}
     {% block content %}{% endblock %}
   </div>
+  
+  <script>
+    // Dark/Light mode toggle
+    const themeToggle = document.getElementById('themeToggle');
+    const html = document.documentElement;
+    
+    // Initialize theme from localStorage or system preference
+    function initializeTheme() {
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme) {
+        html.setAttribute('data-theme', savedTheme);
+        updateThemeIcon(savedTheme);
+      } else {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = prefersDark ? 'dark' : 'light';
+        html.setAttribute('data-theme', theme);
+        updateThemeIcon(theme);
+      }
+    }
+    
+    function updateThemeIcon(theme) {
+      if (!themeToggle) return;
+      const icon = themeToggle.querySelector('i');
+      if (theme === 'dark') {
+        icon.classList.remove('ms-Icon--ClearNight');
+        icon.classList.add('ms-Icon--ClearDay');
+      } else {
+        icon.classList.remove('ms-Icon--ClearDay');
+        icon.classList.add('ms-Icon--ClearNight');
+      }
+    }
+    
+    if (themeToggle) {
+      themeToggle.addEventListener('click', () => {
+        const current = html.getAttribute('data-theme') || 'light';
+        const next = current === 'light' ? 'dark' : 'light';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        updateThemeIcon(next);
+      });
+      initializeTheme();
+    }
+
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
+    if (navToggle && navLinks) {
+      navToggle.addEventListener('click', () => {
+        navLinks.classList.toggle('is-open');
+      });
+    }
+  </script>
 </body>
 </html>

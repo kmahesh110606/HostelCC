@@ -38,7 +38,7 @@ Upload via:
 - `POST /api/students/upload-csv`
 
 CSV columns:
-- `roll_no,name,block,room_no,mess_allotment,points_balance,username,email`
+- `roll_no,name,block,room_no,mess_type,username,email`
 
 ## Security Notes
 - Web dashboards use Django sessions + CSRF.
@@ -46,3 +46,14 @@ CSV columns:
 - Role-based permissions enforced in API views.
 - IP and `X-Client-MAC` are request-logged in middleware.
 - Set production secrets in Azure Key Vault and inject via environment variables.
+
+## Azure Deployment
+- Deployment automation is available in `server/azure/deploy-container-app.ps1`.
+- Full instructions are in `server/azure/README.md`.
+- This deploys Django to Azure Container Apps with PostgreSQL and Redis.
+
+## OTP Configuration
+- You do not need Azure hosting first. Configure OTP through environment variables in any environment (local, Docker, Azure).
+- Production: keep `DEFAULT_OTP_CODE` unset or empty.
+- Development only: set `DJANGO_DEBUG=true` and optionally set `DEFAULT_OTP_CODE=<6-digit-code>` for manual testing.
+- Safety guard: if `DEFAULT_OTP_CODE` is set while `DJANGO_DEBUG=false`, server startup fails to prevent insecure deployment.

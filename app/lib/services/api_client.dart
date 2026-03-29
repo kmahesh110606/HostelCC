@@ -20,6 +20,14 @@ class ApiClient {
     return _parse(response);
   }
 
+  Future<void> delete(String path, {String? token}) async {
+    final response = await http.delete(
+      Uri.parse("$baseUrl$path"),
+      headers: _headers(token),
+    );
+    _parse(response);
+  }
+
   Future<List<dynamic>> getList(String path, {String? token}) async {
     final response = await http.get(
       Uri.parse("$baseUrl$path"),
@@ -59,7 +67,10 @@ class ApiClient {
       try {
         decoded = jsonDecode(response.body);
       } on FormatException {
-        final isHtml = response.body.trimLeft().toLowerCase().startsWith("<!doctype html") ||
+        final isHtml = response.body
+                .trimLeft()
+                .toLowerCase()
+                .startsWith("<!doctype html") ||
             response.body.trimLeft().toLowerCase().startsWith("<html");
         final location = response.headers["location"];
         if (isHtml || location != null) {

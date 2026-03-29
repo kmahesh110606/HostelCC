@@ -133,7 +133,6 @@ class _HostelCCAppState extends State<HostelCCApp> {
     });
   }
 
-
   @override
   Widget build(BuildContext context) {
     if (kIsWeb) {

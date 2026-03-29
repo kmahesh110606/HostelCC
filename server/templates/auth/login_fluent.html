@@ -1,0 +1,274 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="auth-wrap">
+  <section class="auth-panel">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div style="font-size: 48px; margin-bottom: 12px; color: var(--primary);">
+        <i class="fas fa-shield-alt"></i>
+      </div>
+      <h1 style="font-size: 28px; margin: 0 0 8px;">Welcome to HostelCC</h1>
+      <p class="muted">Campus living management platform for all roles</p>
+    </div>
+
+    <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 16px;">
+      <a href="/accounts/login/?mode=signin" class="button {% if mode != 'signin' %}secondary{% endif %}" style="flex: 1; text-align: center;">
+        <i class="fas fa-sign-in-alt"></i> Sign In
+      </a>
+      <a href="/accounts/login/?mode=signup" class="button {% if mode != 'signup' %}secondary{% endif %}" style="flex: 1; text-align: center;">
+        <i class="fas fa-user-plus"></i> Sign Up
+      </a>
+    </div>
+
+    {% if error_message %}
+    <div class="error">
+      <i class="fas fa-exclamation-circle"></i> {{ error_message }}
+    </div>
+    {% endif %}
+
+    {% if stage == 'signin' %}
+    <form method="post" autocomplete="off">
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="signin" />
+      <input type="hidden" name="stage" value="signin" />
+      
+      <div class="form-group">
+        <label for="email"><i class="fas fa-envelope"></i> Email Address</label>
+        <input type="email" id="email" name="email" required autofocus placeholder="your@institution.edu" />
+      </div>
+      
+      <div class="form-group">
+        <label for="otp"><i class="fas fa-key"></i> Verification Code</label>
+        <input type="text" id="otp" name="otp" placeholder="6-digit code (if already sent)" />
+        <p class="helper-text">We'll send a code to your email. Check spam if you don't see it.</p>
+      </div>
+      
+      <div class="form-actions">
+        <button type="submit" style="width: 100%;">
+          <i class="fas fa-arrow-right"></i> Continue
+        </button>
+        <button type="submit" name="resend_otp" value="1" class="button secondary" style="width: 100%;">
+          <i class="fas fa-redo"></i> Resend Code
+        </button>
+        <a href="/accounts/forgot-password/" class="button secondary" style="width: 100%; text-align: center;">
+          <i class="fas fa-key"></i> Forgot Password?
+      </a>
+    </form>
+
+    {% elif stage == 'otp-verify' %}
+    <form method="post" autocomplete="off">
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="signin" />
+      <input type="hidden" name="stage" value="otp-verify" />
+      <input type="hidden" name="email" value="{{ email }}" />
+      
+      <div class="success" style="margin-bottom: 16px;">
+        <i class="fas fa-info-circle"></i>
+        Verification code sent to <strong>{{ email }}</strong>
+      </div>
+      
+      <label for="otp_code"><i class="fas fa-lock"></i> Enter Verification Code</label>
+      <input type="text" id="otp_code" name="otp" required autofocus placeholder="000000" maxlength="6" />
+      <p class="hint">Enter the 6-digit code from your email</p>
+      
+      <button type="submit" style="width: 100%; margin-top: 16px;">
+        <i class="fas fa-check"></i> Verify Code
+      </button>
+      
+      <button type="submit" name="resend_otp" value="1" class="button secondary" style="width: 100%; margin-top: 8px;">
+        <i class="fas fa-redo"></i> Resend Code
+      </button>
+    </form>
+
+    {% elif stage == 'signup-details' %}
+    <form method="post" autocomplete="off">
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="signup" />
+      <input type="hidden" name="stage" value="signup-details" />
+      <input type="hidden" name="email" value="{{ email }}" />
+      
+      <div class="success" style="margin-bottom: 16px;">
+        <i class="fas fa-check-circle"></i>
+        Email verified: <strong>{{ email }}</strong>
+      </div>
+
+      <h3 style="font-weight: 600; margin: 20px 0 12px; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-user" style="color: var(--primary);"></i>
+        Personal Information
+      </h3>
+      
+      <div class="form-grid">
+        <div>
+          <label for="name"><i class="fas fa-id-badge"></i> Full Name</label>
+          <input id="name" type="text" name="name" required />
+        </div>
+        <div>
+          <label for="phone_country_code">Country Code</label>
+          <select id="phone_country_code" name="phone_country_code">
+            {% for code in country_codes %}
+            <option value="{{ code }}" {% if code == '+91' %}selected{% endif %}>{{ code }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div>
+          <label for="phone_number"><i class="fas fa-phone"></i> Phone Number</label>
+          <input id="phone_number" type="tel" name="phone_number" required />
+        </div>
+      </div>
+
+      {% if email|lower|slice:'-16:' == '@vitstudent.ac.in' %}
+      <h3 style="font-weight: 600; margin: 20px 0 12px; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-graduation-cap" style="color: var(--success);"></i>
+        Student Details
+      </h3>
+      
+      <div class="form-grid">
+        <div>
+          <label for="registration_no"><i class="fas fa-barcode"></i> Registration Number</label>
+          <input id="registration_no" type="text" name="registration_no" placeholder="24BAI1400" required />
+        </div>
+        <div>
+          <label for="block">Block</label>
+          <select id="block" name="block" required>
+            <option value="">Select block</option>
+            {% for code, label in block_choices %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div>
+          <label for="room_no"><i class="fas fa-door-open"></i> Room Number</label>
+          <input id="room_no" type="text" name="room_no" placeholder="413" required />
+        </div>
+        <div>
+          <label for="mess_type">Mess Type</label>
+          <select id="mess_type" name="mess_type" required>
+            <option value="">Select mess type</option>
+            <option value="VEG">Vegetarian</option>
+            <option value="NON_VEG">Non-Vegetarian</option>
+            <option value="SPECIAL">Special Diet</option>
+            <option value="FOODPARK">Food Park</option>
+          </select>
+        </div>
+      </div>
+      {% else %}
+      <h3 style="font-weight: 600; margin: 20px 0 12px; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-briefcase" style="color: var(--primary);"></i>
+        Staff Details
+      </h3>
+      
+      <div class="form-grid">
+        <div>
+          <label for="role">Role</label>
+          <select id="role" name="role" {% if email|lower == 'kmahesh110606@outlook.com' %}disabled{% endif %}>
+            {% if email|lower == 'kmahesh110606@outlook.com' %}
+            <option value="ADMIN" selected>Admin</option>
+            {% else %}
+              {% for code, label in staff_roles %}
+              <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            {% endif %}
+          </select>
+          {% if email|lower == 'kmahesh110606@outlook.com' %}<input type="hidden" name="role" value="ADMIN" />{% endif %}
+        </div>
+        <div>
+          <label for="department">Department</label>
+          <select id="department" name="department">
+            <option value="">Select department</option>
+            {% for code, label in department_choices %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div>
+          <label for="job_title">Job Title</label>
+          <input id="job_title" type="text" name="job_title" placeholder="e.g., Maintenance Head" />
+        </div>
+        <div>
+          <label for="assigned_mess_name">Assigned Mess (if applicable)</label>
+          <select id="assigned_mess_name" name="assigned_mess_name">
+            <option value="">Select assigned mess</option>
+            {% for m in mess_names %}
+            <option value="{{ m }}">{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      {% endif %}
+
+      <button type="submit" style="width: 100%; margin-top: 20px;">
+        <i class="fas fa-user-check"></i> Create Account
+      </button>
+    </form>
+
+    {% elif stage == 'set-password' %}
+    <form method="post" autocomplete="off">
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="signup" />
+      <input type="hidden" name="stage" value="set-password" />
+      <input type="hidden" name="email" value="{{ email }}" />
+
+      <div class="success" style="margin-bottom: 16px;">
+        <i class="fas fa-check-circle"></i>
+        Account created successfully!
+      </div>
+
+      <h3 style="font-weight: 600; margin: 20px 0 12px; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-lock" style="color: var(--primary);"></i>
+        Set Your Password
+      </h3>
+
+      <label for="password"><i class="fas fa-key"></i> New Password</label>
+      <input id="password" type="password" name="password" required />
+      <p class="hint">Must be at least 8 characters with letters, numbers, and symbols</p>
+
+      <label for="password_confirm">Confirm Password</label>
+      <input id="password_confirm" type="password" name="password_confirm" required />
+
+      <button type="submit" style="width: 100%; margin-top: 16px;">
+        <i class="fas fa-save"></i> Set Password
+      </button>
+    </form>
+    {% endif %}
+
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); text-align: center;">
+      <p class="muted" style="font-size: 12px; margin: 0;">
+        By signing in, you agree to our terms of service and privacy policy.
+      </p>
+    </div>
+  </section>
+</div>
+
+<style>
+  .auth-panel {
+    animation: slideUp 0.4s ease-out;
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  select {
+    margin-bottom: 12px;
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,435 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .ms-Icon,
+  .ms-Icon::before {
+    font-family: 'FabricMDL2Icons', 'FabricMDL2Icons-0', 'Segoe MDL2 Assets', sans-serif !important;
+  }
+
+  .laundry-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .laundry-card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    background: linear-gradient(170deg, rgba(0, 120, 212, 0.07), rgba(255, 185, 0, 0.06));
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.06);
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .dot-green {
+    background: #107c10;
+    box-shadow: 0 0 0 4px rgba(16, 124, 16, 0.2);
+  }
+
+  .dot-yellow {
+    background: #ffb900;
+    box-shadow: 0 0 0 4px rgba(255, 185, 0, 0.2);
+  }
+
+  .dot-red {
+    background: #e81123;
+    box-shadow: 0 0 0 4px rgba(232, 17, 35, 0.2);
+  }
+
+  .student-qr-wrap {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    padding: 12px;
+    border-radius: 10px;
+    display: grid;
+    gap: 10px;
+    justify-items: center;
+  }
+
+  .student-qr-canvas {
+    padding: 8px;
+    background: #fff;
+    border-radius: 8px;
+    min-height: 184px;
+    min-width: 184px;
+    display: grid;
+    place-items: center;
+  }
+
+  .student-overview {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .student-overview-main {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  .student-calendar-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+    padding: 10px;
+  }
+
+  .student-card-centered {
+    grid-column: 1 / -1 !important;
+    width: min(100%, 1040px);
+    justify-self: center;
+  }
+
+  .month-grid {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .month-head {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    padding: 5px 0;
+    text-transform: uppercase;
+  }
+
+  .month-cell {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    min-height: 38px;
+    display: grid;
+    place-items: center;
+    font-weight: 600;
+    background: var(--panel);
+    color: var(--text);
+  }
+
+  .month-cell.blank {
+    background: transparent;
+    border-style: dashed;
+    color: transparent;
+  }
+
+  .month-cell.highlight {
+    background: rgba(16, 124, 16, 0.14);
+    border-color: rgba(16, 124, 16, 0.55);
+    color: #0b5e0b;
+  }
+
+  .month-cell.today {
+    outline: 2px solid rgba(0, 120, 212, 0.6);
+    outline-offset: 1px;
+  }
+
+  .table-wrap {
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+  }
+
+  .laundry-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 820px;
+  }
+
+  .laundry-table th,
+  .laundry-table td {
+    border-bottom: 1px solid var(--line);
+    padding: 10px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .laundry-table th {
+    background: rgba(0, 120, 212, 0.1);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  @media (max-width: 980px) {
+    .laundry-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .month-grid {
+      gap: 4px;
+    }
+
+    .month-cell {
+      min-height: 34px;
+      font-size: 12px;
+    }
+  }
+
+  @media (min-width: 981px) {
+    .student-overview {
+      grid-template-columns: minmax(260px, 0.95fr) minmax(360px, 1.05fr);
+      align-items: start;
+    }
+  }
+</style>
+
+<div class="laundry-grid">
+  <section class="laundry-card {% if not is_laundry_manager %}student-card-centered{% endif %}" style="grid-column: span 4;">
+    <span class="label"><i class="ms-Icon ms-Icon--QRCode"></i> Student Laundry</span>
+    <h2>My Laundry Schedule</h2>
+
+    {% if student_schedule %}
+    <div class="student-overview">
+      <div class="student-overview-main">
+        <p class="muted" style="margin: 0;"><i class="ms-Icon ms-Icon--Calendar"></i> Pickup Day: <strong>{{ student_schedule.get_day_of_week_display }}</strong></p>
+        <div>
+          <span class="status-pill">
+            {% if student_schedule.submission_status %}
+              <span class="dot dot-green"></span> Clothes Submitted
+            {% elif student_schedule.collection_status %}
+              <span class="dot dot-yellow"></span> Ready for New Submission
+            {% else %}
+              <span class="dot dot-red"></span> Not Submitted Yet
+            {% endif %}
+          </span>
+        </div>
+        <p class="muted" style="margin: 0;"><i class="ms-Icon ms-Icon--Recent"></i> Last Submission: {{ student_schedule.last_submission_at|default:'N/A' }}</p>
+        <p class="muted" style="margin: 0;"><i class="ms-Icon ms-Icon--Clock"></i> Due Collection By: {{ student_schedule.due_collection_by|default:'N/A' }}</p>
+
+        <div class="student-qr-wrap">
+          <div id="student-qr-code" class="student-qr-canvas"></div>
+          <button type="button" class="button secondary" onclick="window.print()">
+            <i class="ms-Icon ms-Icon--Print"></i> Print QR
+          </button>
+        </div>
+      </div>
+
+      <div class="student-calendar-card">
+        <p style="margin: 0 0 8px; font-weight: 700;"><i class="ms-Icon ms-Icon--CalendarWeek"></i> {{ schedule_month_name }} {{ schedule_year }}</p>
+        <div class="month-grid">
+          <div class="month-head">Mon</div>
+          <div class="month-head">Tue</div>
+          <div class="month-head">Wed</div>
+          <div class="month-head">Thu</div>
+          <div class="month-head">Fri</div>
+          <div class="month-head">Sat</div>
+          <div class="month-head">Sun</div>
+          {% for entry in calendar_days %}
+          <div class="month-cell {% if not entry.day %}blank{% endif %} {% if entry.highlighted %}highlight{% endif %} {% if entry.today %}today{% endif %}">
+            {% if entry.day %}{{ entry.day }}{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <p class="muted" style="margin: 8px 0 0;"><i class="ms-Icon ms-Icon--CheckboxComposite"></i> Green dates are your room's assigned laundry dates this month.</p>
+      </div>
+    </div>
+    {% else %}
+    <p class="muted">No student schedule found for this account.</p>
+    {% endif %}
+  </section>
+
+  {% if is_laundry_manager %}
+  <section class="laundry-card" style="grid-column: span 8;">
+    <span class="label"><i class="ms-Icon ms-Icon--Settings"></i> Laundry Operations</span>
+    <h2>Room-Range Scheduling & Tracking</h2>
+    <p class="muted">Admins and laundry managers can define room ranges per block/day and track student status.</p>
+
+    <div style="border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 12px; margin: 8px 0 14px;">
+      <h3 style="margin: 0 0 10px;"><i class="ms-Icon ms-Icon--Add"></i> Add Block Room Range</h3>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_room_range" />
+        <div class="form-row">
+          <div class="form-group">
+            <label for="block_name">Block</label>
+            <select id="block_name" name="block_name" required>
+              <option value="">Select block</option>
+              {% for block in block_choices %}
+              <option value="{{ block }}">{{ block }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="day_of_week">Day</label>
+            <select id="day_of_week" name="day_of_week" required>
+              <option value="">Select day</option>
+              {% for code, label in day_choices %}
+              <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="room_from">From Room</label>
+            <input id="room_from" name="room_from" placeholder="101" required />
+          </div>
+          <div class="form-group">
+            <label for="room_to">To Room</label>
+            <input id="room_to" name="room_to" placeholder="140" required />
+          </div>
+        </div>
+        <div class="form-actions" style="justify-content: flex-start; margin-top: 0;">
+          <button type="submit"><i class="ms-Icon ms-Icon--Accept"></i> Save Room Range</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="table-wrap" style="margin-bottom: 14px;">
+      <table class="laundry-table" style="min-width: 620px;">
+        <thead>
+          <tr>
+            <th>Block</th>
+            <th>Day</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rule in room_ranges %}
+          <tr>
+            <td>{{ rule.block_name }}</td>
+            <td>{{ rule.get_day_of_week_display }}</td>
+            <td>{{ rule.room_from }}</td>
+            <td>{{ rule.room_to }}</td>
+            <td>
+              <form method="post" onsubmit="return confirm('Delete this room range?');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_room_range" />
+                <input type="hidden" name="room_range_id" value="{{ rule.id }}" />
+                <button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Delete"></i> Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="muted">No room ranges defined yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <form method="get" style="margin: 8px 0 14px;">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="block">Block</label>
+          <select id="block" name="block">
+            <option value="">All</option>
+            {% for block in block_choices %}
+            <option value="{{ block }}" {% if block_filter == block %}selected{% endif %}>{{ block }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="status">Submission Status</label>
+          <select id="status" name="status">
+            <option value="" {% if not status_filter %}selected{% endif %}>All</option>
+            <option value="submitted" {% if status_filter == 'submitted' %}selected{% endif %}>Submitted</option>
+            <option value="not_submitted" {% if status_filter == 'not_submitted' %}selected{% endif %}>Not Submitted</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="sort">Sort By</label>
+          <select id="sort" name="sort">
+            <option value="day" {% if sort_by == 'day' %}selected{% endif %}>Day</option>
+            <option value="student" {% if sort_by == 'student' %}selected{% endif %}>Student Reg No</option>
+            <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Most Recent Submission</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions" style="justify-content: flex-start; margin-top: 0;">
+        <button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Filter"></i> Apply Filters</button>
+      </div>
+    </form>
+
+    <div class="table-wrap">
+      <table class="laundry-table">
+        <thead>
+          <tr>
+            <th>Reg No</th>
+            <th>Name</th>
+            <th>Block</th>
+            <th>Room</th>
+            <th>Day</th>
+            <th>Submission</th>
+            <th>Collection</th>
+            <th>Last Submission</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for schedule in manager_schedules %}
+          <tr>
+            <td>{{ schedule.student.roll_no }}</td>
+            <td>{{ schedule.student.name }}</td>
+            <td>{{ schedule.student.block.block_name }}</td>
+            <td>{{ schedule.student.room_no }}</td>
+            <td>{{ schedule.get_day_of_week_display }}</td>
+            <td>
+              {% if schedule.submission_status %}
+              <span class="status-pill"><span class="dot dot-green"></span> Submitted</span>
+              {% else %}
+              <span class="status-pill"><span class="dot dot-red"></span> Pending</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if schedule.collection_status %}
+              <span class="status-pill"><span class="dot dot-green"></span> Collected</span>
+              {% else %}
+              <span class="status-pill"><span class="dot dot-yellow"></span> Awaiting</span>
+              {% endif %}
+            </td>
+            <td>{{ schedule.last_submission_at|default:'N/A' }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="muted">No schedules found for selected filters.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  (function () {
+    const value = "{{ student_qr_text|escapejs }}";
+    const target = document.getElementById('student-qr-code');
+    if (!value || !target || typeof QRCode === 'undefined') {
+      return;
+    }
+    new QRCode(target, {
+      text: value,
+      width: 180,
+      height: 180,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  })();
+</script>
+
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="tabs" style="grid-template-columns: 300px 1fr; align-items: start;">
+  <section class="tab" style="position: sticky; top: 100px;">
+    <div style="text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 12px;">
+        <i class="fas fa-user-circle" style="color: var(--primary);"></i>
+      </div>
+      <h2 style="margin: 0 0 4px;">{{ user.get_full_name|default:user.username }}</h2>
+      <p class="muted">{{ user.role }}</p>
+      <p style="font-size: 14px; color: var(--primary); margin: 8px 0;">{{ user.email }}</p>
+      
+      {% if student %}
+      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line);">
+        <p class="muted" style="font-size: 12px; margin-bottom: 4px;">REGISTRATION</p>
+        <p style="font-weight: 600; color: var(--text);">{{ student.roll_no }}</p>
+      </div>
+      
+      <div style="margin-top: 12px;">
+        <p class="muted" style="font-size: 12px; margin-bottom: 4px;">BLOCK</p>
+        <p style="font-weight: 600; color: var(--text);">{{ student.block.block_name }}</p>
+      </div>
+      
+      <div style="margin-top: 12px;">
+        <p class="muted" style="font-size: 12px; margin-bottom: 4px;">ROOM</p>
+        <p style="font-weight: 600; color: var(--text);">{{ student.room_no }}</p>
+      </div>
+      {% endif %}
+      
+      <a href="/accounts/change-password/" class="button" style="width: 100%; margin-top: 16px;">
+        <i class="fas fa-key"></i> Change Password
+      </a>
+      <a href="/accounts/logout/" class="button secondary" style="width: 100%; margin-top: 8px;">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </a>
+    </div>
+  </section>
+
+  <section class="tab">
+    <span class="label"><i class="fas fa-heart"></i> Profile</span>
+    <h2>Your Information</h2>
+    <p class="muted">View and manage your account details.</p>
+
+    <div style="margin-top: 20px;">
+      <h3 style="font-weight: 600; margin-bottom: 12px;">
+        <i class="fas fa-info-circle" style="color: var(--primary); margin-right: 6px;"></i>
+        Account Details
+      </h3>
+      
+      <div style="background: rgba(0, 120, 212, 0.05); border: 1px solid rgba(0, 120, 212, 0.1); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+          <div>
+            <p class="muted">Email Address</p>
+            <p style="font-weight: 600; color: var(--text);">{{ user.email }}</p>
+          </div>
+          <div>
+            <p class="muted">Username</p>
+            <p style="font-weight: 600; color: var(--text);">{{ user.username }}</p>
+          </div>
+          <div>
+            <p class="muted">Full Name</p>
+            <p style="font-weight: 600; color: var(--text);">{{ user.get_full_name|default:"Not set" }}</p>
+          </div>
+          <div>
+            <p class="muted">Phone</p>
+            <p style="font-weight: 600; color: var(--text);">{{ user.phone_country_code }}{{ user.phone_number|default:"Not set" }}</p>
+          </div>
+          <div>
+            <p class="muted">Role</p>
+            <span class="label" style="display: inline-block;">
+              <i class="fas fa-shield-alt"></i> {{ user.get_role_display }}
+            </span>
+          </div>
+          <div>
+            <p class="muted">Email Verified</p>
+            <p style="font-weight: 600;" class="{% if user.is_email_verified %}success-text{% else %}warning-text{% endif %}">
+              <i class="fas fa-{% if user.is_email_verified %}check-circle{% else %}clock{% endif %}"></i>
+              {% if user.is_email_verified %}Verified{% else %}Pending{% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {% if student %}
+      <h3 style="font-weight: 600; margin-bottom: 12px; margin-top: 24px;">
+        <i class="fas fa-graduation-cap" style="color: var(--primary); margin-right: 6px;"></i>
+        Student Information
+      </h3>
+      
+      <div style="background: rgba(16, 124, 16, 0.05); border: 1px solid rgba(16, 124, 16, 0.1); border-radius: 8px; padding: 16px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+          <div>
+            <p class="muted">Registration Number</p>
+            <p style="font-weight: 600; color: var(--text);">{{ student.roll_no }}</p>
+          </div>
+          <div>
+            <p class="muted">Full Name</p>
+            <p style="font-weight: 600; color: var(--text);">{{ student.name }}</p>
+          </div>
+          <div>
+            <p class="muted">Block</p>
+            <p style="font-weight: 600; color: var(--text);">{{ student.block.block_name }}</p>
+          </div>
+          <div>
+            <p class="muted">Room Number</p>
+            <p style="font-weight: 600; color: var(--text);">{{ student.room_no }}</p>
+          </div>
+          <div>
+            <p class="muted">Mess Type</p>
+            <p style="font-weight: 600; color: var(--text);">{{ student.get_mess_allotment_display }}</p>
+          </div>
+          <div>
+            <p class="muted">Allotted Mess Caterer</p>
+            <p style="font-weight: 600; color: var(--text);">
+              {% if student_mess_caterers %}
+              {{ student_mess_caterers|join:", " }}
+              {% else %}
+              N/A
+              {% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<style>
+  .tab {
+    animation: slideIn 0.3s ease-out;
+  }
+  
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+</style>
+{% endblock %}

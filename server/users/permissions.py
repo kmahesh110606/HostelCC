@@ -25,4 +25,4 @@ class IsMessManager(RolePermission):
 
 
 class IsLaundryPerson(RolePermission):
-    allowed_roles = ["LAUNDRY_PERSON", "ADMIN"]
+    allowed_roles = ["LAUNDRY_PERSON", "LAUNDRY_MANAGER", "ADMIN"]

@@ -13,8 +13,8 @@ class FluentCard extends StatelessWidget {
     this.padding,
     this.onTap,
     this.selected = false,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -53,8 +53,8 @@ class SectionHeader extends StatelessWidget {
     this.subtitle,
     this.icon,
     this.onIconTap,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -108,8 +108,8 @@ class FluentTag extends StatelessWidget {
     this.textColor,
     this.icon,
     this.onClose,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -147,7 +147,8 @@ class FluentTag extends StatelessWidget {
             const SizedBox(width: 4),
             GestureDetector(
               onTap: onClose,
-              child: Icon(FluentIcons.dismiss_12_filled, size: 12, color: textCol),
+              child:
+                  Icon(FluentIcons.dismiss_12_filled, size: 12, color: textCol),
             ),
           ]
         ],
@@ -164,8 +165,8 @@ class StatusIndicator extends StatelessWidget {
   const StatusIndicator({
     required this.status,
     this.color,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   Color _getStatusColor() {
     if (color != null) return color!;
@@ -225,8 +226,8 @@ class InfoBanner extends StatelessWidget {
     required this.backgroundColor,
     required this.textColor,
     this.onClose,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -250,7 +251,8 @@ class InfoBanner extends StatelessWidget {
           ),
           if (onClose != null)
             IconButton(
-              icon: Icon(FluentIcons.dismiss_20_regular, color: textColor, size: 18),
+              icon: Icon(FluentIcons.dismiss_20_regular,
+                  color: textColor, size: 18),
               onPressed: onClose,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -301,8 +303,8 @@ class FluentTextField extends StatefulWidget {
     this.onChanged,
     this.onEditingComplete,
     this.textInputAction,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   State<FluentTextField> createState() => _FluentTextFieldState();

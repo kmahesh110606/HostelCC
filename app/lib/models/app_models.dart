@@ -1,5 +1,6 @@
 class MessMenu {
   const MessMenu({
+    required this.messType,
     required this.weekDay,
     required this.breakfast,
     required this.lunch,
@@ -7,6 +8,7 @@ class MessMenu {
     required this.dinner,
   });
 
+  final String messType;
   final String weekDay;
   final String breakfast;
   final String lunch;
@@ -14,6 +16,7 @@ class MessMenu {
   final String dinner;
 
   factory MessMenu.fromJson(Map<String, dynamic> json) => MessMenu(
+        messType: (json["mess_type"] ?? "").toString(),
         weekDay: (json["week_day"] ?? "").toString(),
         breakfast: (json["breakfast_items"] ?? "").toString(),
         lunch: (json["lunch_items"] ?? "").toString(),
@@ -119,6 +122,48 @@ class MessChangeRequestItem {
       );
 }
 
+class LeastRatedMessItem {
+  const LeastRatedMessItem({
+    required this.menuItem,
+    required this.itemName,
+    required this.weekDay,
+    required this.mealTime,
+    required this.avgRating,
+    required this.totalVotes,
+  });
+
+  final String menuItem;
+  final String itemName;
+  final String weekDay;
+  final String mealTime;
+  final double avgRating;
+  final int totalVotes;
+
+  static double _toDouble(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    return double.tryParse((value ?? "").toString()) ?? 0;
+  }
+
+  static int _toInt(dynamic value) {
+    if (value is num) {
+      return value.toInt();
+    }
+    return int.tryParse((value ?? "").toString()) ?? 0;
+  }
+
+  factory LeastRatedMessItem.fromJson(Map<String, dynamic> json) =>
+      LeastRatedMessItem(
+        menuItem: (json["menu_item"] ?? "").toString(),
+        itemName: (json["item_name"] ?? "").toString(),
+        weekDay: (json["week_day"] ?? "").toString(),
+        mealTime: (json["meal_time"] ?? "").toString(),
+        avgRating: _toDouble(json["avg_rating"]),
+        totalVotes: _toInt(json["total"]),
+      );
+}
+
 class ComplaintItem {
   const ComplaintItem({
     required this.id,
@@ -134,6 +179,7 @@ class ComplaintItem {
     required this.mediaType,
     required this.status,
     required this.statusLabel,
+    required this.userVote,
     required this.upvotes,
     required this.downvotes,
     required this.replies,
@@ -155,12 +201,24 @@ class ComplaintItem {
   final String mediaType;
   final String status;
   final String statusLabel;
+  final String userVote;
   final int upvotes;
   final int downvotes;
   final List<ComplaintReplyItem> replies;
   final DateTime? createdAt;
   final bool canManage;
   final bool canDelete;
+
+  bool get isUpvotedByMe => userVote == "up";
+  bool get isDownvotedByMe => userVote == "down";
+
+  static String _normalizeUserVote(dynamic rawValue) {
+    final value = (rawValue ?? "none").toString().toLowerCase();
+    if (value == "up" || value == "down") {
+      return value;
+    }
+    return "none";
+  }
 
   factory ComplaintItem.fromJson(Map<String, dynamic> json) => ComplaintItem(
         id: (json["id"] ?? 0) as int,
@@ -176,6 +234,7 @@ class ComplaintItem {
         mediaType: (json["media_type"] ?? "TEXT").toString(),
         status: (json["status"] ?? "").toString(),
         statusLabel: (json["status_label"] ?? "").toString(),
+        userVote: _normalizeUserVote(json["user_vote"]),
         upvotes: (json["upvotes"] ?? 0) as int,
         downvotes: (json["downvotes"] ?? 0) as int,
         replies: ((json["replies"] as List<dynamic>?) ?? const <dynamic>[])
@@ -217,23 +276,65 @@ class ComplaintReplyItem {
 class LaundrySchedule {
   const LaundrySchedule({
     required this.id,
+    required this.studentId,
+    required this.dayCode,
     required this.day,
     required this.submission,
     required this.collection,
+    required this.qrToken,
+    required this.lastSubmissionAt,
+    required this.dueCollectionBy,
   });
 
   final int id;
+  final int studentId;
+  final String dayCode;
   final String day;
   final bool submission;
   final bool collection;
+  final String qrToken;
+  final DateTime? lastSubmissionAt;
+  final DateTime? dueCollectionBy;
 
   factory LaundrySchedule.fromJson(Map<String, dynamic> json) =>
       LaundrySchedule(
         id: (json["id"] ?? 0) as int,
-        day: (json["day_of_week"] ?? "").toString(),
+        studentId: (json["student"] ?? 0) as int,
+        dayCode: _dayCode((json["day_of_week"] ?? "").toString()),
+        day: _dayLabel((json["day_of_week"] ?? "").toString()),
         submission: json["submission_status"] == true,
         collection: json["collection_status"] == true,
+        qrToken: (json["qr_token"] ?? "").toString(),
+        lastSubmissionAt: json["last_submission_at"] != null
+            ? DateTime.tryParse(json["last_submission_at"].toString())
+            : null,
+        dueCollectionBy: json["due_collection_by"] != null
+            ? DateTime.tryParse(json["due_collection_by"].toString())
+            : null,
       );
+
+  static String _dayCode(String value) => value.trim().toUpperCase();
+
+  static String _dayLabel(String value) {
+    switch (_dayCode(value)) {
+      case "MON":
+        return "Monday";
+      case "TUE":
+        return "Tuesday";
+      case "WED":
+        return "Wednesday";
+      case "THU":
+        return "Thursday";
+      case "FRI":
+        return "Friday";
+      case "SAT":
+        return "Saturday";
+      case "SUN":
+        return "Sunday";
+      default:
+        return value;
+    }
+  }
 }
 
 class CatererItem {
@@ -259,16 +360,20 @@ class AppNotificationItem {
     required this.id,
     required this.title,
     required this.message,
+    required this.posterUrl,
     required this.level,
     required this.audience,
+    required this.createdByName,
     required this.createdAt,
   });
 
   final int id;
   final String title;
   final String message;
+  final String posterUrl;
   final String level;
   final String audience;
+  final String createdByName;
   final DateTime? createdAt;
 
   factory AppNotificationItem.fromJson(Map<String, dynamic> json) =>
@@ -276,8 +381,10 @@ class AppNotificationItem {
         id: (json["id"] ?? 0) as int,
         title: (json["title"] ?? "").toString(),
         message: (json["message"] ?? "").toString(),
+        posterUrl: (json["poster_url"] ?? json["poster"] ?? "").toString(),
         level: (json["level"] ?? "INFO").toString(),
         audience: (json["audience"] ?? "ALL").toString(),
+        createdByName: (json["created_by_name"] ?? "").toString(),
         createdAt: json["created_at"] != null
             ? DateTime.tryParse(json["created_at"].toString())
             : null,
@@ -374,7 +481,6 @@ class UserProfileStudentItem {
     required this.blockName,
     required this.roomNo,
     required this.messAllotment,
-    required this.pointsBalance,
   });
 
   final int id;
@@ -383,7 +489,6 @@ class UserProfileStudentItem {
   final String blockName;
   final String roomNo;
   final String messAllotment;
-  final String pointsBalance;
 
   factory UserProfileStudentItem.fromJson(Map<String, dynamic> json) =>
       UserProfileStudentItem(
@@ -393,7 +498,6 @@ class UserProfileStudentItem {
         blockName: (json["block_name"] ?? "").toString(),
         roomNo: (json["room_no"] ?? "").toString(),
         messAllotment: (json["mess_allotment"] ?? "").toString(),
-        pointsBalance: (json["points_balance"] ?? "0").toString(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -403,6 +507,5 @@ class UserProfileStudentItem {
         "block_name": blockName,
         "room_no": roomNo,
         "mess_allotment": messAllotment,
-        "points_balance": pointsBalance,
       };
 }

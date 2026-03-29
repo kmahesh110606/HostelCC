@@ -40,6 +40,7 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
   List<Map<String, String>> _staffRoles = <Map<String, String>>[];
   List<Map<String, String>> _departmentChoices = <Map<String, String>>[];
   List<String> _messNames = <String>[];
+  Map<String, List<String>> _blockMessTypes = <String, List<String>>{};
   List<String> _countryCodes = <String>["+91"];
 
   String _countryCode = "+91";
@@ -51,6 +52,29 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
 
   bool get _isStudent =>
       widget.email.toLowerCase().endsWith("@vitstudent.ac.in");
+
+  List<String> _allowedMessTypesForBlock(String block) {
+    final configured = _blockMessTypes[block];
+    if (configured != null && configured.isNotEmpty) {
+      return configured;
+    }
+    return const ["VEG", "NON_VEG", "SPECIAL", "FOODPARK"];
+  }
+
+  String _messTypeLabel(String messType) {
+    switch (messType) {
+      case "VEG":
+        return "Vegetarian";
+      case "NON_VEG":
+        return "Non-Vegetarian";
+      case "SPECIAL":
+        return "Special Diet";
+      case "FOODPARK":
+        return "Food Park";
+      default:
+        return messType;
+    }
+  }
 
   @override
   void initState() {
@@ -104,6 +128,16 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
       final messNames = ((data["mess_names"] ?? <dynamic>[]) as List<dynamic>)
           .map((e) => e.toString())
           .toList();
+      final blockMessTypesData = (data["block_mess_types"] ??
+          <String, dynamic>{}) as Map<String, dynamic>;
+      final blockMessTypes = blockMessTypesData.map(
+        (key, value) => MapEntry(
+          key.toString().toUpperCase(),
+          ((value is List<dynamic>) ? value : <dynamic>[])
+              .map((entry) => entry.toString())
+              .toList(),
+        ),
+      );
 
       if (!mounted) return;
       setState(() {
@@ -123,6 +157,11 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
 
         _messNames = messNames;
         _assignedMessName = _messNames.isNotEmpty ? _messNames.first : "";
+        _blockMessTypes = blockMessTypes;
+
+        final allowedMessTypes = _allowedMessTypesForBlock(_block);
+        _messType =
+            allowedMessTypes.isNotEmpty ? allowedMessTypes.first : "VEG";
       });
     } catch (e) {
       if (!mounted) return;
@@ -230,7 +269,7 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
                         Expanded(
                           flex: 2,
                           child: DropdownButtonFormField<String>(
-                            value: _countryCode,
+                            initialValue: _countryCode,
                             decoration: const InputDecoration(
                               labelText: "Code",
                               border: OutlineInputBorder(),
@@ -279,7 +318,7 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
-                        value: _block.isNotEmpty ? _block : null,
+                        initialValue: _block.isNotEmpty ? _block : null,
                         decoration: const InputDecoration(
                           labelText: "Block",
                           border: OutlineInputBorder(),
@@ -292,6 +331,9 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
                           if (value == null) return;
                           setState(() {
                             _block = value;
+                            final allowed = _allowedMessTypesForBlock(_block);
+                            _messType =
+                                allowed.isNotEmpty ? allowed.first : "VEG";
                           });
                         },
                         validator: (v) => (v == null || v.isEmpty)
@@ -310,25 +352,28 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
-                        value: _messType,
+                        initialValue: _messType,
                         decoration: const InputDecoration(
                           labelText: "Mess Type",
                           border: OutlineInputBorder(),
                         ),
-                        items: const [
-                          DropdownMenuItem(
-                              value: "VEG", child: Text("Vegetarian")),
-                          DropdownMenuItem(
-                              value: "NON_VEG", child: Text("Non-Vegetarian")),
-                          DropdownMenuItem(
-                              value: "SPECIAL", child: Text("Special Diet")),
-                        ],
+                        items: _allowedMessTypesForBlock(_block)
+                            .map(
+                              (messType) => DropdownMenuItem(
+                                value: messType,
+                                child: Text(_messTypeLabel(messType)),
+                              ),
+                            )
+                            .toList(),
                         onChanged: (value) {
                           if (value == null) return;
                           setState(() {
                             _messType = value;
                           });
                         },
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? "Mess type is required"
+                            : null,
                       ),
                     ] else ...[
                       const SectionHeader(
@@ -336,7 +381,7 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
                         subtitle: "Choose your role and department",
                       ),
                       DropdownButtonFormField<String>(
-                        value: _role,
+                        initialValue: _role,
                         decoration: const InputDecoration(
                           labelText: "Role",
                           border: OutlineInputBorder(),
@@ -354,7 +399,8 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
-                        value: _department.isNotEmpty ? _department : null,
+                        initialValue:
+                            _department.isNotEmpty ? _department : null,
                         decoration: const InputDecoration(
                           labelText: "Department",
                           border: OutlineInputBorder(),
@@ -386,7 +432,7 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
                       if (_role == "MESS_MANAGER") ...[
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
-                          value: _assignedMessName.isNotEmpty
+                          initialValue: _assignedMessName.isNotEmpty
                               ? _assignedMessName
                               : null,
                           decoration: const InputDecoration(
@@ -420,10 +466,12 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
                       obscureText: true,
                       prefixIcon: FluentIcons.key_24_regular,
                       validator: (v) {
-                        if (v == null || v.isEmpty)
+                        if (v == null || v.isEmpty) {
                           return "Password is required";
-                        if (v.length < 8)
+                        }
+                        if (v.length < 8) {
                           return "Password must be at least 8 characters";
+                        }
                         return null;
                       },
                     ),
@@ -434,10 +482,12 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
                       obscureText: true,
                       prefixIcon: FluentIcons.key_24_regular,
                       validator: (v) {
-                        if (v == null || v.isEmpty)
+                        if (v == null || v.isEmpty) {
                           return "Confirm password is required";
-                        if (v != _passwordController.text)
+                        }
+                        if (v != _passwordController.text) {
                           return "Passwords do not match";
+                        }
                         return null;
                       },
                     ),

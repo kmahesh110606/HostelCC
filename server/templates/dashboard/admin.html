@@ -1,8 +1,56 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="tabs">
-  <section class="tab"><span class="label">Control</span><h2>Admin Console</h2><p class="muted">Manage users, roles, blocks, rooms, menus, schedules, and complaints.</p></section>
-  <section class="tab"><span class="label">CSV Upload</span><h2>Bulk Student Import</h2><p class="muted">Use /api/students/upload-csv with roll_no, name, block, room_no data.</p></section>
-  <section class="tab"><span class="label">Security</span><h2>Audit Trail</h2><p class="muted">IP/MAC and suspicious traffic logging enabled via middleware.</p></section>
+<style>
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+  }
+
+  .dashboard-card {
+    text-decoration: none;
+    color: inherit;
+    display: grid;
+    place-items: center;
+    gap: 8px;
+    min-height: 180px;
+  }
+
+  .dashboard-card .ms-Icon {
+    font-size: 30px;
+    color: var(--primary);
+  }
+</style>
+
+<div class="dashboard-grid">
+  <a class="tab dashboard-card" href="/notifications/">
+    <i class="ms-Icon ms-Icon--Ringer"></i>
+    <h2>Notifications</h2>
+    {% with n=notifications|first %}
+      {% if n %}
+      <p class="muted"><strong>{{ n.title }}</strong> - {{ n.created_at|date:'d M, h:i A' }}</p>
+      {% else %}
+      <p class="muted">No alerts right now.</p>
+      {% endif %}
+    {% endwith %}
+  </a>
+
+  <a class="tab dashboard-card" href="/profile/">
+    <i class="ms-Icon ms-Icon--Contact"></i>
+    <h2>Profile Controls</h2>
+    <p class="muted">Unlock monthly mess changes for students.</p>
+  </a>
+
+  <a class="tab dashboard-card" href="/admin/">
+    <i class="ms-Icon ms-Icon--Settings"></i>
+    <h2>Admin Console</h2>
+    <p class="muted">Manage users, hostels, menus, and operations.</p>
+  </a>
+
+  <a class="tab dashboard-card" href="/community/">
+    <i class="ms-Icon ms-Icon--Comment"></i>
+    <h2>Community</h2>
+    <p class="muted">Review complaints and moderation updates.</p>
+  </a>
 </div>
 {% endblock %}

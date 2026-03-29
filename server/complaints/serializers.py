@@ -9,7 +9,7 @@ class ComplaintReplySerializer(serializers.ModelSerializer):
     class Meta:
         model = ComplaintReply
         fields = ["id", "complaint", "author", "author_name", "text", "created_at"]
-        read_only_fields = ["author", "created_at"]
+        read_only_fields = ["complaint", "author", "created_at"]
 
     def get_author_name(self, obj):
         full_name = obj.author.get_full_name().strip()
@@ -25,6 +25,9 @@ class ComplaintSerializer(serializers.ModelSerializer):
     room_no = serializers.SerializerMethodField()
     media_url = serializers.SerializerMethodField()
     can_delete = serializers.SerializerMethodField()
+    can_manage = serializers.SerializerMethodField()
+    status_label = serializers.SerializerMethodField()
+    user_vote = serializers.SerializerMethodField()
 
     class Meta:
         model = Complaint
@@ -44,10 +47,13 @@ class ComplaintSerializer(serializers.ModelSerializer):
             "media_type",
             "warden_tag",
             "status",
+            "status_label",
+            "user_vote",
             "upvotes",
             "downvotes",
             "created_at",
             "can_delete",
+            "can_manage",
             "replies",
         ]
         read_only_fields = [
@@ -98,6 +104,39 @@ class ComplaintSerializer(serializers.ModelSerializer):
         if obj.author_id == request.user.id:
             return True
         return bool(obj.student and obj.student.user_id == request.user.id)
+
+    def get_can_manage(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+
+        user = request.user
+        if user.role in {"ADMIN", "WARDEN"}:
+            return True
+        return user.role == "SUPERVISOR" and bool(user.department and user.department == obj.category)
+
+    def get_status_label(self, obj):
+        return obj.status_display_label
+
+    def get_user_vote(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return "none"
+
+        user_id = request.user.id
+        prefetched_votes = getattr(obj, "_prefetched_objects_cache", {}).get("votes")
+        if prefetched_votes is not None:
+            for vote in prefetched_votes:
+                if vote.user_id == user_id:
+                    return "up" if vote.value == ComplaintVote.Value.UPVOTE else "down"
+            return "none"
+
+        vote_value = obj.votes.filter(user_id=user_id).values_list("value", flat=True).first()
+        if vote_value == ComplaintVote.Value.UPVOTE:
+            return "up"
+        if vote_value == ComplaintVote.Value.DOWNVOTE:
+            return "down"
+        return "none"
 
 
 class ComplaintVoteSerializer(serializers.ModelSerializer):

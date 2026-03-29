@@ -1,3 +1,7 @@
+import json
+import re
+from datetime import date
+
 from django.core.cache import cache
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -5,18 +9,209 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from students.models import Student
+from students.utils import resolve_student_for_user
 from users.permissions import IsAdmin, IsLaundryPerson
 
-from .models import LaundryEvent, LaundrySchedule
-from .serializers import LaundryEventSerializer, LaundryScheduleSerializer
+from .models import LaundryEvent, LaundryRoomRange, LaundrySchedule
+from .serializers import LaundryEventSerializer, LaundryRoomRangeSerializer, LaundryScheduleSerializer
+
+
+def _normalize_upper(value: str | None) -> str:
+    return (value or "").strip().upper()
+
+
+def _room_number_as_int(value: str | None):
+    if not value:
+        return None
+    digits = re.findall(r"\d+", str(value))
+    if not digits:
+        return None
+    return int("".join(digits))
+
+
+def _room_in_rule(room_no: str, room_from: str, room_to: str) -> bool:
+    room_int = _room_number_as_int(room_no)
+    from_int = _room_number_as_int(room_from)
+    to_int = _room_number_as_int(room_to)
+    if room_int is not None and from_int is not None and to_int is not None:
+        low, high = sorted((from_int, to_int))
+        return low <= room_int <= high
+
+    room_text = _normalize_upper(room_no)
+    from_text = _normalize_upper(room_from)
+    to_text = _normalize_upper(room_to)
+    low, high = sorted((from_text, to_text))
+    return bool(room_text) and low <= room_text <= high
+
+
+_DAY_SORT_ORDER = {
+    LaundrySchedule.DayChoices.MON: 0,
+    LaundrySchedule.DayChoices.TUE: 1,
+    LaundrySchedule.DayChoices.WED: 2,
+    LaundrySchedule.DayChoices.THU: 3,
+    LaundrySchedule.DayChoices.FRI: 4,
+    LaundrySchedule.DayChoices.SAT: 5,
+    LaundrySchedule.DayChoices.SUN: 6,
+}
+
+
+def _infer_student_day_from_room_ranges(student):
+    if not student or not student.block:
+        return None
+
+    rules = LaundryRoomRange.objects.filter(is_active=True, block_name__iexact=student.block.block_name)
+    matching_days = {
+        rule.day_of_week
+        for rule in rules
+        if _room_in_rule(student.room_no, rule.room_from, rule.room_to)
+    }
+    if not matching_days:
+        return None
+
+    return sorted(matching_days, key=lambda code: _DAY_SORT_ORDER.get(code, 99))[0]
+
+
+def _get_or_create_schedule_for_student(student):
+    if not student:
+        return None
+
+    schedule = (
+        LaundrySchedule.objects.select_related("student", "student__block", "student__user")
+        .filter(student=student)
+        .first()
+    )
+    if schedule:
+        return schedule
+
+    inferred_day = _infer_student_day_from_room_ranges(student)
+    if not inferred_day:
+        return None
+
+    schedule, _ = LaundrySchedule.objects.get_or_create(
+        student=student,
+        defaults={"day_of_week": inferred_day},
+    )
+    return (
+        LaundrySchedule.objects.select_related("student", "student__block", "student__user")
+        .filter(id=schedule.id)
+        .first()
+    )
+
+
+def _today_day_code() -> str:
+    day_map = {
+        0: LaundrySchedule.DayChoices.MON,
+        1: LaundrySchedule.DayChoices.TUE,
+        2: LaundrySchedule.DayChoices.WED,
+        3: LaundrySchedule.DayChoices.THU,
+        4: LaundrySchedule.DayChoices.FRI,
+        5: LaundrySchedule.DayChoices.SAT,
+        6: LaundrySchedule.DayChoices.SUN,
+    }
+    return day_map[date.today().weekday()]
+
+
+def _parse_qr_text_payload(qr_text: str) -> dict[str, str] | None:
+    text = (qr_text or "").strip()
+    if not text:
+        return None
+
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        payload = None
+
+    if isinstance(payload, dict):
+        parsed: dict[str, str] = {}
+        for key in ("student_id", "qr_token", "roll_no", "email", "room_no", "block_name"):
+            value = payload.get(key)
+            if value is not None and str(value).strip():
+                parsed[key] = str(value).strip()
+
+        for key, aliases in {
+            "roll_no": ("reg_no", "regno", "registration_no"),
+            "email": ("mail",),
+            "room_no": ("room",),
+            "block_name": ("block",),
+        }.items():
+            if key in parsed:
+                continue
+            for alias in aliases:
+                value = payload.get(alias)
+                if value is not None and str(value).strip():
+                    parsed[key] = str(value).strip()
+                    break
+
+        return parsed or None
+
+    parts = [part.strip() for part in text.split("|")]
+    if len(parts) == 4:
+        roll_no, email, room_no, block_name = parts
+        return {
+            "roll_no": roll_no,
+            "email": email,
+            "room_no": room_no,
+            "block_name": block_name,
+        }
+    if len(parts) == 2 and parts[0].isdigit():
+        return {"student_id": parts[0], "qr_token": parts[1]}
+    return None
+
+
+def _is_submission_allowed_for_today(schedule: LaundrySchedule) -> tuple[bool, str]:
+    today_code = _today_day_code()
+    student = schedule.student
+    student_room = _normalize_upper(student.room_no)
+    student_block = _normalize_upper(student.block.block_name if student.block else "")
+
+    if student_block:
+        block_rules_qs = LaundryRoomRange.objects.filter(is_active=True, block_name__iexact=student_block)
+        if block_rules_qs.exists():
+            today_rules = list(block_rules_qs.filter(day_of_week=today_code))
+            if not today_rules:
+                return (
+                    False,
+                    f"Submission not allowed. No laundry slot is configured for block {student_block} today ({today_code}).",
+                )
+            for rule in today_rules:
+                if _room_in_rule(student_room, rule.room_from, rule.room_to):
+                    return True, ""
+            return (
+                False,
+                f"Submission not allowed today for room {student.room_no} in block {student_block}.",
+            )
+
+    if schedule.day_of_week != today_code:
+        return False, f"Submission not allowed. Your day is {schedule.day_of_week}, today is {today_code}."
+
+    return True, ""
 
 
 class LaundryScheduleViewSet(viewsets.ModelViewSet):
-    queryset = LaundrySchedule.objects.select_related("student").all()
+    queryset = LaundrySchedule.objects.select_related("student", "student__block", "student__user").all()
     serializer_class = LaundryScheduleSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if user.is_authenticated and user.role == "STUDENT":
+            student = resolve_student_for_user(user)
+            if not student:
+                return queryset.none()
+            _get_or_create_schedule_for_student(student)
+            return queryset.filter(student_id=student.id)
+        return queryset
+
     def get_permissions(self):
-        if self.action in ["create", "update", "partial_update", "destroy", "mark_submission", "mark_collection"]:
+        if self.action in [
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+            "mark_submission",
+            "mark_collection",
+            "scan_qr_payload",
+        ]:
             permission_classes = [IsLaundryPerson]
         else:
             permission_classes = [IsAuthenticated]
@@ -24,13 +219,51 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path=r"qr/(?P<student_id>[^/.]+)")
     def qr_for_student(self, request, student_id=None):
-        cache_key = f"laundry_qr_{student_id}"
+        schedule = self.get_queryset().filter(student_id=student_id).first()
+        if not schedule:
+            student = Student.objects.select_related("block", "user").filter(id=student_id).first()
+            schedule = _get_or_create_schedule_for_student(student)
+        if not schedule:
+            return Response({"detail": "Laundry schedule not found for student."}, status=status.HTTP_404_NOT_FOUND)
+
+        allowed_roles = {"STUDENT", "LAUNDRY_PERSON", "LAUNDRY_MANAGER", "ADMIN"}
+        if request.user.role not in allowed_roles:
+            return Response({"detail": "Not allowed to view student QR data."}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "STUDENT":
+            student = resolve_student_for_user(request.user)
+            if not student or student.id != schedule.student_id:
+                return Response({"detail": "You can only access your own QR."}, status=status.HTTP_403_FORBIDDEN)
+
+        cache_key = f"laundry_qr_{schedule.student_id}_{schedule.qr_token}"
         cached = cache.get(cache_key)
         if cached:
             return Response(cached)
 
-        schedule = LaundrySchedule.objects.select_related("student").get(student_id=student_id)
-        payload = {"student_id": student_id, "qr_token": schedule.qr_token, "day_of_week": schedule.day_of_week}
+        block_name = schedule.student.block.block_name if schedule.student.block else ""
+        student_email = (
+            (schedule.student.user.email if schedule.student.user else "")
+            or (schedule.student.user.username if schedule.student.user else "")
+            or ""
+        )
+
+        qr_payload = {
+            "student_id": schedule.student_id,
+            "qr_token": str(schedule.qr_token),
+            "roll_no": schedule.student.roll_no,
+            "email": student_email.strip().lower(),
+            "room_no": schedule.student.room_no,
+            "block_name": block_name,
+        }
+
+        payload = {
+            "student_id": schedule.student_id,
+            "qr_token": str(schedule.qr_token),
+            "day_of_week": schedule.day_of_week,
+            "roll_no": schedule.student.roll_no,
+            "room_no": schedule.student.room_no,
+            "block_name": block_name,
+            "qr_text": json.dumps(qr_payload, separators=(",", ":")),
+        }
         cache.set(cache_key, payload, timeout=300)
         return Response(payload)
 
@@ -66,8 +299,214 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
         )
         return Response({"status": "collection_marked", "color": "green"})
 
+    @action(detail=False, methods=["post"], url_path="scan")
+    def scan_qr_payload(self, request):
+        """
+        Scan QR and mark submission/collection. Accepts two formats:
+        1. Token-based (legacy): student_id + qr_token
+        2. Text payload (new): JSON payload or "regno|mail|room|block"
+        """
+        qr_text = (request.data.get("qr_text") or "").strip()
+        student_id = request.data.get("student_id")
+        qr_token = (request.data.get("qr_token") or "").strip()
+        event_type = (request.data.get("event_type") or LaundryEvent.EventType.SUBMISSION).strip().upper()
+
+        parsed_qr = None
+        if qr_text:
+            parsed_qr = _parse_qr_text_payload(qr_text)
+            if not parsed_qr:
+                return Response(
+                    {
+                        "detail": (
+                            "Invalid qr_text payload. Use JSON with student_id/qr_token or roll_no/email/room_no/block_name, "
+                            "or pipe format regno|mail|room|block."
+                        ),
+                        "color": "red",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if parsed_qr.get("student_id") and not student_id:
+                student_id = parsed_qr["student_id"]
+            if parsed_qr.get("qr_token") and not qr_token:
+                qr_token = parsed_qr["qr_token"]
+
+        if student_id is not None:
+            student_id = str(student_id).strip()
+
+        schedule = None
+        if student_id and qr_token:
+            schedule = (
+                LaundrySchedule.objects.select_related("student", "student__block", "student__user")
+                .filter(student_id=student_id)
+                .first()
+            )
+            if not schedule:
+                student = Student.objects.select_related("block", "user").filter(id=student_id).first()
+                schedule = _get_or_create_schedule_for_student(student)
+            if not schedule:
+                return Response(
+                    {"detail": "Laundry schedule not found for student.", "color": "red"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if str(schedule.qr_token).strip() != qr_token:
+                return Response(
+                    {"detail": "Invalid QR token.", "color": "red"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            parsed_qr = parsed_qr or {}
+            roll_no = (parsed_qr.get("roll_no") or "").strip()
+            if not roll_no:
+                return Response(
+                    {"detail": "Either qr_text or (student_id + qr_token) is required.", "color": "red"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            student = Student.objects.select_related("block", "user").filter(roll_no=roll_no).first()
+            if not student:
+                return Response(
+                    {"detail": f"Student {roll_no} not found.", "color": "red"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            qr_room = _normalize_upper(parsed_qr.get("room_no"))
+            student_room = _normalize_upper(student.room_no)
+            if qr_room and qr_room != student_room:
+                return Response(
+                    {"detail": f"Room mismatch. Expected {student.room_no}, got {qr_room}.", "color": "red"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            qr_block = _normalize_upper(parsed_qr.get("block_name"))
+            student_block = _normalize_upper(student.block.block_name if student.block else "")
+            if qr_block and qr_block != student_block:
+                return Response(
+                    {"detail": f"Block mismatch. Expected {student_block}, got {qr_block}.", "color": "red"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            qr_email = (parsed_qr.get("email") or "").strip().lower()
+            student_email = ((student.user.email if student.user else "") or "").strip().lower()
+            if qr_email and student_email and qr_email != student_email:
+                return Response(
+                    {"detail": "Email mismatch in QR payload.", "color": "red"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            schedule = (
+                LaundrySchedule.objects.select_related("student", "student__block", "student__user")
+                .filter(student=student)
+                .first()
+            )
+            if not schedule:
+                schedule = _get_or_create_schedule_for_student(student)
+
+        if not schedule:
+            return Response(
+                {"detail": "Laundry schedule not found.", "color": "red"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if event_type not in {LaundryEvent.EventType.SUBMISSION, LaundryEvent.EventType.COLLECTION}:
+            return Response(
+                {"detail": f"Unknown event type: {event_type}", "color": "red"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if event_type == LaundryEvent.EventType.SUBMISSION:
+            is_allowed, reason = _is_submission_allowed_for_today(schedule)
+            if not is_allowed:
+                return Response(
+                    {
+                        "detail": reason,
+                        "color": "red",
+                        "student_id": schedule.student_id,
+                        "schedule_id": schedule.id,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if schedule.submission_status and not schedule.collection_status:
+                return Response(
+                    {
+                        "detail": "Previous laundry not yet collected. Please collect before submitting new laundry.",
+                        "color": "red",
+                        "student_id": schedule.student_id,
+                        "schedule_id": schedule.id,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            try:
+                schedule.mark_submission()
+                action = LaundryEvent.EventType.SUBMISSION
+                color = "orange"
+                result_msg = "Laundry submission registered."
+            except ValueError as exc:
+                return Response(
+                    {"detail": str(exc), "color": "red"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        elif event_type == LaundryEvent.EventType.COLLECTION:
+            if not schedule.submission_status:
+                return Response(
+                    {
+                        "detail": "No pending laundry to collect.",
+                        "color": "red",
+                        "student_id": schedule.student_id,
+                        "schedule_id": schedule.id,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            try:
+                schedule.mark_collection()
+                action = LaundryEvent.EventType.COLLECTION
+                color = "green"
+                result_msg = "Laundry collection registered."
+            except ValueError as exc:
+                return Response(
+                    {"detail": str(exc), "color": "red"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        LaundryEvent.objects.create(
+            student=schedule.student,
+            schedule=schedule,
+            event_type=action,
+            scanned_by=request.user,
+        )
+
+        return Response(
+            {
+                "status": "ok",
+                "message": result_msg,
+                "event_type": action,
+                "color": color,
+                "student_id": schedule.student_id,
+                "schedule_id": schedule.id,
+                "student_name": schedule.student.name,
+                "student_roll_no": schedule.student.roll_no,
+                "room_no": schedule.student.room_no,
+                "block_name": schedule.student.block.block_name if schedule.student.block else "",
+            }
+        )
+
 
 class LaundryEventViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = LaundryEvent.objects.select_related("student", "schedule", "scanned_by").all()
     serializer_class = LaundryEventSerializer
     permission_classes = [IsAdmin]
+
+
+class LaundryRoomRangeViewSet(viewsets.ModelViewSet):
+    queryset = LaundryRoomRange.objects.all()
+    serializer_class = LaundryRoomRangeSerializer
+
+    def get_permissions(self):
+        if self.action in ["create", "update", "partial_update", "destroy"]:
+            permission_classes = [IsLaundryPerson]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]

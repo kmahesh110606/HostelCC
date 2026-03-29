@@ -25,6 +25,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
+  static const _connectivityErrorMessage =
+      "Unable to connect to the server. This may be due to slow internet. Please try again.";
+  static const _genericLoginErrorMessage =
+      "Unable to sign in right now. Please try again.";
+
   bool _loading = false;
   String? _error;
 
@@ -58,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await widget.onLogin(session);
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = _friendlyLoginError(e);
       });
     } finally {
       if (mounted) {
@@ -67,6 +72,59 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
+  }
+
+  String _friendlyLoginError(Object error) {
+    final raw = error.toString().trim();
+    final normalized = raw.toLowerCase();
+
+    if (_isConnectivityIssue(normalized)) {
+      return _connectivityErrorMessage;
+    }
+
+    final cleaned = raw
+        .replaceFirst(
+          RegExp(r"^(exception|error)\s*:\s*", caseSensitive: false),
+          "",
+        )
+        .trim();
+
+    if (cleaned.isEmpty || _looksTechnicalError(cleaned.toLowerCase())) {
+      return _genericLoginErrorMessage;
+    }
+
+    return cleaned;
+  }
+
+  bool _isConnectivityIssue(String message) {
+    const connectivitySignals = <String>[
+      "socketexception",
+      "failed host lookup",
+      "connection refused",
+      "network is unreachable",
+      "connection reset",
+      "connection closed",
+      "timed out",
+      "timeout",
+      "os error",
+      "handshakeexception",
+      "clientexception",
+    ];
+
+    return connectivitySignals.any(message.contains);
+  }
+
+  bool _looksTechnicalError(String message) {
+    const technicalSignals = <String>[
+      "api returned",
+      "status ",
+      "formatexception",
+      "stack trace",
+      "http",
+      "socket",
+    ];
+
+    return message.length > 180 || technicalSignals.any(message.contains);
   }
 
   @override

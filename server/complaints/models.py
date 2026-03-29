@@ -28,6 +28,7 @@ class Complaint(models.Model):
 
     class Status(models.TextChoices):
         OPEN = "OPEN", "Open"
+        IN_PROGRESS = "IN_PROGRESS", "In Progress"
         CLOSED = "CLOSED", "Closed"
 
     student = models.ForeignKey(Student, on_delete=models.SET_NULL, null=True, blank=True, related_name="complaints")
@@ -43,7 +44,7 @@ class Complaint(models.Model):
     media = models.FileField(upload_to="complaints/media/", null=True, blank=True)
     media_type = models.CharField(max_length=10, choices=MediaType.choices, default=MediaType.TEXT)
     warden_tag = models.CharField(max_length=120, blank=True)
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.OPEN)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
     upvotes = models.PositiveIntegerField(default=0)
     downvotes = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -63,6 +64,14 @@ class Complaint(models.Model):
         self.upvotes = counts.get("up", 0) or 0
         self.downvotes = counts.get("down", 0) or 0
         self.save(update_fields=["upvotes", "downvotes"])
+
+    @property
+    def status_display_label(self) -> str:
+        if self.status == Complaint.Status.OPEN:
+            return "Active"
+        if self.status == Complaint.Status.IN_PROGRESS:
+            return "In Progress"
+        return "Closed"
 
 
 class ComplaintReply(models.Model):

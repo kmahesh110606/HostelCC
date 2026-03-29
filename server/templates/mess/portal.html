@@ -1,0 +1,648 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .mess-shell {
+    display: grid;
+    gap: 14px;
+  }
+
+  .mess-tab {
+    text-align: left;
+  }
+
+  .week-strip {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+
+  .week-strip::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .week-strip::-webkit-scrollbar-thumb {
+    background: var(--line);
+    border-radius: 99px;
+  }
+
+  .day-pill {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--text);
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+  }
+
+  .day-pill.active {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 12%, var(--panel));
+    color: var(--primary);
+  }
+
+  .day-panel {
+    display: none;
+    margin-top: 14px;
+  }
+
+  .day-panel.active {
+    display: block;
+  }
+
+  .meal-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .meal-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px;
+    background: color-mix(in srgb, var(--panel) 93%, var(--primary-light) 7%);
+  }
+
+  .meal-card h4 {
+    margin-bottom: 8px;
+    text-transform: capitalize;
+  }
+
+  .meal-items {
+    margin: 0;
+    padding-left: 18px;
+    color: var(--muted);
+    display: grid;
+    gap: 5px;
+    font-size: 14px;
+  }
+
+  .meal-empty {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  .action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+
+  .action-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    background: var(--panel);
+    text-align: left;
+  }
+
+  .action-card h3 {
+    margin: 0 0 6px;
+  }
+
+  .field-row {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(3, minmax(130px, 1fr));
+    margin-top: 8px;
+  }
+
+  .stars {
+    direction: rtl;
+    display: inline-flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 6px;
+    width: 100%;
+  }
+
+  .stars input {
+    display: none;
+  }
+
+  .stars label {
+    font-size: 40px;
+    color: color-mix(in srgb, var(--line) 78%, var(--text) 22%);
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+    background: color-mix(in srgb, var(--panel) 90%, var(--line) 10%);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    line-height: 1;
+  }
+
+  .stars label:hover,
+  .stars label:hover ~ label,
+  .stars input:checked ~ label {
+    color: #ffb900;
+    background: color-mix(in srgb, #ffb900 10%, var(--panel));
+    border-color: color-mix(in srgb, #ffb900 48%, var(--line));
+    transform: translateY(-1px);
+  }
+
+  .rating-wrap {
+    margin-top: 10px;
+    text-align: center;
+  }
+
+  .inline-note {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 6px;
+  }
+
+  .poll-trigger {
+    width: 100%;
+    text-align: center;
+  }
+
+  .poll-trigger[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .poll-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    place-items: center;
+    background: rgba(12, 18, 28, 0.62);
+    backdrop-filter: blur(2px);
+    padding: 16px;
+    z-index: 100;
+  }
+
+  .poll-modal.active {
+    display: grid;
+  }
+
+  .poll-modal-card {
+    width: min(920px, 100%);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 52px rgba(0, 0, 0, 0.18);
+  }
+
+  body.modal-open {
+    overflow: hidden;
+  }
+
+  .poll-modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .poll-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(250px, 1fr));
+    gap: 12px;
+  }
+
+  .poll-col {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    background: color-mix(in srgb, var(--panel) 94%, var(--line) 6%);
+  }
+
+  .poll-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
+    margin-top: 8px;
+  }
+
+  .admin-create {
+    margin-top: 12px;
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+  }
+
+  @media (max-width: 980px) {
+    .meal-grid,
+    .action-grid,
+    .poll-columns,
+    .field-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="mess-shell">
+  <section class="tab mess-tab">
+    <span class="label">Mess Menu</span>
+    <h2>Weekly Menu</h2>
+    <p class="muted">Select a day to view breakfast, lunch, snacks, and dinner.</p>
+
+    {% if student %}
+    <p class="muted" style="margin-top: 8px;">Showing menu for your mess type: <strong>{{ selected_mess_type }}</strong>.</p>
+    {% else %}
+    <form method="get" style="display: grid; grid-template-columns: 220px auto; gap: 8px; max-width: 460px; margin-top: 8px;">
+      <select name="mess_type" aria-label="Mess type">
+        {% for mess_type in available_mess_types %}
+        <option value="{{ mess_type }}" {% if mess_type == selected_mess_type %}selected{% endif %}>{{ mess_type }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="button secondary">Load Menu Type</button>
+    </form>
+    {% endif %}
+
+    <div class="week-strip" role="tablist" aria-label="Mess menu days">
+      {% for card in menu_cards %}
+      <button
+        type="button"
+        class="day-pill"
+        data-day-tab="{{ card.code }}"
+        aria-selected="false"
+      >
+        {{ card.label }}
+      </button>
+      {% endfor %}
+    </div>
+
+    {% for card in menu_cards %}
+    <article class="day-panel" data-day-panel="{{ card.code }}">
+      <h3>{{ card.label }}</h3>
+      {% if not card.has_menu %}
+      <p class="muted">Menu is not configured for this day yet.</p>
+      {% endif %}
+      <div class="meal-grid">
+        {% for slot, items in card.meal_map.items %}
+        <div class="meal-card">
+          <h4>{{ slot }}</h4>
+          {% if items %}
+          <ul class="meal-items">
+            {% for item in items %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="meal-empty">No items listed.</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+
+  <section class="tab mess-tab">
+    <span class="label">Feedback And Polls</span>
+    <h2>{{ month }} Student Actions</h2>
+    <p class="muted">Rate food and vote on the meeting poll from one place.</p>
+
+    <div class="action-grid" style="margin-top: 10px;">
+      <article class="action-card">
+        <h3>Rate Food</h3>
+        <p class="muted">Choose day, meal time, and menu item from dropdowns before rating.</p>
+
+        <form method="post" style="margin-top: 8px;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="rate_item" />
+
+          <div class="field-row">
+            <div>
+              <label for="rate-day">Day</label>
+              <select id="rate-day" name="week_day" required>
+                {% for card in menu_cards %}
+                <option value="{{ card.code }}" {% if card.code == current_week_day %}selected{% endif %}>{{ card.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="rate-slot">Time Of Day</label>
+              <select id="rate-slot" name="meal_slot" required>
+                {% for slot in meal_slots %}
+                <option value="{{ slot }}">{{ slot|title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="rate-item">Menu Item</label>
+              <select id="rate-item" name="item_name" required>
+                <option value="" selected disabled>Select day and meal first</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="rating-wrap">
+            <label style="display: block;">Rating</label>
+            <div class="stars" aria-label="5 star rating selector">
+              <input id="star-5" type="radio" name="rating" value="5" required />
+              <label for="star-5" title="5 stars">★</label>
+              <input id="star-4" type="radio" name="rating" value="4" />
+              <label for="star-4" title="4 stars">★</label>
+              <input id="star-3" type="radio" name="rating" value="3" />
+              <label for="star-3" title="3 stars">★</label>
+              <input id="star-2" type="radio" name="rating" value="2" />
+              <label for="star-2" title="2 stars">★</label>
+              <input id="star-1" type="radio" name="rating" value="1" />
+              <label for="star-1" title="1 star">★</label>
+            </div>
+          </div>
+
+          <div style="margin-top: 10px;">
+            <label for="rate-comment">Comments (optional)</label>
+            <input id="rate-comment" name="comment" placeholder="Share what worked or what should improve" />
+          </div>
+
+          <button type="submit" style="margin-top: 12px;">Submit Rating</button>
+        </form>
+      </article>
+
+      <article class="action-card">
+        <h3>Poll For Mess Meeting</h3>
+        <p class="muted">Open the poll modal to like additions and dislike removals.</p>
+        <button
+          type="button"
+          id="open-poll-modal"
+          class="poll-trigger"
+          {% if not poll_is_active %}disabled{% endif %}
+        >
+          {% if poll_is_active %}Open Active Poll{% else %}Poll Not Active Yet{% endif %}
+        </button>
+        <p class="inline-note">
+          {% if poll_is_active %}
+          Poll is active now. Click to view all current add/remove options.
+          {% else %}
+          Poll becomes active once admin or mess manager adds options.
+          {% endif %}
+        </p>
+
+        <h4 style="margin-top: 14px;">Least Rated Dishes</h4>
+        <div style="display: grid; gap: 8px;">
+          {% for row in least_rated %}
+          <div style="border: 1px solid var(--line); border-radius: 8px; padding: 8px;">
+            <strong>{{ row.menu_item }}</strong>
+            <p class="muted" style="margin: 4px 0 0;">Avg: {{ row.avg_rating|floatformat:2 }} • Votes: {{ row.total }}</p>
+          </div>
+          {% empty %}
+          <p class="muted">No rating data yet.</p>
+          {% endfor %}
+        </div>
+
+        {% if can_view_staff_feedback %}
+        <h4 style="margin-top: 14px;">Recent Item Feedback (Your Mess)</h4>
+        <div style="display: grid; gap: 8px;">
+          {% for row in staff_feedback %}
+          <div style="border: 1px solid var(--line); border-radius: 8px; padding: 8px;">
+            <strong>{{ row.item_name }}</strong>
+            <p class="muted" style="margin: 4px 0 0;">{{ row.day_label }} • {{ row.meal_label }} • {{ row.rating }}/5</p>
+            <p class="muted" style="margin: 4px 0 0;">Student: {{ row.student_roll_no }}{% if row.student_name %} ({{ row.student_name }}){% endif %}</p>
+            {% if row.comment %}
+            <p style="margin: 6px 0 0;">{{ row.comment }}</p>
+            {% endif %}
+            {% if row.manager_reply %}
+            <p class="muted" style="margin: 6px 0 0;">Reply: {{ row.manager_reply }}</p>
+            {% endif %}
+          </div>
+          {% empty %}
+          <p class="muted">No item-wise feedback available for your assigned mess.</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if can_manage_polls %}
+        <form method="post" class="admin-create">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_poll" />
+          <label for="poll_type">Create Poll Option</label>
+          <select id="poll_type" name="poll_type" required>
+            <option value="ADD">Add New Item (Like)</option>
+            <option value="REMOVE">Remove Existing (Dislike)</option>
+          </select>
+          <label for="poll_item">Item Name</label>
+          <input id="poll_item" name="poll_item" required placeholder="Example: Paneer Fried Rice" />
+          <button type="submit" style="margin-top: 8px;">Save Poll Option</button>
+        </form>
+        {% endif %}
+      </article>
+    </div>
+  </section>
+</div>
+
+<div id="poll-modal" class="poll-modal" aria-hidden="true" role="dialog" aria-label="Mess poll options">
+  <div class="poll-modal-card">
+    <div class="poll-modal-head">
+      <div>
+        <h3 style="margin: 0;">Mess Meeting Poll</h3>
+        <p class="muted" style="margin: 4px 0 0;">Vote on what to add and what to remove.</p>
+      </div>
+      <button type="button" id="close-poll-modal" class="button secondary">Close</button>
+    </div>
+
+    <div class="poll-columns">
+      <section class="poll-col">
+        <h4>Add Items (Likes)</h4>
+        {% for option in add_options %}
+        <form method="post" class="poll-item">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="vote_poll" />
+          <input type="hidden" name="option_id" value="{{ option.id }}" />
+          <span>{{ option.item_name }} ({{ option.total_votes }})</span>
+          {% if student %}<button type="submit" class="button secondary">Like</button>{% endif %}
+        </form>
+        {% empty %}
+        <p class="muted">No add-item options yet.</p>
+        {% endfor %}
+      </section>
+
+      <section class="poll-col">
+        <h4>Remove Items (Dislikes)</h4>
+        {% for option in remove_options %}
+        <form method="post" class="poll-item">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="vote_poll" />
+          <input type="hidden" name="option_id" value="{{ option.id }}" />
+          <span>{{ option.item_name }} ({{ option.total_votes }})</span>
+          {% if student %}<button type="submit" class="button secondary">Dislike</button>{% endif %}
+        </form>
+        {% empty %}
+        <p class="muted">No remove-item options yet.</p>
+        {% endfor %}
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const dayButtons = document.querySelectorAll('[data-day-tab]');
+    const dayPanels = document.querySelectorAll('[data-day-panel]');
+    const menuOptionsByDay = {};
+    const defaultDay = '{{ current_week_day }}';
+    const daySelect = document.getElementById('rate-day');
+    const slotSelect = document.getElementById('rate-slot');
+    const itemSelect = document.getElementById('rate-item');
+
+    dayPanels.forEach((panel) => {
+      const dayCode = panel.dataset.dayPanel;
+      const slotMap = {};
+
+      panel.querySelectorAll('.meal-card').forEach((mealCard) => {
+        const slotHeading = mealCard.querySelector('h4');
+        if (!slotHeading) {
+          return;
+        }
+
+        const slot = slotHeading.textContent.trim();
+        const items = Array.from(mealCard.querySelectorAll('.meal-items li')).map((item) => item.textContent.trim());
+        slotMap[slot] = items;
+      });
+
+      menuOptionsByDay[dayCode] = slotMap;
+    });
+
+    function fillSelect(select, values, placeholder) {
+      if (!select) {
+        return;
+      }
+
+      select.innerHTML = '';
+      const placeholderOption = document.createElement('option');
+      placeholderOption.value = '';
+      placeholderOption.textContent = placeholder;
+      placeholderOption.disabled = true;
+      placeholderOption.selected = true;
+      select.appendChild(placeholderOption);
+
+      values.forEach((value) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value.charAt(0).toUpperCase() + value.slice(1);
+        select.appendChild(option);
+      });
+
+      select.disabled = values.length === 0;
+    }
+
+    function updateItemOptions() {
+      const day = daySelect ? daySelect.value : '';
+      const slot = slotSelect ? slotSelect.value : '';
+      const dayMap = menuOptionsByDay[day] || {};
+      const items = dayMap[slot] || [];
+
+      if (!itemSelect) {
+        return;
+      }
+
+      itemSelect.innerHTML = '';
+      const placeholderOption = document.createElement('option');
+      placeholderOption.value = '';
+      placeholderOption.textContent = items.length ? 'Select menu item' : 'No menu items for this selection';
+      placeholderOption.disabled = true;
+      placeholderOption.selected = true;
+      itemSelect.appendChild(placeholderOption);
+
+      items.forEach((item) => {
+        const option = document.createElement('option');
+        option.value = item;
+        option.textContent = item;
+        itemSelect.appendChild(option);
+      });
+
+      itemSelect.disabled = items.length === 0;
+    }
+
+    function updateSlotOptions() {
+      const day = daySelect ? daySelect.value : '';
+      const dayMap = menuOptionsByDay[day] || {};
+      const slots = Object.keys(dayMap);
+      fillSelect(slotSelect, slots, slots.length ? 'Select meal time' : 'No meal times for this day');
+      updateItemOptions();
+    }
+
+    function activateDay(dayCode) {
+      dayButtons.forEach((button) => {
+        const isActive = button.dataset.dayTab === dayCode;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+
+      dayPanels.forEach((panel) => {
+        panel.classList.toggle('active', panel.dataset.dayPanel === dayCode);
+      });
+    }
+
+    if (dayButtons.length > 0) {
+      const hasDefault = Array.from(dayButtons).some((button) => button.dataset.dayTab === defaultDay);
+      activateDay(hasDefault ? defaultDay : dayButtons[0].dataset.dayTab);
+
+      dayButtons.forEach((button) => {
+        button.addEventListener('click', () => activateDay(button.dataset.dayTab));
+      });
+    }
+
+    if (daySelect && slotSelect && itemSelect) {
+      updateSlotOptions();
+      daySelect.addEventListener('change', updateSlotOptions);
+      slotSelect.addEventListener('change', updateItemOptions);
+    }
+
+    const modal = document.getElementById('poll-modal');
+    const openBtn = document.getElementById('open-poll-modal');
+    const closeBtn = document.getElementById('close-poll-modal');
+
+    function closeModal() {
+      if (!modal) {
+        return;
+      }
+      modal.classList.remove('active');
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+    }
+
+    if (openBtn && modal) {
+      openBtn.addEventListener('click', () => {
+        if (openBtn.hasAttribute('disabled')) {
+          return;
+        }
+        modal.classList.add('active');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+      });
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeModal);
+    }
+
+    if (modal) {
+      modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+          closeModal();
+        }
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          closeModal();
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}

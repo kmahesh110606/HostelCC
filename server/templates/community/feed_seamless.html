@@ -1,0 +1,393 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="tabs" style="grid-template-columns: 2fr 3fr; align-items: start;">
+  <section class="tab" style="position: sticky; top: 92px;">
+    <span class="label"><i class="fas fa-pencil-alt"></i> Create Complaint</span>
+    <h2>Start A Thread</h2>
+    <p class="muted">Tag the issue, add text, and optionally attach image/video evidence.</p>
+
+    <form id="complaintForm" enctype="multipart/form-data" style="margin-top: 10px;">
+      {% csrf_token %}
+      <input type="hidden"name="action" value="create" />
+      <div class="form-group">
+        <label for="category">Category Tag</label>
+        <select id="category" name="category" required>
+          <option value="">Select category</option>
+          {% for code, label in categories %}
+          <option value="{{ code }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="text">Complaint Text</label>
+        <textarea id="text" name="text" rows="5" placeholder="Explain the issue in detail"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="media">Image or Video</label>
+        <input id="media" name="media" type="file" accept="image/*,video/*" />
+      </div>
+      <div class="form-actions">
+        <button type="submit" style="width: 100%;">
+          <i class="fas fa-send"></i> Post to Community
+        </button>
+      </div>
+    </form>
+
+    <h3 style="margin-top: 20px; margin-bottom: 10px;">Find Threads</h3>
+    <form id="filterForm" style="margin-top: 8px;">
+      <div class="form-group">
+        <label for="q">Search Text</label>
+        <input id="q" name="q" value="{{ query }}" placeholder="Search complaints" />
+      </div>
+      <div class="form-group">
+        <label for="category_filter">Filter Category</label>
+        <select id="category_filter" name="category">
+          <option value="">All</option>
+          {% for code, label in categories %}
+          <option value="{{ code }}" {% if category_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="media_filter">Filter Media</label>
+        <select id="media_filter" name="media_type">
+          <option value="">All</option>
+          {% for code, label in media_choices %}
+          <option value="{{ code }}" {% if media_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-actions">
+        <button type="submit" style="width: 100%;">
+          <i class="fas fa-filter"></i> Apply Filters
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <section class="tab">
+    <span class="label"><i class="fas fa-comments"></i> Community Feed</span>
+    <h2>Threads</h2>
+    <p class="muted">Vote and discuss complaints to prioritize resolution.</p>
+
+    <div id="feedContainer" style="margin-top: 12px; display: grid; gap: 12px;">
+      <!-- Feed items will be loaded here via AJAX -->
+    </div>
+    
+    <div id="loadingIndicator" style="text-align: center; padding: 20px; display: none;">
+      <i class="fas fa-spinner fa-spin"></i> Loading more complaints...
+    </div>
+    
+    <button id="loadMoreBtn" style="width: 100%; margin-top: 12px; display: none;">
+      <i class="fas fa-chevron-down"></i> Load More
+    </button>
+  </section>
+</div>
+
+<style>
+  .complaint-card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+    background: var(--panel);
+    transition: all 0.2s ease;
+  }
+  
+  .complaint-card:hover {
+    border-color: var(--primary-light);
+    box-shadow: 0 4px 12px rgba(91, 155, 213, 0.12);
+  }
+  
+  .complaint-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  
+  .complaint-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
+  
+  .complaint-meta span {
+    color: var(--muted);
+  }
+  
+  .complaint-text {
+    margin: 10px 0;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  
+  .complaint-media {
+    width: 100%;
+    max-height: 320px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    margin: 10px 0;
+  }
+  
+  .complaint-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+  
+  .vote-button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s ease;
+  }
+  
+  .vote-button:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(0, 120, 212, 0.05);
+  }
+  
+  .vote-button.active {
+    background: rgba(0, 120, 212, 0.1);
+    color: var(--primary);
+    border-color: var(--primary);
+  }
+</style>
+
+<script>
+  let currentPage = 1;
+  let isLoading = false;
+  let hasMore = true;
+  let currentFilters = new URLSearchParams(window.location.search);
+
+  const feedContainer = document.getElementById('feedContainer');
+  const loadMoreBtn = document.getElementById('loadMoreBtn');
+  const loadingIndicator = document.getElementById('loadingIndicator');
+  const complaintForm = document.getElementById('complaintForm');
+  const filterForm = document.getElementById('filterForm');
+
+  // Load initial feed
+  function loadFeed(page = 1, append = false) {
+    if (isLoading || !hasMore) return;
+    
+    isLoading = true;
+    loadingIndicator.style.display = 'block';
+    
+    const params = new URLSearchParams({
+      page: page,
+      q: document.getElementById('q').value || '',
+      category: document.getElementById('category_filter').value || '',
+      media_type: document.getElementById('media_filter').value || '',
+      ajax: '1'
+    });
+
+    fetch('/community/?_=' + Date.now() + '&' + params)
+      .then(response => response.json())
+      .then(data => {
+        loadingIndicator.style.display = 'none';
+        
+        if (!append) {
+          feedContainer.innerHTML = '';
+          currentPage = 1;
+        }
+        
+        if (data.items.length === 0 && page === 1) {
+          feedContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);"><i class="fas fa-inbox"></i> <p>No complaints found</p></div>';
+          loadMoreBtn.style.display = 'none';
+          return;
+        }
+        
+        data.items.forEach(item => {
+          const card = createComplaintCard(item);
+          feedContainer.appendChild(card);
+        });
+        
+        hasMore = data.has_more;
+        currentPage = page + 1;
+        
+        loadMoreBtn.style.display = hasMore ? 'block' : 'none';
+        isLoading = false;
+      })
+      .catch(error => {
+        console.error('Error loading feed:', error);
+        loadingIndicator.style.display = 'none';
+        isLoading = false;
+      });
+  }
+
+  function createComplaintCard(item) {
+    const card = document.createElement('div');
+    card.classList.add('complaint-card');
+    card.dataset.complaintId = item.id;
+
+    let mediaHtml = '';
+    if (item.media) {
+      const isImage = item.media_type === 'IMAGE';
+      if (isImage) {
+        mediaHtml = `<img src="${item.media}" alt="Complaint media" class="complaint-media" />`;
+      } else if (item.media_type === 'VIDEO') {
+        mediaHtml = `<video controls class="complaint-media" style="max-height: 320px;"><source src="${item.media}" /></video>`;
+      }
+    }
+
+    const statusColor = item.status === 'OPEN' ? '#FFB900' : '#107C10';
+    const statusIcon = item.status === 'OPEN' ? 'exclamation-circle' : 'check-circle';
+
+    card.innerHTML = `
+      <div class="complaint-header">
+        <div>
+          <span class="label" style="margin-bottom: 6px;">
+            <i class="fas fa-${statusIcon}" style="color: ${statusColor};"></i>
+            ${item.category}
+          </span>
+          <span class="label" style="margin-bottom: 6px;">
+            <i class="fas fa-circle" style="color: ${statusColor}; font-size: 8px;"></i>
+            ${item.status}
+          </span>
+        </div>
+      </div>
+      
+      <div class="complaint-meta">
+        <strong>${item.author_name}</strong>
+        <span>•</span>
+        <span>${item.block_name}</span>
+        <span>•</span>
+        <span>${item.registration_no}</span>
+        <span>•</span>
+        <span><i class="fas fa-clock"></i> ${formatTime(item.created_at)}</span>
+      </div>
+      
+      <div class="complaint-text">${escapeHtml(item.text)}</div>
+      
+      ${mediaHtml}
+      
+      <div class="complaint-actions">
+        <button class="vote-button upvote-btn" data-complaint-id="${item.id}">
+          <i class="fas fa-thumbs-up"></i>
+          <span class="upvote-count">${item.upvotes || 0}</span>
+        </button>
+        <button class="vote-button downvote-btn" data-complaint-id="${item.id}">
+          <i class="fas fa-thumbs-down"></i>
+          <span class="downvote-count">${item.downvotes || 0}</span>
+        </button>
+        <button class="vote-button reply-btn" data-complaint-id="${item.id}">
+          <i class="fas fa-reply"></i>
+          <span>${item.reply_count || 0} Replies</span>
+        </button>
+      </div>
+    `;
+
+    // Add vote handlers
+    card.querySelector('.upvote-btn').addEventListener('click', () => handleVote(item.id, 'up', card));
+    card.querySelector('.downvote-btn').addEventListener('click', () => handleVote(item.id, 'down', card));
+    
+    return card;
+  }
+
+  function handleVote(complaintId, direction, card) {
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    formData.append('action', 'vote');
+    formData.append('complaint_id', complaintId);
+    formData.append('direction', direction);
+
+    fetch(window.location.pathname, {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        const upvoteBtn = card.querySelector('.upvote-btn');
+        const downvoteBtn = card.querySelector('.downvote-btn');
+        
+        upvoteBtn.classList.toggle('active', data.user_vote === 'up');
+        downvoteBtn.classList.toggle('active', data.user_vote === 'down');
+        
+        upvoteBtn.querySelector('.upvote-count').textContent = data.upvotes;
+        downvoteBtn.querySelector('.downvote-count').textContent = data.downvotes;
+      }
+    });
+  }
+
+  function formatTime(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now - date;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    
+    return date.toLocaleDateString();
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Form submissions
+  complaintForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const formData = new FormData(complaintForm);
+    
+    fetch(window.location.pathname, {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        complaintForm.reset();
+        alert('Complaint posted successfully!');
+        loadFeed(1, false);  // Reload feed
+      } else {
+        alert('Error: ' + (data.error || 'Failed to post complaint'));
+      }
+    });
+  });
+
+  filterForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    currentPage = 1;
+    hasMore = true;
+    loadFeed(1, false);
+  });
+
+  loadMoreBtn.addEventListener('click', () => {
+    loadFeed(currentPage, true);
+  });
+
+  // Load initial feed
+  loadFeed(1);
+
+  // Infinite scroll
+  window.addEventListener('scroll', () => {
+    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 400) {
+      if (hasMore && !isLoading && loadMoreBtn.style.display === 'block') {
+        loadFeed(currentPage, true);
+      }
+    }
+  });
+</script>
+{% endblock %}

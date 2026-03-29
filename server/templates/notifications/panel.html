@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .notifications-layout {
+    width: min(100%, 1280px);
+    margin: 0 auto;
+    align-items: start;
+    grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr);
+    gap: 20px;
+  }
+
+  .notifications-layout--single {
+    grid-template-columns: minmax(0, 920px);
+    justify-content: center;
+  }
+
+  .notifications-panel {
+    text-align: left;
+  }
+
+  .notifications-panel .muted {
+    margin-bottom: 14px;
+  }
+
+  .notifications-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-top: 18px;
+    align-items: stretch;
+  }
+
+  .notification-card {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    background: var(--panel);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  }
+
+  .notification-card + .notification-card {
+    border-top: 3px solid rgba(0, 120, 212, 0.15);
+  }
+
+  .notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 8px;
+  }
+
+  .notification-title {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.35;
+  }
+
+  .notification-meta {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .notification-message {
+    margin: 0 0 10px;
+    line-height: 1.6;
+    white-space: pre-line;
+  }
+
+  .notification-poster {
+    width: 100%;
+    max-height: 260px;
+    object-fit: contain;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    background: #fff;
+  }
+
+  .notification-actions {
+    margin-top: 10px;
+  }
+
+  .notification-actions form {
+    margin: 0;
+  }
+
+  @media (max-width: 1100px) {
+    .notifications-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .notification-card {
+      width: 100%;
+      padding: 14px;
+    }
+
+    .notification-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>
+<div class="tabs notifications-layout{% if not is_admin %} notifications-layout--single{% endif %}">
+  <section class="tab notifications-panel">
+    <span class="label"><i class="fas fa-bell"></i> Notification Panel</span>
+    <h2>Campus Alerts</h2>
+    <p class="muted">Reply alerts, mess meeting reminders, and hostel meeting updates are listed here.</p>
+
+    <div class="notifications-list">
+      {% for n in notifications %}
+      <article class="notification-card">
+        <div class="row notification-header">
+          <h3 class="notification-title">{{ n.title }}</h3>
+          <span class="label">{{ n.level }} | {{ n.audience }}</span>
+        </div>
+        <p class="notification-message">{{ n.message }}</p>
+        {% if n.poster %}
+          {% if '.pdf' in n.poster.name|lower %}
+          <p style="margin: 0 0 8px;"><a class="button secondary" href="{{ n.poster.url }}" target="_blank" rel="noopener">Open Poster PDF</a></p>
+          {% else %}
+          <img src="{{ n.poster.url }}" alt="Notification poster" class="notification-poster" />
+          {% endif %}
+        {% endif %}
+        <p class="notification-meta">Posted on {{ n.created_at|date:'d M Y, h:i A' }}</p>
+        {% if is_admin %}
+        <div class="notification-actions">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete" />
+            <input type="hidden" name="notification_id" value="{{ n.id }}" />
+            <button type="submit" class="button secondary">Delete</button>
+          </form>
+        </div>
+        {% endif %}
+      </article>
+      {% empty %}
+      <p class="muted">No notifications published yet.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if is_admin %}
+  <section class="tab">
+    <span class="label"><i class="fas fa-pen"></i> Admin</span>
+    <h2>Create Notification</h2>
+    <p class="muted">This publishes to both website and Flutter app dashboards.</p>
+
+    <form method="post" enctype="multipart/form-data" style="display: grid; gap: 10px; margin-top: 12px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create" />
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" name="title" required maxlength="140" />
+      </div>
+      <div class="form-group">
+        <label>Message</label>
+        <textarea name="message" rows="4" required></textarea>
+      </div>
+      <div class="form-row" style="margin: 0;">
+        <div class="form-group">
+          <label>Audience</label>
+          <select name="audience">
+            {% for key, name in audience_choices %}
+            <option value="{{ key }}">{{ name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select name="level">
+            {% for key, name in level_choices %}
+            <option value="{{ key }}">{{ name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Poster (optional: image or PDF)</label>
+        <input type="file" name="poster" accept=".png,.jpg,.jpeg,.pdf" />
+      </div>
+      <div class="checkbox-group">
+        <div class="checkbox-item">
+          <input type="checkbox" id="is_active" name="is_active" checked />
+          <label for="is_active">Active</label>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit"><i class="fas fa-paper-plane"></i> Publish</button>
+      </div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

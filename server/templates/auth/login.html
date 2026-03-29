@@ -2,54 +2,258 @@
 {% block content %}
 <div class="auth-wrap">
   <section class="auth-panel">
-    <h2>Sign In</h2>
-    <p class="muted">Secure access for students, wardens, managers, and admins.</p>
+    <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 14px;">
+      <h2 style="margin: 0;">Account Access</h2>
+      <div class="row" style="gap: 6px;">
+        <a href="/accounts/login/?mode=signin" class="button {% if mode != 'signin' %}secondary{% endif %}">Sign In</a>
+        <a href="/accounts/login/?mode=signup" class="button {% if mode != 'signup' %}secondary{% endif %}">Sign Up</a>
+      </div>
+    </div>
+    <p class="muted">Use your institutional email to access HostelCC.</p>
 
     {% if error_message %}
     <div class="error">{{ error_message }}</div>
     {% endif %}
 
-    {% if stage == 'email' %}
+    {% if stage == 'signin' %}
     <form method="post" autocomplete="off">
       {% csrf_token %}
-      <input type="hidden" name="stage" value="email" />
+      <input type="hidden" name="mode" value="signin" />
+      <input type="hidden" name="stage" value="signin" />
       <input type="hidden" name="next" value="{{ next_url }}" />
-      <label for="email">Email Address</label>
-      <input id="email" name="email" type="email" required placeholder="name@vitstudent.ac.in" />
-      <button type="submit">Continue</button>
-      <a class="button linklike" href="/accounts/forgot-password/">Forgot Password?</a>
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input id="email" name="email" type="email" required placeholder="name@vitstudent.ac.in" />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required placeholder="Enter your password" />
+      </div>
+      <div class="form-actions">
+        <button type="submit">Continue</button>
+        <a class="button secondary" href="/accounts/forgot-password/">Forgot Password?</a>
+      </div>
     </form>
-    {% elif stage == 'password' %}
+    {% elif stage == 'signup-email' %}
     <form method="post" autocomplete="off">
       {% csrf_token %}
-      <input type="hidden" name="stage" value="password" />
+      <input type="hidden" name="mode" value="signup" />
+      <input type="hidden" name="stage" value="signup-email" />
+      <div class="form-group">
+        <label for="signup_email">Email Address</label>
+        <input id="signup_email" name="email" type="email" required placeholder="name@vitstudent.ac.in / name@vit.ac.in" />
+        <p class="hint">Allowed: @vitstudent.ac.in, @vit.ac.in, and authorized admin email.</p>
+      </div>
+      <div class="form-actions">
+        <button type="submit">Send OTP</button>
+      </div>
+    </form>
+    {% elif stage == 'signup-otp' %}
+    <form method="post" autocomplete="off">
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="signup" />
+      <input type="hidden" name="stage" value="signup-otp" />
+      <input type="hidden" name="email" value="{{ email }}" />
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" value="{{ email }}" disabled />
+      </div>
+      <div class="form-group">
+        <label for="otp_code">OTP</label>
+        <input id="otp_code" name="otp_code" type="text" maxlength="6" required placeholder="Enter 6-digit OTP" />
+        {% if fixed_otp %}
+        <p class="hint">Dev OTP: {{ fixed_otp }}</p>
+        {% endif %}
+      </div>
+      <div class="form-actions">
+        <button type="submit">Verify OTP</button>
+      </div>
+    </form>
+    {% elif stage == 'signup-details' %}
+    <form method="post" autocomplete="off">
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="signup" />
+      <input type="hidden" name="stage" value="signup-details" />
       <input type="hidden" name="email" value="{{ email }}" />
       <input type="hidden" name="next" value="{{ next_url }}" />
-      <label>Email Address</label>
-      <input type="email" value="{{ email }}" disabled />
-      <label for="password">Password</label>
-      <input id="password" name="password" type="password" required placeholder="Enter your password" />
-      <button type="submit">Login</button>
-      <a class="button linklike" href="/accounts/forgot-password/">Forgot Password?</a>
-    </form>
-    {% else %}
-    <form method="post" autocomplete="off">
-      {% csrf_token %}
-      <input type="hidden" name="stage" value="otp" />
-      <input type="hidden" name="email" value="{{ email }}" />
-      <input type="hidden" name="next" value="{{ next_url }}" />
-      <label>Email Address</label>
-      <input type="email" value="{{ email }}" disabled />
-      <label for="otp_code">One-Time Password (OTP)</label>
-      <input id="otp_code" name="otp_code" type="text" maxlength="6" required placeholder="Enter 6-digit OTP" />
-      {% if fixed_otp %}
-      <p class="hint">Dev OTP: {{ fixed_otp }}</p>
+
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" value="{{ email }}" disabled />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input id="name" name="name" required />
+        </div>
+        <div class="form-group">
+          <label for="phone_country_code">Country Code</label>
+          <select id="phone_country_code" name="phone_country_code">
+            {% for code in country_codes %}
+            <option value="{{ code }}" {% if code == '+91' %}selected{% endif %}>{{ code }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="phone_number">Phone Number</label>
+          <input id="phone_number" name="phone_number" required />
+        </div>
+      </div>
+
+      {% if email|lower|slice:'-16:' == '@vitstudent.ac.in' %}
+      <h3>Student Details</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="registration_no">Registration Number</label>
+          <input id="registration_no" name="registration_no" required placeholder="24BAI1400" />
+        </div>
+        <div class="form-group">
+          <label for="block">Block</label>
+          <select id="block" name="block" required>
+            <option value="">Select</option>
+            {% for code, label in block_choices %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="room_no">Room No</label>
+          <input id="room_no" name="room_no" required placeholder="413" />
+        </div>
+        <div class="form-group">
+          <label for="mess_type">Mess Type</label>
+          <select id="mess_type" name="mess_type" required>
+            <option value="">Select mess type</option>
+          </select>
+        </div>
+      </div>
+      {% else %}
+      <h3>Staff Details</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="role">Role</label>
+          <select id="role" name="role" {% if email|lower == 'kmahesh110606@outlook.com' %}disabled{% endif %}>
+            {% if email|lower == 'kmahesh110606@outlook.com' %}
+            <option value="ADMIN" selected>Admin</option>
+            {% else %}
+              {% for code, label in staff_roles %}
+              <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            {% endif %}
+          </select>
+          {% if email|lower == 'kmahesh110606@outlook.com' %}<input type="hidden" name="role" value="ADMIN" />{% endif %}
+        </div>
+        <div class="form-group">
+          <label for="job_title">Job Title</label>
+          <input id="job_title" name="job_title" required placeholder="Hostel Supervisor" />
+        </div>
+        <div class="form-group">
+          <label for="department">Concerned Department</label>
+          <select id="department" name="department" required>
+            <option value="">Select department</option>
+            {% for code, label in department_choices %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div id="mess-manager-caterer" class="form-group" style="display: none;">
+        <label for="assigned_mess_name">Assigned Caterer (for mess managers)</label>
+        <select id="assigned_mess_name" name="assigned_mess_name">
+          <option value="">Select assigned caterer</option>
+          {% for m in mess_names %}
+          <option value="{{ m }}">{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
       {% endif %}
-      <label for="new_password">Create Password</label>
-      <input id="new_password" name="new_password" type="password" minlength="8" required placeholder="At least 8 characters" />
-      <button type="submit">Verify OTP and Set Password</button>
+
+      <div class="form-group">
+        <label for="password">Create Password</label>
+        <input id="password" name="password" type="password" minlength="8" required placeholder="At least 8 characters" />
+      </div>
+      <div class="form-group">
+        <label for="confirm_password">Confirm Password</label>
+        <input id="confirm_password" name="confirm_password" type="password" minlength="8" required placeholder="Re-enter password" />
+      </div>
+      <div class="form-actions">
+        <button type="submit">Create Account</button>
+      </div>
     </form>
     {% endif %}
   </section>
 </div>
+
+<script>
+  (function () {
+    const blockSelect = document.getElementById("block");
+    const messTypeSelect = document.getElementById("mess_type");
+    const blockMessTypes = JSON.parse('{{ block_mess_types_json|escapejs }}');
+
+    function fillOptions(select, values, placeholder) {
+      if (!select) {
+        return;
+      }
+
+      select.innerHTML = "";
+      const placeholderOption = document.createElement("option");
+      placeholderOption.value = "";
+      placeholderOption.textContent = placeholder;
+      placeholderOption.disabled = true;
+      placeholderOption.selected = true;
+      select.appendChild(placeholderOption);
+
+      values.forEach((value) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value === "NON_VEG"
+          ? "Non-Veg"
+          : (value === "FOODPARK" ? "Food Park" : value.charAt(0) + value.slice(1).toLowerCase());
+        select.appendChild(option);
+      });
+
+      select.disabled = values.length === 0;
+    }
+
+    function syncMessTypesByBlock() {
+      if (!blockSelect || !messTypeSelect) {
+        return;
+      }
+
+      const selectedBlock = blockSelect.value || "";
+      const options = blockMessTypes[selectedBlock] || [];
+      fillOptions(messTypeSelect, options, options.length ? "Select mess type" : "Select block first");
+    }
+
+    const roleSelect = document.getElementById("role");
+    const managerField = document.getElementById("mess-manager-caterer");
+    const catererSelect = document.getElementById("assigned_mess_name");
+
+    function syncManagerField() {
+      if (!roleSelect || !managerField) {
+        return;
+      }
+      const isManager = roleSelect.value === "MESS_MANAGER";
+      managerField.style.display = isManager ? "block" : "none";
+      if (catererSelect) {
+        catererSelect.required = isManager;
+        if (!isManager) {
+          catererSelect.value = "";
+        }
+      }
+    }
+
+    if (blockSelect && messTypeSelect) {
+      blockSelect.addEventListener("change", syncMessTypesByBlock);
+      syncMessTypesByBlock();
+    }
+
+    if (roleSelect) {
+      roleSelect.addEventListener("change", syncManagerField);
+      syncManagerField();
+    }
+  })();
+</script>
 {% endblock %}

@@ -1,8 +1,56 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="tabs">
-  <section class="tab"><span class="label">Schedule</span><h2>Assign Laundry Days</h2><p class="muted">Set per-student day and holiday exceptions.</p></section>
-  <section class="tab"><span class="label">Scan</span><h2>QR Workflow</h2><p class="muted">Submission marks orange; collection within 1 week marks green.</p></section>
-  <section class="tab"><span class="label">Rules</span><h2>Validation</h2><p class="muted">Blocks multiple submissions on the same date.</p></section>
+<style>
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+  }
+
+  .dashboard-card {
+    text-decoration: none;
+    color: inherit;
+    display: grid;
+    place-items: center;
+    gap: 8px;
+    min-height: 180px;
+  }
+
+  .dashboard-card .ms-Icon {
+    font-size: 30px;
+    color: var(--primary);
+  }
+</style>
+
+<div class="dashboard-grid">
+  <a class="tab dashboard-card" href="/notifications/">
+    <i class="ms-Icon ms-Icon--Ringer"></i>
+    <h2>Notifications</h2>
+    {% with n=notifications|first %}
+      {% if n %}
+      <p class="muted"><strong>{{ n.title }}</strong> - {{ n.created_at|date:'d M, h:i A' }}</p>
+      {% else %}
+      <p class="muted">No alerts right now.</p>
+      {% endif %}
+    {% endwith %}
+  </a>
+
+  <a class="tab dashboard-card" href="/laundry/">
+    <i class="ms-Icon ms-Icon--Product"></i>
+    <h2>Schedule Tracking</h2>
+    <p class="muted">Manage student laundry schedules and status.</p>
+  </a>
+
+  <a class="tab dashboard-card" href="/laundry/">
+    <i class="ms-Icon ms-Icon--QRCode"></i>
+    <h2>QR Workflow</h2>
+    <p class="muted">Use QR process for submission and collection.</p>
+  </a>
+
+  <a class="tab dashboard-card" href="/profile/">
+    <i class="ms-Icon ms-Icon--Contact"></i>
+    <h2>Profile</h2>
+    <p class="muted">Review your account and role details.</p>
+  </a>
 </div>
 {% endblock %}

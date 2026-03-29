@@ -19,7 +19,7 @@ class PaginatedResponse<T> {
 
 /// Seamless feed manager to handle pagination without full reload
 class SeamlessFeedManager<T> {
-  List<T> _items = [];
+  final List<T> _items = [];
   int _currentPage = 1;
   int _total = 0;
   bool _hasMore = true;

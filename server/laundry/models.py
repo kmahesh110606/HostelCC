@@ -61,3 +61,18 @@ class LaundryEvent(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class LaundryRoomRange(models.Model):
+    block_name = models.CharField(max_length=10, db_index=True)
+    day_of_week = models.CharField(max_length=3, choices=LaundrySchedule.DayChoices.choices)
+    room_from = models.CharField(max_length=10)
+    room_to = models.CharField(max_length=10)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["block_name", "day_of_week", "room_from"]
+
+    def __str__(self):
+        return f"{self.block_name} {self.day_of_week}: {self.room_from}-{self.room_to}"

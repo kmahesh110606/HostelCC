@@ -2,6 +2,9 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PORT=8000
+ENV WEB_CONCURRENCY=3
+ENV GUNICORN_TIMEOUT=120
 
 WORKDIR /app
 
@@ -16,4 +19,4 @@ COPY . /app/
 
 EXPOSE 8000
 
-CMD ["gunicorn", "hostel_app.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+CMD ["sh", "-c", "gunicorn hostel_app.wsgi:application --bind 0.0.0.0:${PORT} --workers ${WEB_CONCURRENCY} --timeout ${GUNICORN_TIMEOUT}"]

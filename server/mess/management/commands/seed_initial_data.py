@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 
 from hostels.models import HostelBlock
 from mess.models import Caterer, MessMenu
+from mess.options import MESS_TYPES, iter_caterer_rows
 
 
 class Command(BaseCommand):
@@ -14,22 +15,11 @@ class Command(BaseCommand):
             block, _ = HostelBlock.objects.get_or_create(block_name=name)
             blocks[name] = block
 
-        caterers = [
-            ("Rassence", "veg, nonveg, foodpark", "A"),
-            ("Fusion", "veg, special", "A"),
-            ("Grace", "veg, nonveg, special", "D2"),
-            ("Proodle", "veg, foodpark", "D2"),
-            ("SRRC", "veg, nonveg, special", "C"),
-            ("Zenith", "veg, nonveg, foodpark", "C"),
-            ("AB", "veg, nonveg, special", "B"),
-            ("PR Sathya", "veg, nonveg, special", "E"),
-        ]
-
-        for name, meal_types, block_name in caterers:
+        for block_name, mess_type, name in iter_caterer_rows():
             Caterer.objects.get_or_create(
                 name=name,
                 block=blocks[block_name],
-                defaults={"meal_types": meal_types},
+                meal_types=mess_type,
             )
 
         mock_menu = {
@@ -65,15 +55,17 @@ class Command(BaseCommand):
             },
         }
 
-        for day, items in mock_menu.items():
-            MessMenu.objects.update_or_create(
-                week_day=day,
-                defaults={
-                    "breakfast_items": items["breakfast"],
-                    "lunch_items": items["lunch"],
-                    "snacks_items": items["snacks"],
-                    "dinner_items": items["dinner"],
-                },
-            )
+        for mess_type in MESS_TYPES.keys():
+            for day, items in mock_menu.items():
+                MessMenu.objects.update_or_create(
+                    mess_type=mess_type,
+                    week_day=day,
+                    defaults={
+                        "breakfast_items": items["breakfast"],
+                        "lunch_items": items["lunch"],
+                        "snacks_items": items["snacks"],
+                        "dinner_items": items["dinner"],
+                    },
+                )
 
         self.stdout.write(self.style.SUCCESS("Seeded blocks, caterers, and mess menu."))

@@ -1,0 +1,420 @@
+/* HostelCC Global UI polish for templates and forms */
+
+:root {
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --ring: 0 0 0 4px rgba(0, 120, 212, 0.16);
+  --surface-soft: color-mix(in srgb, var(--panel) 86%, var(--primary) 14%);
+}
+
+/* Core typography + rhythm */
+form,
+fieldset,
+.tab,
+.auth-panel,
+.community-panel,
+.feed-card,
+.laundry-card {
+  letter-spacing: 0.01em;
+}
+
+form {
+  display: grid;
+  gap: 12px;
+}
+
+form .row {
+  margin: 0;
+}
+
+label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hint,
+.helper-text,
+.muted.small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* Inputs */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="search"],
+input[type="file"],
+textarea,
+select {
+  width: 100%;
+  max-width: 100%;
+  min-height: 44px;
+  margin: 4px 0 0;
+  border: 1px solid color-mix(in srgb, var(--line) 78%, var(--primary) 22%);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 95%, white 5%), var(--panel));
+  color: var(--text);
+  padding: 11px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  box-sizing: border-box;
+}
+
+input:hover:not(:focus):not(:disabled),
+textarea:hover:not(:focus):not(:disabled),
+select:hover:not(:focus):not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary-light) 60%, var(--line) 40%);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--ring);
+  background: var(--panel);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: color-mix(in srgb, var(--muted) 85%, transparent 15%);
+}
+
+textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%235a5a5a' stroke-width='1.75'%3E%3Cpath d='M5 8l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 38px;
+}
+
+select option {
+  background: var(--panel);
+  color: var(--text);
+}
+
+input[type="file"] {
+  padding: 10px;
+  border-style: dashed;
+  background: color-mix(in srgb, var(--panel) 85%, var(--bg) 15%);
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--bg) 92%, var(--line) 8%);
+}
+
+input[readonly],
+textarea[readonly] {
+  background: color-mix(in srgb, var(--bg) 90%, var(--panel) 10%);
+}
+
+/* Checkbox + radio */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.checkbox-group,
+.radio-group {
+  display: grid;
+  gap: 10px;
+}
+
+.checkbox-item,
+.radio-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Structure helpers */
+.form-group {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.form-group.required label::after {
+  content: " *";
+  color: var(--error);
+}
+
+.form-group.has-error input,
+.form-group.has-error textarea,
+.form-group.has-error select {
+  border-color: var(--error);
+  box-shadow: 0 0 0 3px rgba(232, 17, 35, 0.12);
+}
+
+.form-group .error-message {
+  display: none;
+  color: var(--error);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.form-group.has-error .error-message {
+  display: block;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.form-actions {
+  margin-top: 6px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Buttons */
+button,
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+.button {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  min-height: 40px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+
+button,
+input[type="submit"],
+.button:not(.secondary):not(.danger):not(.success):not(.linklike) {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 92%, #ffffff 8%), color-mix(in srgb, var(--primary-dark) 75%, var(--primary) 25%));
+  border-color: color-mix(in srgb, var(--primary-dark) 60%, var(--primary) 40%);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(0, 120, 212, 0.24);
+}
+
+button:hover:not(:disabled),
+input[type="submit"]:hover:not(:disabled),
+.button:not(.secondary):not(.danger):not(.success):not(.linklike):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(0, 120, 212, 0.3);
+}
+
+button:active:not(:disabled),
+input[type="submit"]:active:not(:disabled),
+.button:not(.secondary):not(.danger):not(.success):not(.linklike):active {
+  transform: translateY(0);
+}
+
+.button.secondary,
+input[type="reset"],
+button.secondary {
+  background: color-mix(in srgb, var(--panel) 90%, var(--bg) 10%);
+  border-color: color-mix(in srgb, var(--line) 70%, var(--primary) 30%);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.button.secondary:hover,
+input[type="reset"]:hover,
+button.secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.button.danger,
+button.danger {
+  background: linear-gradient(135deg, #ff4658, #c71b2d);
+  border-color: #a71424;
+  color: #fff;
+}
+
+.button.success,
+button.success {
+  background: linear-gradient(135deg, #21a41c, #0f6f0f);
+  border-color: #0c5a0c;
+  color: #fff;
+}
+
+button:disabled,
+input:disabled,
+.button:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.linklike {
+  background: transparent;
+  color: var(--primary);
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  min-height: unset;
+  display: inline;
+}
+
+/* Cards + utility surfaces */
+fieldset,
+.surface,
+.soft-card,
+.table-wrap {
+  border: 1px solid color-mix(in srgb, var(--line) 78%, var(--primary) 22%);
+  border-radius: var(--radius-md);
+  background: linear-gradient(175deg, color-mix(in srgb, var(--panel) 97%, white 3%), var(--panel));
+}
+
+fieldset {
+  padding: 14px;
+}
+
+fieldset legend {
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Alerts */
+.error,
+.success,
+.form-message {
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.error,
+.form-message.error {
+  background: rgba(232, 17, 35, 0.1);
+  border-color: rgba(232, 17, 35, 0.32);
+  color: #b0101f;
+}
+
+.success,
+.form-message.success {
+  background: rgba(16, 124, 16, 0.1);
+  border-color: rgba(16, 124, 16, 0.32);
+  color: #0d6410;
+}
+
+.form-message.warning {
+  background: rgba(255, 185, 0, 0.12);
+  border-color: rgba(255, 185, 0, 0.35);
+  color: #9f6a00;
+}
+
+.form-message.info {
+  background: rgba(0, 120, 212, 0.11);
+  border-color: rgba(0, 120, 212, 0.3);
+  color: #005ea8;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 80%, var(--primary) 20%);
+}
+
+tbody tr:hover {
+  background: color-mix(in srgb, var(--panel) 86%, var(--primary) 14%);
+}
+
+/* Page entry animation for cleaner visual feel */
+.shell {
+  animation: shellFadeIn 0.3s ease;
+}
+
+@keyframes shellFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions {
+    justify-content: stretch;
+  }
+
+  .form-actions > * {
+    flex: 1 1 auto;
+  }
+
+  button,
+  input[type="submit"],
+  input[type="button"],
+  input[type="reset"],
+  .button {
+    width: 100%;
+  }
+}

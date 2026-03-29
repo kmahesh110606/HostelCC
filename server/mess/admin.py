@@ -5,21 +5,22 @@ from .models import Caterer, Feedback, MenuPollOption, MenuPollVote, MessChangeR
 
 @admin.register(MessMenu)
 class MessMenuAdmin(admin.ModelAdmin):
-    list_display = ("week_day",)
-    search_fields = ("week_day",)
+    list_display = ("mess_type", "week_day")
+    search_fields = ("mess_type", "week_day")
+    list_filter = ("mess_type",)
 
 
 @admin.register(Caterer)
 class CatererAdmin(admin.ModelAdmin):
     list_display = ("name", "block", "meal_types")
-    list_filter = ("block",)
+    list_filter = ("block", "meal_types")
     search_fields = ("name", "meal_types")
 
 
 @admin.register(Feedback)
 class FeedbackAdmin(admin.ModelAdmin):
-    list_display = ("student", "menu_item", "rating", "month", "created_at")
-    list_filter = ("month", "rating")
+    list_display = ("student", "week_day", "meal_time", "menu_item", "rating", "month", "created_at")
+    list_filter = ("month", "week_day", "meal_time", "rating")
 
 
 @admin.register(MenuPollOption)

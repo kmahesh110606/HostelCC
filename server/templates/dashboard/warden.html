@@ -1,8 +1,56 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="tabs">
-  <section class="tab"><span class="label">Community</span><h2>Warden Complaint View</h2><p class="muted">Tag and review complaints. Print unresolved counts by category from API.</p></section>
-  <section class="tab"><span class="label">Mess</span><h2>Mess Monitoring</h2><p class="muted">Read menus and monitor high-volume feedback trends.</p></section>
-  <section class="tab"><span class="label">Laundry</span><h2>Laundry Oversight</h2><p class="muted">Check schedule integrity and breach reports.</p></section>
+<style>
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+  }
+
+  .dashboard-card {
+    text-decoration: none;
+    color: inherit;
+    display: grid;
+    place-items: center;
+    gap: 8px;
+    min-height: 180px;
+  }
+
+  .dashboard-card .ms-Icon {
+    font-size: 30px;
+    color: var(--primary);
+  }
+</style>
+
+<div class="dashboard-grid">
+  <a class="tab dashboard-card" href="/notifications/">
+    <i class="ms-Icon ms-Icon--Ringer"></i>
+    <h2>Notifications</h2>
+    {% with n=notifications|first %}
+      {% if n %}
+      <p class="muted"><strong>{{ n.title }}</strong> - {{ n.created_at|date:'d M, h:i A' }}</p>
+      {% else %}
+      <p class="muted">No alerts right now.</p>
+      {% endif %}
+    {% endwith %}
+  </a>
+
+  <a class="tab dashboard-card" href="/community/">
+    <i class="ms-Icon ms-Icon--Comment"></i>
+    <h2>Community</h2>
+    <p class="muted">Review and moderate complaint threads.</p>
+  </a>
+
+  <a class="tab dashboard-card" href="/mess/">
+    <i class="ms-Icon ms-Icon--EatDrink"></i>
+    <h2>Mess Oversight</h2>
+    <p class="muted">Monitor menu quality and feedback trends.</p>
+  </a>
+
+  <a class="tab dashboard-card" href="/laundry/">
+    <i class="ms-Icon ms-Icon--Product"></i>
+    <h2>Laundry Oversight</h2>
+    <p class="muted">Track schedule quality and service gaps.</p>
+  </a>
 </div>
 {% endblock %}

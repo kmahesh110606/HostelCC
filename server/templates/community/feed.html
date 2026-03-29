@@ -1,151 +1,774 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="tabs" style="grid-template-columns: 2fr 1fr;">
-  <section class="tab">
-    <span class="label">Community</span>
-    <h2>Hostel Complaints Feed</h2>
-    <p class="muted">Post text/image/video complaints and tag the relevant category.</p>
+<style>
+  .ms-Icon {
+    font-family: 'FabricMDL2Icons', 'FabricMDL2Icons-0', 'Segoe MDL2 Assets', sans-serif !important;
+  }
 
-    <form method="get" class="row" style="align-items: flex-end; margin-top: 14px;">
-      <div style="flex: 1 1 220px;">
+  .feed-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: linear-gradient(155deg, rgba(0, 120, 212, 0.08), rgba(16, 124, 16, 0.06));
+  }
+
+  .new-complaint-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #0f6cbd, #107c10);
+    color: #fff;
+    font-weight: 700;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .new-complaint-btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .community-layout {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .community-panel {
+    background: linear-gradient(165deg, rgba(0, 120, 212, 0.08), rgba(16, 124, 16, 0.05));
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: none;
+  }
+
+  .community-panel h2,
+  .community-panel h3 {
+    margin-bottom: 8px;
+  }
+
+  .community-panel .muted {
+    margin-bottom: 12px;
+  }
+
+  .side-panel {
+    position: sticky;
+    top: 90px;
+  }
+
+  .active-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .active-item {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    background: var(--panel);
+  }
+
+  .feed-area {
+    display: grid;
+    gap: 14px;
+  }
+
+  .feed-card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 120, 212, 0.04));
+    box-shadow: none;
+    transition: border-color 0.2s ease;
+  }
+
+  .feed-card:hover {
+    border-color: rgba(0, 120, 212, 0.34);
+  }
+
+  .tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    font-weight: 700;
+    font-size: 12px;
+  }
+
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .status-dot-active {
+    background: #107c10;
+  }
+
+  .status-dot-progress {
+    background: #ffb900;
+  }
+
+  .status-dot-closed {
+    background: #e81123;
+  }
+
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .feed-media {
+    width: 100%;
+    max-height: 440px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    margin-top: 8px;
+  }
+
+  .actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 10px;
+  }
+
+  .actions-row form {
+    margin: 0;
+  }
+
+  .action-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--panel) 92%, var(--line) 8%);
+    color: var(--text);
+    min-width: 62px;
+    min-height: 36px;
+    padding: 6px 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .action-pill i {
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .action-pill:hover {
+    border-color: rgba(0, 120, 212, 0.45);
+  }
+
+  .action-pill.upvote:hover {
+    background: rgba(16, 124, 16, 0.12);
+    border-color: rgba(16, 124, 16, 0.5);
+  }
+
+  .action-pill.downvote:hover {
+    background: rgba(232, 17, 35, 0.1);
+    border-color: rgba(232, 17, 35, 0.48);
+  }
+
+  .action-pill.comments:hover {
+    background: rgba(0, 120, 212, 0.1);
+  }
+
+  .action-pill .vote-count {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .action-pill.active {
+    border-color: var(--primary);
+    background: rgba(0, 120, 212, 0.12);
+  }
+
+  .manage-status-form {
+    margin-left: auto;
+  }
+
+  .comment-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+  }
+
+  .comment-modal.open {
+    display: flex;
+  }
+
+  .comment-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(12, 18, 28, 0.62);
+    backdrop-filter: blur(2px);
+  }
+
+  .comment-modal-card {
+    position: relative;
+    width: min(860px, 100%);
+    max-height: 88vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--panel);
+    box-shadow: 0 20px 52px rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+  }
+
+  .new-complaint-modal .comment-modal-card {
+    width: min(720px, 100%);
+  }
+
+  .comment-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .comment-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .comment-modal-close {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .comment-modal-close:hover {
+    border-color: rgba(232, 17, 35, 0.42);
+    color: #e81123;
+  }
+
+  .comment-modal-content {
+    overflow-y: auto;
+    padding: 14px 16px;
+  }
+
+  .comment-modal-footer {
+    border-top: 1px solid var(--line);
+    padding: 14px 16px;
+    background: color-mix(in srgb, var(--panel) 94%, var(--line) 6%);
+  }
+
+  .comments-box {
+    margin: 0;
+    padding: 0;
+  }
+
+  .comment-item {
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+  }
+
+  .comment-item.activity {
+    border-left: 4px solid var(--primary);
+    background: rgba(0, 120, 212, 0.08);
+  }
+
+  .comment-metadata {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  body.modal-open {
+    overflow: hidden;
+  }
+
+  @media (max-width: 1080px) {
+    .community-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .side-panel {
+      position: static;
+      top: auto;
+    }
+
+    .feed-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .new-complaint-btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .actions-row .action-pill {
+      flex: 1 1 calc(50% - 8px);
+      justify-content: center;
+      min-height: 40px;
+    }
+
+    .manage-status-form {
+      margin-left: 0;
+      width: 100%;
+    }
+
+    .manage-status-form select,
+    .manage-status-form button {
+      width: 100%;
+    }
+
+    .comment-modal {
+      padding: 10px;
+    }
+
+    .comment-modal-card {
+      max-height: 92vh;
+    }
+  }
+</style>
+
+<div class="feed-toolbar">
+  <div>
+    <span class="label"><i class="ms-Icon ms-Icon--People"></i> Community Actions</span>
+    <p class="muted" style="margin: 6px 0 0;">Tap New Complaint to post. Feed stays focused and cleaner on mobile.</p>
+  </div>
+  <button type="button" class="new-complaint-btn" data-modal-target="new-complaint-modal" aria-label="Open new complaint form">
+    <i class="ms-Icon ms-Icon--Add"></i>
+    New Complaint
+  </button>
+</div>
+
+<div class="community-layout">
+  <aside class="community-panel side-panel">
+    <span class="label"><i class="ms-Icon ms-Icon--Filter"></i> Feed Controls</span>
+    <h2>Find Complaints</h2>
+    <p class="muted">Filter by block, status, category, and sorting.</p>
+
+    <form method="get" style="margin-top: 8px;">
+      <div class="form-group">
         <label for="q">Search</label>
-        <input id="q" name="q" value="{{ query }}" placeholder="Search complaints" />
+        <input id="q" name="q" value="{{ query }}" placeholder="Search text or author" />
       </div>
-      <div style="flex: 1 1 180px;">
-        <label for="category_filter">Category</label>
-        <select id="category_filter" name="category">
-          <option value="">All</option>
-          {% for code, label in categories %}
-          <option value="{{ code }}" {% if category_filter == code %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="category_filter">Category</label>
+          <select id="category_filter" name="category">
+            <option value="">All</option>
+            {% for code, label in categories %}
+            <option value="{{ code }}" {% if category_filter == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="status_filter">Status</label>
+          <select id="status_filter" name="status">
+            <option value="">All</option>
+            {% for code, label in status_choices %}
+            <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
-      <div style="flex: 1 1 150px;">
-        <label for="media_filter">Media</label>
-        <select id="media_filter" name="media_type">
-          <option value="">All</option>
-          {% for code, label in media_choices %}
-          <option value="{{ code }}" {% if media_filter == code %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="block_filter">Block</label>
+          <select id="block_filter" name="block">
+            <option value="">All</option>
+            {% for block in block_choices %}
+            <option value="{{ block }}" {% if block_filter == block %}selected{% endif %}>{{ block }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="sort_filter">Sort</label>
+          <select id="sort_filter" name="sort">
+            <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>Newest</option>
+            <option value="oldest" {% if sort_by == 'oldest' %}selected{% endif %}>Oldest</option>
+            <option value="upvotes" {% if sort_by == 'upvotes' %}selected{% endif %}>Most Upvoted</option>
+          </select>
+        </div>
       </div>
-      <div>
-        <button type="submit">Apply</button>
+      <div class="form-actions" style="justify-content: stretch;">
+        <button type="submit" style="width: 100%;" class="secondary"><i class="ms-Icon ms-Icon--Filter"></i> Apply Filters</button>
       </div>
     </form>
 
-    <form method="post" enctype="multipart/form-data" style="margin-top: 20px; border-top: 1px solid var(--line); padding-top: 16px;">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="create" />
-      <label for="category">Complaint Tag</label>
-      <select id="category" name="category" required>
-        <option value="">Select category</option>
-        {% for code, label in categories %}
-        <option value="{{ code }}">{{ label }}</option>
-        {% endfor %}
-      </select>
-      <label for="text">Complaint</label>
-      <textarea id="text" name="text" rows="4" placeholder="Describe the issue clearly"></textarea>
-      <label for="media">Image/Video (optional)</label>
-      <input id="media" name="media" type="file" accept="image/*,video/*" />
-      <button type="submit">Post Complaint</button>
-    </form>
+    {% if show_management_panel %}
+    <h3 style="margin-top: 18px;">Active Complaints</h3>
+    <div class="active-list">
+      {% for active in active_complaints %}
+      <div class="active-item">
+        <div class="tag-row">
+          <span class="status-dot status-dot-active"></span>
+          <strong>#{{ active.id }}</strong>
+          <span class="tag-chip">{{ active.get_category_display }}</span>
+        </div>
+        <p class="muted" style="margin: 0;">{{ active.text|truncatechars:90 }}</p>
+      </div>
+      {% empty %}
+      <p class="muted">No active complaints currently.</p>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </aside>
 
-    <div style="margin-top: 22px; display: grid; gap: 14px;">
-      {% for item in complaint_items %}
-      <article class="tab" style="margin: 0;">
-        <div class="row" style="justify-content: space-between; align-items: flex-start;">
-          <div>
-            <span class="label">{{ item.obj.get_category_display }}</span>
-            <h3 style="margin: 8px 0 6px;">{{ item.author_name }}</h3>
-            <p class="muted" style="margin: 0;">Reg No: {{ item.registration_no|default:'N/A' }} | Hostel: {{ item.block_name|default:'N/A' }} | Room: {{ item.room_no|default:'N/A' }}</p>
+  <section class="feed-area">
+    <div class="community-panel">
+      <span class="label"><i class="ms-Icon ms-Icon--AllApps"></i> Community Feed</span>
+      <h2>Complaint Threads</h2>
+      <p class="muted">Supervisors manage their department, wardens manage all departments, and status updates stay inside comments.</p>
+    </div>
+
+    {% for item in complaint_items %}
+    <article class="feed-card">
+      <div class="meta-row">
+        <div>
+          <div class="tag-row">
+            <span class="tag-chip"><i class="ms-Icon ms-Icon--Tag"></i> {{ item.obj.get_category_display }}</span>
+            <span class="tag-chip"><i class="ms-Icon ms-Icon--Pinned"></i> Block {{ item.block_name|default:'N/A' }}</span>
+            <span class="tag-chip"><i class="ms-Icon ms-Icon--DateTime2"></i> {{ item.obj.created_at|date:'d M Y, h:i A' }}</span>
           </div>
+          <h3 style="margin: 2px 0 4px;">{{ item.author_name }}</h3>
+          <p class="muted" style="margin: 0;">Reg No: {{ item.registration_no|default:'N/A' }} | Room: {{ item.room_no|default:'N/A' }}</p>
+        </div>
+
+        <div style="display: grid; gap: 8px;">
+          <span class="status-chip">
+            {% if item.obj.status == 'OPEN' %}
+              <span class="status-dot status-dot-active"></span> Active
+            {% elif item.obj.status == 'IN_PROGRESS' %}
+              <span class="status-dot status-dot-progress"></span> In Progress
+            {% else %}
+              <span class="status-dot status-dot-closed"></span> Closed
+            {% endif %}
+          </span>
+
           {% if item.can_delete %}
           <form method="post" onsubmit="return confirm('Delete this post?')">
             {% csrf_token %}
             <input type="hidden" name="action" value="delete" />
             <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
-            <button type="submit" class="button secondary">Delete</button>
+            <button type="submit" class="button secondary" style="width: 100%;"><i class="ms-Icon ms-Icon--Delete"></i> Delete</button>
           </form>
           {% endif %}
         </div>
+      </div>
 
-        {% if item.obj.text %}
-        <p style="margin-top: 10px; white-space: pre-wrap;">{{ item.obj.text }}</p>
+      {% if item.obj.text %}
+      <p style="margin-top: 8px; white-space: pre-wrap;">{{ item.obj.text }}</p>
+      {% endif %}
+
+      {% if item.obj.media %}
+        {% if item.obj.media_type == 'IMAGE' %}
+        <img src="{{ item.obj.media.url }}" alt="Complaint media" class="feed-media" />
+        {% elif item.obj.media_type == 'VIDEO' %}
+        <video controls class="feed-media">
+          <source src="{{ item.obj.media.url }}" />
+        </video>
         {% endif %}
+      {% endif %}
 
-        {% if item.obj.media %}
-          {% if item.obj.media_type == 'IMAGE' %}
-          <img src="{{ item.obj.media.url }}" alt="Complaint media" style="width: 100%; max-height: 420px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line);" />
-          {% elif item.obj.media_type == 'VIDEO' %}
-          <video controls style="width: 100%; max-height: 420px; border-radius: 8px; border: 1px solid var(--line);">
-            <source src="{{ item.obj.media.url }}" />
-          </video>
-          {% endif %}
+      <div class="actions-row">
+        <form method="post" class="vote-form" data-direction="up">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="vote" />
+          <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
+          <input type="hidden" name="direction" value="up" />
+          <button type="submit" class="action-pill upvote vote-up" aria-label="Upvote complaint {{ item.obj.id }}">
+            <i class="ms-Icon ms-Icon--Up"></i>
+            <span class="vote-count">{{ item.obj.upvotes }}</span>
+          </button>
+        </form>
+
+        <form method="post" class="vote-form" data-direction="down">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="vote" />
+          <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
+          <input type="hidden" name="direction" value="down" />
+          <button type="submit" class="action-pill downvote vote-down" aria-label="Downvote complaint {{ item.obj.id }}">
+            <i class="ms-Icon ms-Icon--Down"></i>
+            <span class="vote-count">{{ item.obj.downvotes }}</span>
+          </button>
+        </form>
+
+        <button type="button" class="action-pill comments open-comments-btn" data-modal-target="comments-modal-{{ item.obj.id }}" aria-label="Open comments for complaint {{ item.obj.id }}">
+          <i class="ms-Icon ms-Icon--CommentSolid"></i>
+          <span class="vote-count">{{ item.obj.replies.count }}</span>
+        </button>
+
+        {% if item.can_manage %}
+        <form method="post" class="row manage-status-form" style="gap: 8px; align-items: center;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="set_status" />
+          <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
+          <select name="status" style="width: 170px; margin: 0;">
+            {% for code, label in status_choices %}
+            <option value="{{ code }}" {% if item.obj.status == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit"><i class="ms-Icon ms-Icon--CompletedSolid"></i> Update Status</button>
+        </form>
         {% endif %}
+      </div>
+    </article>
 
-        <div class="row" style="margin-top: 10px;">
-          <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="vote" />
-            <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
-            <input type="hidden" name="direction" value="up" />
-            <button type="submit" class="button secondary">Upvote ({{ item.obj.upvotes }})</button>
-          </form>
-          <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="vote" />
-            <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
-            <input type="hidden" name="direction" value="down" />
-            <button type="submit" class="button secondary">Downvote ({{ item.obj.downvotes }})</button>
-          </form>
-          <span class="muted">{{ item.obj.created_at|date:'d M Y, h:i A' }}</span>
+    <div id="comments-modal-{{ item.obj.id }}" class="comment-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title-{{ item.obj.id }}">
+      <div class="comment-modal-backdrop" data-modal-close></div>
+      <div class="comment-modal-card">
+        <div class="comment-modal-header">
+          <h4 id="modal-title-{{ item.obj.id }}" class="comment-modal-title">
+            <i class="ms-Icon ms-Icon--Comment"></i>
+            Complaint #{{ item.obj.id }} Comments
+          </h4>
+          <button type="button" class="comment-modal-close" data-modal-close aria-label="Close comments modal">
+            <i class="ms-Icon ms-Icon--ChromeClose"></i>
+          </button>
         </div>
 
-        <div style="margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px;">
-          <h4 style="margin: 0 0 8px;">Comments</h4>
-          {% for reply in item.obj.replies.all %}
-          <p style="margin: 0 0 8px;"><strong>{{ reply.author.get_full_name|default:reply.author.username }}</strong>: {{ reply.text }}</p>
-          {% empty %}
-          <p class="muted" style="margin: 0 0 8px;">No comments yet.</p>
-          {% endfor %}
-          <form method="post" class="row" style="align-items: flex-end;">
+        <div class="comment-modal-content">
+          <div class="comments-box">
+            {% for reply in item.obj.replies.all %}
+            <div class="comment-item {% if '[Status Update]' in reply.text %}activity{% endif %}">
+              <div class="comment-metadata">
+                <strong>{{ reply.author.get_full_name|default:reply.author.username }}</strong>
+                <span>{{ reply.created_at|date:'d M Y, h:i A' }}</span>
+              </div>
+              <div>{{ reply.text }}</div>
+            </div>
+            {% empty %}
+            <p class="muted" style="margin: 0;">No comments yet. Start the discussion.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="comment-modal-footer">
+          <form method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="comment" />
             <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
-            <div style="flex: 1;">
-              <label for="comment_{{ item.obj.id }}">Add Comment</label>
-              <input id="comment_{{ item.obj.id }}" name="comment_text" required placeholder="Write a comment" />
-            </div>
-            <div>
-              <button type="submit">Comment</button>
+            <div class="form-row" style="align-items: end;">
+              <div class="form-group" style="margin: 0;">
+                <label for="comment_{{ item.obj.id }}">Add Comment</label>
+                <input id="comment_{{ item.obj.id }}" name="comment_text" required placeholder="Write a response or status update" />
+              </div>
+              <div class="form-group" style="margin: 0;">
+                <button type="submit"><i class="ms-Icon ms-Icon--Send"></i> Comment</button>
+              </div>
             </div>
           </form>
         </div>
-      </article>
-      {% empty %}
-      <p class="muted">No posts yet. Be the first to post a complaint.</p>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="tab">
-    <span class="label">Mess</span>
-    <h2>Sample Weekly Menu</h2>
-    <p class="muted">Quick view of meal plan while browsing community posts.</p>
-    <div style="display: grid; gap: 10px; margin-top: 12px;">
-      {% for menu in menus %}
-      <div style="border: 1px solid var(--line); border-radius: 8px; padding: 10px;">
-        <h3 style="margin: 0 0 8px;">{{ menu.get_week_day_display }}</h3>
-        <p class="muted"><strong>Breakfast:</strong> {{ menu.breakfast_items }}</p>
-        <p class="muted"><strong>Lunch:</strong> {{ menu.lunch_items }}</p>
-        <p class="muted"><strong>Snacks:</strong> {{ menu.snacks_items }}</p>
-        <p class="muted"><strong>Dinner:</strong> {{ menu.dinner_items }}</p>
       </div>
-      {% empty %}
-      <p class="muted">Menu not configured yet.</p>
-      {% endfor %}
     </div>
+    {% empty %}
+    <div class="community-panel">
+      <p class="muted">No posts yet. Be the first to post a complaint.</p>
+    </div>
+    {% endfor %}
   </section>
 </div>
+
+<div id="new-complaint-modal" class="comment-modal new-complaint-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="new-complaint-title">
+  <div class="comment-modal-backdrop" data-modal-close></div>
+  <div class="comment-modal-card">
+    <div class="comment-modal-header">
+      <h3 id="new-complaint-title" class="comment-modal-title">
+        <i class="ms-Icon ms-Icon--Add"></i>
+        Create New Complaint
+      </h3>
+      <button type="button" class="comment-modal-close" data-modal-close aria-label="Close new complaint modal">
+        <i class="ms-Icon ms-Icon--ChromeClose"></i>
+      </button>
+    </div>
+    <div class="comment-modal-content">
+      <form method="post" enctype="multipart/form-data" style="display: grid; gap: 10px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create" />
+        <div class="form-group required">
+          <label for="modal_category">Category Tag</label>
+          <select id="modal_category" name="category" required>
+            <option value="">Select category</option>
+            {% for code, label in categories %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group required">
+          <label for="modal_text">Complaint Text</label>
+          <textarea id="modal_text" name="text" rows="5" placeholder="Explain the issue in detail"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="modal_media">Image or Video</label>
+          <input id="modal_media" name="media" type="file" accept="image/*,video/*" />
+        </div>
+        <div class="form-actions" style="justify-content: stretch; margin-top: 2px;">
+          <button type="submit" style="width: 100%;"><i class="ms-Icon ms-Icon--Send"></i> Post to Community</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const openButtons = document.querySelectorAll('[data-modal-target]');
+    const closeButtons = document.querySelectorAll('[data-modal-close]');
+    const voteForms = document.querySelectorAll('.vote-form');
+
+    function closeModal(modal) {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+    }
+
+    function openModal(modal) {
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('modal-open');
+    }
+
+    openButtons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        const modalId = button.getAttribute('data-modal-target');
+        const modal = document.getElementById(modalId);
+        if (modal) {
+          openModal(modal);
+        }
+      });
+    });
+
+    closeButtons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        const modal = button.closest('.comment-modal');
+        if (modal) {
+          closeModal(modal);
+        }
+      });
+    });
+
+    voteForms.forEach(function (form) {
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        const formData = new FormData(form);
+        const card = form.closest('.feed-card');
+        if (!card) {
+          form.submit();
+          return;
+        }
+
+        fetch(form.getAttribute('action') || window.location.pathname, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (data) {
+          if (!data.success) {
+            return;
+          }
+
+          const upButton = card.querySelector('.vote-up');
+          const downButton = card.querySelector('.vote-down');
+
+          if (upButton) {
+            const countNode = upButton.querySelector('.vote-count');
+            if (countNode) {
+              countNode.textContent = data.upvotes;
+            }
+            upButton.classList.toggle('active', data.user_vote === 'up');
+          }
+
+          if (downButton) {
+            const countNode = downButton.querySelector('.vote-count');
+            if (countNode) {
+              countNode.textContent = data.downvotes;
+            }
+            downButton.classList.toggle('active', data.user_vote === 'down');
+          }
+        })
+        .catch(function () {
+          form.submit();
+        });
+      });
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        document.querySelectorAll('.comment-modal.open').forEach(function (modal) {
+          closeModal(modal);
+        });
+      }
+    });
+
+  })();
+</script>
 {% endblock %}

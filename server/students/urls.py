@@ -9,5 +9,7 @@ student_upload = StudentViewSet.as_view({"post": "upload_csv"})
 urlpatterns = [
     path("", student_list, name="student-list"),
     path("upload-csv", student_upload, name="student-upload-csv"),
+    path("upload-csv/", student_upload, name="student-upload-csv-slash"),
     path("<int:pk>", student_detail, name="student-detail"),
+    path("<int:pk>/", student_detail, name="student-detail-slash"),
 ]

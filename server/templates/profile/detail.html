@@ -32,19 +32,69 @@
         <input value="{% if student %}{{ student.room_no }}{% else %}N/A{% endif %}" disabled />
       </div>
       <div>
-        <label>Mess Allotment</label>
-        <input value="{% if student %}{{ student.mess_allotment }}{% else %}N/A{% endif %}" disabled />
+        <label>Mess Type</label>
+        <input value="{% if student %}{{ student.get_mess_allotment_display }}{% else %}N/A{% endif %}" disabled />
       </div>
       <div>
-        <label>Points Balance</label>
-        <input value="{% if student %}{{ student.points_balance }}{% else %}N/A{% endif %}" disabled />
+        <label>Allotted Mess Caterer</label>
+        <input value="{% if student and student_mess_caterers %}{{ student_mess_caterers|join:', ' }}{% else %}N/A{% endif %}" disabled />
       </div>
     </div>
+
+    {% if student %}
+    <div style="margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px;">
+      <h3 style="margin-bottom: 6px;">Monthly Mess Change</h3>
+      {% if student.mess_change_unlocked %}
+      <p class="muted">Admin has unlocked your profile this month. Pick your new mess and submit once.</p>
+      <form method="post" style="display: grid; gap: 10px; max-width: 360px; margin-top: 10px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_mess_choice" />
+        <div>
+          <label for="mess_allotment">Choose Mess Type</label>
+          <select id="mess_allotment" name="mess_allotment" required>
+            <option value="">Select mess type</option>
+            {% for m in editable_mess_types %}
+            <option value="{{ m }}" {% if student.mess_allotment == m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit">Save Mess Preference</button>
+      </form>
+      {% else %}
+      <p class="muted">Mess change is locked. Admin can unlock your profile during the monthly change window.</p>
+      {% endif %}
+    </div>
+    {% endif %}
 
     <div class="row" style="margin-top: 16px;">
       <a class="button" href="/accounts/forgot-password/">Forgot Password</a>
       <a class="button secondary" href="/community/">Open Community</a>
     </div>
   </section>
+
+  {% if user.role == 'ADMIN' %}
+  <section class="tab" style="margin-top: 14px;">
+    <h2>Admin: Unlock Student Mess Changes</h2>
+    <p class="muted">Enable this once per month so a student can update mess allotment from their profile.</p>
+    <form method="post" style="display: grid; gap: 10px; max-width: 520px; margin-top: 8px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="set_mess_unlock" />
+      <div>
+        <label for="student_id">Student</label>
+        <select id="student_id" name="student_id" required>
+          <option value="">Select student</option>
+          {% for s in students_for_admin %}
+          <option value="{{ s.id }}">{{ s.roll_no }} - {{ s.name }} ({{ s.block.block_name }}) {% if s.mess_change_unlocked %}[UNLOCKED]{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="checkbox-item">
+        <input type="checkbox" id="mess_change_unlocked" name="mess_change_unlocked" checked />
+        <label for="mess_change_unlocked">Unlock selected student</label>
+      </div>
+      <button type="submit">Update Access</button>
+    </form>
+  </section>
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,13 +1,31 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.core.paginator import Paginator
+import json
 
-from mess.models import MessMenu
 from students.models import Student
 
 from .models import Complaint, ComplaintReply, ComplaintVote
+
+
+def _can_manage_complaint(user, complaint: Complaint) -> bool:
+    if not user.is_authenticated:
+        return False
+    if user.role in {"ADMIN", "WARDEN"}:
+        return True
+    return user.role == "SUPERVISOR" and bool(user.department and user.department == complaint.category)
+
+
+def _log_status_activity(complaint: Complaint, actor, new_status: str) -> None:
+    actor_name = actor.get_full_name().strip() or actor.username
+    ComplaintReply.objects.create(
+        complaint=complaint,
+        author=actor,
+        text=f"[Status Update] {actor_name} set status to {complaint.get_status_display()}.",
+    )
 
 
 def _infer_media_type(uploaded_file) -> str:
@@ -52,13 +70,19 @@ def community_feed(request: HttpRequest) -> HttpResponse:
             text = request.POST.get("text", "").strip()
             uploaded = request.FILES.get("media")
 
+            error = None
             if not category or category not in {choice[0] for choice in Complaint.Category.choices}:
-                messages.error(request, "Please select a valid category.")
+                error = "Please select a valid category."
             elif not text and not uploaded:
-                messages.error(request, "Add complaint text or attach image/video.")
+                error = "Add complaint text or attach image/video."
+            
+            if error:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'success': False, 'error': error})
+                messages.error(request, error)
             else:
                 student = Student.objects.filter(user=request.user).first()
-                Complaint.objects.create(
+                complaint = Complaint.objects.create(
                     student=student,
                     author=request.user,
                     category=category,
@@ -66,8 +90,12 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                     media=uploaded,
                     media_type=_infer_media_type(uploaded),
                 )
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'success': True, 'complaint_id': complaint.id})
                 messages.success(request, "Post published.")
-            return redirect("community-feed")
+            
+            if not (request.headers.get('X-Requested-With') == 'XMLHttpRequest'):
+                return redirect("community-feed")
 
         if action == "comment":
             complaint = get_object_or_404(Complaint, id=request.POST.get("complaint_id"))
@@ -79,10 +107,29 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                 messages.error(request, "Comment cannot be empty.")
             return redirect("community-feed")
 
+        if action == "set_status":
+            complaint = get_object_or_404(Complaint, id=request.POST.get("complaint_id"))
+            requested_status = request.POST.get("status", "").strip().upper()
+            valid_statuses = {choice[0] for choice in Complaint.Status.choices}
+
+            if not _can_manage_complaint(request.user, complaint):
+                messages.error(request, "You can only manage complaints for your department unless you are a warden/admin.")
+            elif requested_status not in valid_statuses:
+                messages.error(request, "Invalid status selected.")
+            else:
+                if complaint.status != requested_status:
+                    complaint.status = requested_status
+                    complaint.save(update_fields=["status"])
+                    _log_status_activity(complaint, request.user, requested_status)
+                messages.success(request, "Complaint status updated.")
+            return redirect("community-feed")
+
         if action == "vote":
             complaint = get_object_or_404(Complaint, id=request.POST.get("complaint_id"))
             direction = request.POST.get("direction", "").strip().lower()
             if direction not in {"up", "down"}:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'success': False, 'error': 'Invalid vote action'})
                 messages.error(request, "Invalid vote action.")
                 return redirect("community-feed")
 
@@ -92,13 +139,30 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                 user=request.user,
                 defaults={"value": value},
             )
+            
+            user_vote = None
             if not created:
                 if vote.value == value:
                     vote.delete()
+                    user_vote = None
                 else:
                     vote.value = value
                     vote.save(update_fields=["value", "updated_at"])
+                    user_vote = direction
+            else:
+                user_vote = direction
+            
             complaint.refresh_vote_counts()
+            
+            # Return JSON for AJAX requests
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'upvotes': complaint.upvotes,
+                    'downvotes': complaint.downvotes,
+                    'user_vote': user_vote,
+                })
+            
             return redirect("community-feed")
 
         if action == "delete":
@@ -116,6 +180,9 @@ def community_feed(request: HttpRequest) -> HttpResponse:
     query = request.GET.get("q", "").strip()
     category_filter = request.GET.get("category", "").strip()
     media_filter = request.GET.get("media_type", "").strip()
+    status_filter = request.GET.get("status", "").strip().upper()
+    block_filter = request.GET.get("block", "").strip().upper()
+    sort_by = request.GET.get("sort", "newest").strip().lower()
 
     complaints = Complaint.objects.select_related("student", "student__block", "author").prefetch_related(
         "replies",
@@ -128,6 +195,23 @@ def community_feed(request: HttpRequest) -> HttpResponse:
         complaints = complaints.filter(category=category_filter)
     if media_filter:
         complaints = complaints.filter(media_type=media_filter)
+    if block_filter:
+        complaints = complaints.filter(student__block__block_name=block_filter)
+
+    is_supervisor = request.user.role == "SUPERVISOR"
+    if is_supervisor and request.user.department:
+        complaints = complaints.filter(category=request.user.department)
+
+    active_scope = complaints
+    if status_filter:
+        complaints = complaints.filter(status=status_filter)
+
+    if sort_by == "oldest":
+        complaints = complaints.order_by("created_at")
+    elif sort_by == "upvotes":
+        complaints = complaints.order_by("-upvotes", "-created_at")
+    else:
+        complaints = complaints.order_by("-created_at")
 
     complaint_items = []
     for complaint in complaints:
@@ -148,10 +232,46 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                 "can_delete": request.user.role == "ADMIN"
                 or complaint.author_id == request.user.id
                 or bool(complaint.student and complaint.student.user_id == request.user.id),
+                "can_manage": _can_manage_complaint(request.user, complaint),
+                "status_label": complaint.status_display_label,
             }
         )
 
-    menus = MessMenu.objects.all().order_by("week_day")
+    active_complaints = active_scope.filter(status=Complaint.Status.OPEN)[:12]
+
+    # Handle AJAX/JSON requests
+    if request.GET.get('ajax') == '1':
+        page = int(request.GET.get('page', 1))
+        paginator = Paginator(complaint_items, 10)  # 10 items per page
+        page_obj = paginator.get_page(page)
+        
+        items_data = []
+        for item in page_obj:
+            complaint = item['obj']
+            items_data.append({
+                'id': complaint.id,
+                'category': complaint.get_category_display(),
+                'status': complaint.status,
+                'status_label': complaint.status_display_label,
+                'text': complaint.text,
+                'author_name': item['author_name'],
+                'block_name': item['block_name'],
+                'registration_no': item['registration_no'],
+                'created_at': complaint.created_at.isoformat(),
+                'upvotes': complaint.upvotes,
+                'downvotes': complaint.downvotes,
+                'reply_count': complaint.replies.count(),
+                'media': complaint.media.url if complaint.media else None,
+                'media_type': complaint.media_type,
+                'can_manage': item['can_manage'],
+            })
+        
+        return JsonResponse({
+            'items': items_data,
+            'total': paginator.count,
+            'has_more': page_obj.has_next(),
+            'page': page,
+        })
 
     return render(
         request,
@@ -162,7 +282,13 @@ def community_feed(request: HttpRequest) -> HttpResponse:
             "query": query,
             "category_filter": category_filter,
             "media_filter": media_filter,
+            "status_filter": status_filter,
+            "block_filter": block_filter,
+            "sort_by": sort_by,
             "media_choices": Complaint.MediaType.choices,
-            "menus": menus,
+            "status_choices": Complaint.Status.choices,
+            "block_choices": sorted({choice for choice in Student.objects.values_list("block__block_name", flat=True).distinct() if choice}),
+            "active_complaints": active_complaints,
+            "show_management_panel": request.user.role in {"SUPERVISOR", "WARDEN", "ADMIN"},
         },
     )
