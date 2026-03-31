@@ -112,7 +112,8 @@ class ComplaintViewSet(viewsets.ModelViewSet):
         serializer = ComplaintReplySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(complaint=complaint, author=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        # Return the full complaint object so the Flutter app can parse it
+        return Response(ComplaintSerializer(complaint, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def close(self, request, pk=None):

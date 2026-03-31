@@ -2214,7 +2214,7 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
   Widget _communityTab() {
     final tabPadding = _tabContentPadding(context);
     final activeFilterCount = _communityActiveFilterCount();
-    final accentText = const Color(0xFF8FB3D9);
+    final accentText = const Color.fromARGB(255, 59, 101, 207);
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -2224,7 +2224,9 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: Colors.black,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black
+                  : Colors.white,
               borderRadius: BorderRadius.circular(12),
             ),
             padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
@@ -2234,7 +2236,9 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                   child: Container(
                     height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF101214),
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.black
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: const Color(0xFF2A2F36),
@@ -2244,20 +2248,30 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                       controller: _communitySearchController,
                       textInputAction: TextInputAction.search,
                       onSubmitted: (_) => _applyCommunityFilters(),
-                      style: const TextStyle(color: Color(0xFFE6EEF7)),
+                      style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFFE6EEF7)
+                            : Colors.black,
+                      ),
                       decoration: InputDecoration(
                         isDense: true,
                         hintText: "Search posts",
-                        hintStyle: const TextStyle(color: Color(0xFF6C7B8F)),
+                        hintStyle: TextStyle(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFF6C7B8F)
+                              : const Color(0xFF6C7B8F),
+                        ),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 11,
                         ),
-                        prefixIcon: const Icon(
+                        prefixIcon: Icon(
                           FluentIcons.search_24_regular,
                           size: 18,
-                          color: Color(0xFF7F93AA),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFF7F93AA)
+                              : const Color(0xFF2A2F36),
                         ),
                         suffixIcon:
                             _communitySearchController.text.trim().isEmpty
@@ -2267,10 +2281,13 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
                                       _communitySearchController.clear();
                                       _clearCommunityFilters();
                                     },
-                                    icon: const Icon(
+                                    icon: Icon(
                                       FluentIcons.dismiss_24_regular,
                                       size: 18,
-                                      color: Color(0xFF7F93AA),
+                                      color: Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? const Color(0xFF7F93AA)
+                                          : const Color(0xFF2A2F36),
                                     ),
                                     tooltip: "Clear search",
                                   ),
@@ -3170,7 +3187,7 @@ class _RoleDashboardScreenState extends State<RoleDashboardScreen> {
               child: Column(
                 children: [
                   const Text(
-                    "Scan QR codes or search by registration number to log laundry submissions and collections.",
+                    "Scan student laundry QR codes to log submissions and collections.",
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),

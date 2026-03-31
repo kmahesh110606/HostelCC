@@ -1,6 +1,9 @@
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import "package:shared_preferences/shared_preferences.dart";
 
 class StorageService {
+  static const _secure = FlutterSecureStorage();
   static const _accessKey = "access_token";
   static const _refreshKey = "refresh_token";
   static const _usernameKey = "username";
@@ -18,8 +21,8 @@ class StorageService {
     required String email,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_accessKey, accessToken);
-    await prefs.setString(_refreshKey, refreshToken);
+    await _secure.write(key: _accessKey, value: accessToken);
+    await _secure.write(key: _refreshKey, value: refreshToken);
     await prefs.setString(_usernameKey, username);
     await prefs.setString(_roleKey, role);
     await prefs.setString(_emailKey, email);
@@ -27,9 +30,11 @@ class StorageService {
 
   Future<Map<String, String?>> readSession() async {
     final prefs = await SharedPreferences.getInstance();
+    final access = await _secure.read(key: _accessKey);
+    final refresh = await _secure.read(key: _refreshKey);
     return {
-      "access": prefs.getString(_accessKey),
-      "refresh": prefs.getString(_refreshKey),
+      "access": access,
+      "refresh": refresh,
       "username": prefs.getString(_usernameKey),
       "role": prefs.getString(_roleKey),
       "email": prefs.getString(_emailKey),
@@ -68,8 +73,8 @@ class StorageService {
 
   Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_accessKey);
-    await prefs.remove(_refreshKey);
+    await _secure.delete(key: _accessKey);
+    await _secure.delete(key: _refreshKey);
     await prefs.remove(_usernameKey);
     await prefs.remove(_roleKey);
     await prefs.remove(_emailKey);
