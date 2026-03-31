@@ -95,9 +95,16 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Azure Storage configuration using environment variables
+DEFAULT_FILE_STORAGE = "storages.backends.azure_storage.AzureStorage"
+AZURE_ACCOUNT_NAME = os.environ.get("AZURE_ACCOUNT_NAME", "hostelccstorage")
+AZURE_ACCOUNT_KEY = os.environ.get("AZURE_ACCOUNT_KEY", "")
+AZURE_CONTAINER = os.environ.get("AZURE_CONTAINER", "media")
+
 STORAGES = {
     "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "BACKEND": "storages.backends.azure_storage.AzureStorage",
     },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",

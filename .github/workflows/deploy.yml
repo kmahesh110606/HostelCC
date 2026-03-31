@@ -1,0 +1,54 @@
+name: Build and Deploy to Azure Container Registry
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  ACR_NAME: hostelcc
+  ACR_LOGIN_SERVER: hostelcc.azurecr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Log in to Azure Container Registry
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ env.ACR_LOGIN_SERVER }}
+        username: ${{ secrets.AZURE_ACR_USERNAME }}
+        password: ${{ secrets.AZURE_ACR_PASSWORD }}
+
+    - name: Build and push Django image
+      run: |
+        docker build -t hostel_web:latest .
+        docker tag hostel_web:latest ${{ env.ACR_LOGIN_SERVER }}/hostel_web:latest
+        docker push ${{ env.ACR_LOGIN_SERVER }}/hostel_web:latest
+
+    - name: Pull and push Nginx image
+      run: |
+        docker pull nginx:1.27-alpine
+        docker tag nginx:1.27-alpine ${{ env.ACR_LOGIN_SERVER }}/nginx:1.27-alpine
+        docker push ${{ env.ACR_LOGIN_SERVER }}/nginx:1.27-alpine
+
+    - name: Pull and push PgBouncer image
+      run: |
+        docker pull edoburu/pgbouncer:1.22.1-p0
+        docker tag edoburu/pgbouncer:1.22.1-p0 ${{ env.ACR_LOGIN_SERVER }}/pgbouncer:1.22.1-p0
+        docker push ${{ env.ACR_LOGIN_SERVER }}/pgbouncer:1.22.1-p0
+
+    # Optional: Trigger redeploy of Azure Container Apps (if using ACA)
+    # - name: Redeploy Container App
+    #   run: |
+    #     az containerapp update --name hostel-web --resource-group hostel-rg --image ${{ env.ACR_LOGIN_SERVER }}/hostel_web:latest
+    #     az containerapp update --name hostel-nginx --resource-group hostel-rg --image ${{ env.ACR_LOGIN_SERVER }}/nginx:1.27-alpine
+    #     az containerapp update --name hostel-pgbouncer --resource-group hostel-rg --image ${{ env.ACR_LOGIN_SERVER }}/pgbouncer:1.22.1-p0

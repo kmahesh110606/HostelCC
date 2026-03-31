@@ -201,6 +201,15 @@ def role_login(request: HttpRequest) -> HttpResponse:
         stage = request.POST.get("stage", "signin")
         posted_email = request.POST.get("email", "").strip()
 
+        # Always update session and local email for signup-details stage
+        if stage == "signup-details":
+            if posted_email:
+                email = posted_email
+                request.session["auth_email"] = email
+            elif not email:
+                # fallback: try to get from session
+                email = request.session.get("auth_email", "")
+
         if stage == "signin":
             email = posted_email
             user = User.objects.filter(email__iexact=email).first()
@@ -307,7 +316,7 @@ def role_login(request: HttpRequest) -> HttpResponse:
         {
             "mode": mode,
             "stage": stage,
-            "email": email,
+            "email": email,  # always set
             "error_message": error_message,
             "fixed_otp": _get_fixed_otp_code(),
             "next_url": next_url,

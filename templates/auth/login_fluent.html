@@ -14,9 +14,11 @@
       <a href="/accounts/login/?mode=signin" class="button {% if mode != 'signin' %}secondary{% endif %}" style="flex: 1; text-align: center;">
         <i class="fas fa-sign-in-alt"></i> Sign In
       </a>
+      {% if mode != 'signup' %}
       <a href="/accounts/login/?mode=signup" class="button {% if mode != 'signup' %}secondary{% endif %}" style="flex: 1; text-align: center;">
         <i class="fas fa-user-plus"></i> Sign Up
       </a>
+      {% endif %}
     </div>
 
     {% if error_message %}
@@ -118,7 +120,7 @@
         </div>
       </div>
 
-      {% if email|lower|slice:'-16:' == '@vitstudent.ac.in' %}
+      {% if email|lower|cut:' '|slice:'-17:' == '@vitstudent.ac.in' %}
       <h3 style="font-weight: 600; margin: 20px 0 12px; display: flex; align-items: center; gap: 8px;">
         <i class="fas fa-graduation-cap" style="color: var(--success);"></i>
         Student Details
