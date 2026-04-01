@@ -12,7 +12,7 @@ def _csv_env(name: str, default: str = "") -> list[str]:
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-dev-key")
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
-ALLOWED_HOSTS = _csv_env("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost,10.127.18.48")
+ALLOWED_HOSTS = _csv_env("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost,.azurewebsites.net")
 if not ALLOWED_HOSTS or ALLOWED_HOSTS == [""]:
     import warnings
     warnings.warn("DJANGO_ALLOWED_HOSTS is not set. Allowing all hosts (not recommended for production).")
