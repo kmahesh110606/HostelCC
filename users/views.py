@@ -51,11 +51,14 @@ def _issue_otp_for_user(user) -> tuple[bool, str]:
         return True, ""
     if not user.email:
         return False, "No email address is available for this account."
+    from_email = (getattr(settings, "DEFAULT_FROM_EMAIL", "") or getattr(settings, "EMAIL_HOST_USER", "") or "").strip()
+    if not from_email:
+        return False, "Email service is not configured. Please contact admin."
     try:
         send_mail(
             subject="Hostel Management OTP",
             message=f"Your OTP is {challenge.otp_code}. It expires in 10 minutes.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=from_email,
             recipient_list=[user.email],
             fail_silently=False,
         )
@@ -67,7 +70,7 @@ def _issue_otp_for_user(user) -> tuple[bool, str]:
 
 def _is_allowed_signup_email(email: str) -> bool:
     lower = (email or "").lower()
-    return lower.endswith("@vitstudent.ac.in") or lower.endswith("@vit.ac.in") or lower == "kmahesh110606@outlook.com"
+    return lower.endswith("@vitstudent.ac.in") or lower.endswith("@vit.ac.in") or lower == "1442space@gmail.com"
 
 
 def _ensure_username(email: str, registration_number: str = "") -> str:
@@ -134,11 +137,15 @@ class RequestOTPView(APIView):
         if fixed_otp:
             return Response({"detail": "OTP generated in dev mode.", "dev_mode": True})
 
+        from_email = (getattr(settings, "DEFAULT_FROM_EMAIL", "") or getattr(settings, "EMAIL_HOST_USER", "") or "").strip()
+        if not from_email:
+            return Response({"detail": "Email service is not configured. Please contact admin."}, status=503)
+
         try:
             send_mail(
                 subject="Hostel Management OTP",
                 message=f"Your OTP is {challenge.otp_code}. It expires in 10 minutes.",
-                from_email=settings.DEFAULT_FROM_EMAIL,
+                from_email=from_email,
                 recipient_list=[user.email],
                 fail_silently=False,
             )
@@ -325,7 +332,7 @@ class SignupCompleteView(APIView):
             department = (data.get("department") or "").strip()
             assigned_mess_name = (data.get("assigned_mess_name") or "").strip()
 
-            if email == "kmahesh110606@outlook.com":
+            if email == "1442space@gmail.com":
                 role = User.Role.ADMIN
             elif role not in {
                 User.Role.WARDEN,

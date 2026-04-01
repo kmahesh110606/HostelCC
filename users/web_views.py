@@ -42,11 +42,15 @@ def _issue_otp(user) -> tuple[bool, str]:
     if not user.email:
         return False, "No email address is available for this account."
 
+    from_email = (getattr(settings, "DEFAULT_FROM_EMAIL", "") or getattr(settings, "EMAIL_HOST_USER", "") or "").strip()
+    if not from_email:
+        return False, "Email service is not configured. Please contact admin."
+
     try:
         send_mail(
             subject="Hostel Management OTP",
             message=f"Your OTP is {challenge.otp_code}. It expires in 10 minutes.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=from_email,
             recipient_list=[user.email],
             fail_silently=False,
         )
@@ -61,7 +65,7 @@ def _is_allowed_signup_email(email: str) -> bool:
     return (
         lower.endswith("@vitstudent.ac.in")
         or lower.endswith("@vit.ac.in")
-        or lower == "kmahesh110606@outlook.com"
+        or lower == "1442space@gmail.com"
     )
 
 
@@ -148,7 +152,7 @@ def _onboard_user_from_signup(request: HttpRequest, user) -> str:
         department = request.POST.get("department", "").strip()
         assigned_mess_name = request.POST.get("assigned_mess_name", "").strip()
 
-        if user.email.lower() == "kmahesh110606@outlook.com":
+        if user.email.lower() == "1442space@gmail.com":
             role = User.Role.ADMIN
         elif role not in {
             User.Role.WARDEN,
