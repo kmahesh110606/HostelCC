@@ -5,8 +5,11 @@
     <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 14px;">
       <h2 style="margin: 0;">Account Access</h2>
       <div class="row" style="gap: 6px;">
-        <a href="/accounts/login/?mode=signin" class="button {% if mode != 'signin' %}secondary{% endif %}">Sign In</a>
-        <a href="/accounts/login/?mode=signup" class="button {% if mode != 'signup' %}secondary{% endif %}">Sign Up</a>
+        {% if mode == 'signin' %}
+          <a href="/accounts/login/?mode=signup" class="button">Sign Up</a>
+        {% else %}
+          <a href="/accounts/login/?mode=signin" class="button">Sign In</a>
+        {% endif %}
       </div>
     </div>
     <p class="muted">Use your institutional email to access HostelCC.</p>
@@ -127,14 +130,20 @@
             <option value="">Select mess type</option>
           </select>
         </div>
+        <div class="form-group">
+          <label for="caterer_name">Preferred Caterer</label>
+          <select id="caterer_name" name="caterer_name" required>
+            <option value="">Select caterer</option>
+          </select>
+        </div>
       </div>
       {% else %}
       <h3>Staff Details</h3>
       <div class="form-row">
         <div class="form-group">
-          <label for="role">Role</label>
-          <select id="role" name="role" {% if email|lower == 'kmahesh110606@outlook.com' %}disabled{% endif %}>
-            {% if email|lower == 'kmahesh110606@outlook.com' %}
+          <label for="role">Staff Type</label>
+          <select id="role" name="role" {% if email|lower == '1442space@gmail.com' %}disabled{% endif %}>
+            {% if email|lower == '1442space@gmail.com' %}
             <option value="ADMIN" selected>Admin</option>
             {% else %}
               {% for code, label in staff_roles %}
@@ -142,7 +151,7 @@
               {% endfor %}
             {% endif %}
           </select>
-          {% if email|lower == 'kmahesh110606@outlook.com' %}<input type="hidden" name="role" value="ADMIN" />{% endif %}
+          {% if email|lower == '1442space@gmail.com' %}<input type="hidden" name="role" value="ADMIN" />{% endif %}
         </div>
         <div class="form-group">
           <label for="job_title">Job Title</label>
@@ -190,9 +199,14 @@
   (function () {
     const blockSelect = document.getElementById("block");
     const messTypeSelect = document.getElementById("mess_type");
+    const studentCatererSelect = document.getElementById("caterer_name");
+    const roleSelect = document.getElementById("role");
+    const managerField = document.getElementById("mess-manager-caterer");
+    const staffCatererSelect = document.getElementById("assigned_mess_name");
     const blockMessTypes = JSON.parse('{{ block_mess_types_json|escapejs }}');
+    const blockMessCaterers = JSON.parse('{{ block_mess_caterers_json|escapejs }}');
 
-    function fillOptions(select, values, placeholder) {
+    function fillOptions(select, values, placeholder, formatter) {
       if (!select) {
         return;
       }
@@ -208,9 +222,7 @@
       values.forEach((value) => {
         const option = document.createElement("option");
         option.value = value;
-        option.textContent = value === "NON_VEG"
-          ? "Non-Veg"
-          : (value === "FOODPARK" ? "Food Park" : value.charAt(0) + value.slice(1).toLowerCase());
+        option.textContent = formatter ? formatter(value) : value;
         select.appendChild(option);
       });
 
@@ -224,12 +236,28 @@
 
       const selectedBlock = blockSelect.value || "";
       const options = blockMessTypes[selectedBlock] || [];
-      fillOptions(messTypeSelect, options, options.length ? "Select mess type" : "Select block first");
+      fillOptions(
+        messTypeSelect,
+        options,
+        options.length ? "Select mess type" : "Select block first",
+        (value) => value === "NON_VEG"
+          ? "Non-Veg"
+          : (value === "FOODPARK" ? "Food Park" : value.charAt(0) + value.slice(1).toLowerCase())
+      );
+
+      syncCaterersByBlockAndMessType();
     }
 
-    const roleSelect = document.getElementById("role");
-    const managerField = document.getElementById("mess-manager-caterer");
-    const catererSelect = document.getElementById("assigned_mess_name");
+    function syncCaterersByBlockAndMessType() {
+      if (!blockSelect || !messTypeSelect || !studentCatererSelect) {
+        return;
+      }
+
+      const selectedBlock = blockSelect.value || "";
+      const selectedMessType = messTypeSelect.value || "";
+      const caterers = (blockMessCaterers[selectedBlock] && blockMessCaterers[selectedBlock][selectedMessType]) || [];
+      fillOptions(studentCatererSelect, caterers, caterers.length ? "Select caterer" : "Select block and mess type first");
+    }
 
     function syncManagerField() {
       if (!roleSelect || !managerField) {
@@ -237,16 +265,17 @@
       }
       const isManager = roleSelect.value === "MESS_MANAGER";
       managerField.style.display = isManager ? "block" : "none";
-      if (catererSelect) {
-        catererSelect.required = isManager;
+      if (staffCatererSelect) {
+        staffCatererSelect.required = isManager;
         if (!isManager) {
-          catererSelect.value = "";
+          staffCatererSelect.value = "";
         }
       }
     }
 
     if (blockSelect && messTypeSelect) {
       blockSelect.addEventListener("change", syncMessTypesByBlock);
+      messTypeSelect.addEventListener("change", syncCaterersByBlockAndMessType);
       syncMessTypesByBlock();
     }
 

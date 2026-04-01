@@ -215,8 +215,13 @@ def community_feed(request: HttpRequest) -> HttpResponse:
     else:
         complaints = complaints.order_by("-created_at")
 
+    # Paginate at QuerySet level BEFORE building complaint_items to avoid loading all records into memory
+    page_num = int(request.GET.get('page', 1))
+    paginator = Paginator(complaints, 10)  # 10 items per page
+    page_obj = paginator.get_page(page_num)
+    
     complaint_items = []
-    for complaint in complaints:
+    for complaint in page_obj:
         author_name = "Unknown"
         if complaint.author:
             full_name = complaint.author.get_full_name().strip()
@@ -243,12 +248,9 @@ def community_feed(request: HttpRequest) -> HttpResponse:
 
     # Handle AJAX/JSON requests
     if request.GET.get('ajax') == '1':
-        page = int(request.GET.get('page', 1))
-        paginator = Paginator(complaint_items, 10)  # 10 items per page
-        page_obj = paginator.get_page(page)
         
         items_data = []
-        for item in page_obj:
+        for item in complaint_items:
             complaint = item['obj']
             items_data.append({
                 'id': complaint.id,
@@ -272,7 +274,7 @@ def community_feed(request: HttpRequest) -> HttpResponse:
             'items': items_data,
             'total': paginator.count,
             'has_more': page_obj.has_next(),
-            'page': page,
+            'page': page_obj.number,
         })
 
     return render(

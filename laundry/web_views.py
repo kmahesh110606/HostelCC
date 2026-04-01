@@ -96,13 +96,35 @@ def _infer_student_day_from_room_ranges(student):
     return weekday_code[dated_rules[0].scheduled_date.weekday()]
 
 
-def _matching_room_rules_for_date(block_name: str, target_date: date, preloaded_rules=None):
+def _active_holiday_dates(cache: list | None = None):
+    """Get active holiday dates, using provided cache if available."""
+    if cache is not None:
+        return cache
+    return list(
+        LaundryHoliday.objects.filter(is_active=True)
+        .order_by("holiday_date")
+        .values_list("holiday_date", flat=True)
+    )
+
+
+def _shift_date_for_holidays(source_date: date, holiday_dates):
+    shifted = source_date
+    while True:
+        shift_days = sum(1 for holiday in holiday_dates if holiday <= shifted)
+        next_date = source_date + timedelta(days=shift_days)
+        if next_date == shifted:
+            return shifted
+        shifted = next_date
+
+
+def _matching_room_rules_for_date(block_name: str, target_date: date, preloaded_rules=None, holiday_cache=None):
+    """Match room rules for a specific date, supporting holiday caching."""
     if preloaded_rules is None:
         block_rules = list(LaundryRoomRange.objects.filter(is_active=True, block_name__iexact=block_name))
     else:
         block_rules = list(preloaded_rules)
 
-    holiday_dates = _active_holiday_dates()
+    holiday_dates = _active_holiday_dates(cache=holiday_cache)
     shifted_exact_rules = []
     for rule in block_rules:
         if not rule.scheduled_date:
@@ -123,24 +145,6 @@ def _matching_room_rules_for_date(block_name: str, target_date: date, preloaded_
         6: LaundrySchedule.DayChoices.SUN,
     }[target_date.weekday()]
     return [rule for rule in block_rules if rule.scheduled_date is None and rule.day_of_week == weekday_code]
-
-
-def _active_holiday_dates():
-    return list(
-        LaundryHoliday.objects.filter(is_active=True)
-        .order_by("holiday_date")
-        .values_list("holiday_date", flat=True)
-    )
-
-
-def _shift_date_for_holidays(source_date: date, holiday_dates):
-    shifted = source_date
-    while True:
-        shift_days = sum(1 for holiday in holiday_dates if holiday <= shifted)
-        next_date = source_date + timedelta(days=shift_days)
-        if next_date == shifted:
-            return shifted
-        shifted = next_date
 
 
 def _build_admin_month_calendar(room_ranges, holidays, year: int, month: int, block_filter: str = ""):
@@ -165,7 +169,12 @@ def _build_admin_month_calendar(room_ranges, holidays, year: int, month: int, bl
             selected_blocks = blocks
 
         for block in selected_blocks:
-            matching_rules = _matching_room_rules_for_date(block, current, preloaded_rules=ranges_by_block.get(block, []))
+            matching_rules = _matching_room_rules_for_date(
+                block,
+                current,
+                preloaded_rules=ranges_by_block.get(block, []),
+                holiday_cache=holidays,
+            )
             for rule in matching_rules:
                 slots.append(
                     {
@@ -231,7 +240,7 @@ def _get_or_create_schedule_for_student(student):
     )
 
 
-def _build_student_month_days(student_schedule, room_rules):
+def _build_student_month_days(student_schedule, room_rules, holiday_cache=None):
     if not student_schedule:
         return [], "", 0
 
@@ -257,7 +266,7 @@ def _build_student_month_days(student_schedule, room_rules):
         block_name = student_schedule.student.block.block_name if student_schedule.student.block else ""
         for day in range(1, last_day + 1):
             current = date(year, month, day)
-            matching_rules = _matching_room_rules_for_date(block_name, current, preloaded_rules=room_rules)
+            matching_rules = _matching_room_rules_for_date(block_name, current, preloaded_rules=room_rules, holiday_cache=holiday_cache)
             if any(_room_in_rule(room_no, rule.room_from, rule.room_to) for rule in matching_rules):
                 highlight_days.add(day)
     else:
@@ -478,6 +487,7 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
         room_ranges = room_ranges.filter(block_name=block_filter)
     room_ranges = room_ranges.order_by("block_name", "scheduled_date", "day_of_week", "room_from")
     holidays = LaundryHoliday.objects.filter(is_active=True).order_by("holiday_date")
+    holiday_dates = list(holidays.values_list("holiday_date", flat=True))
 
     student_qr_text = ""
     if student_schedule:
@@ -501,7 +511,7 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
         student_block = student_schedule.student.block.block_name
         student_room_rules = list(all_room_ranges.filter(block_name__iexact=student_block))
 
-    calendar_days, schedule_month_name, schedule_year = _build_student_month_days(student_schedule, student_room_rules)
+    calendar_days, schedule_month_name, schedule_year = _build_student_month_days(student_schedule, student_room_rules, holiday_cache=holiday_dates)
 
     ready_for_next_submission = False
     if student_schedule and student_schedule.collection_status:
@@ -523,14 +533,15 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
     if calendar_month < 1 or calendar_month > 12:
         calendar_month = today.month
 
-    holiday_dates = list(holidays.values_list("holiday_date", flat=True))
-    admin_calendar_cells = _build_admin_month_calendar(
-        room_ranges=list(all_room_ranges),
-        holidays=holiday_dates,
-        year=calendar_year,
-        month=calendar_month,
-        block_filter=block_filter,
-    )
+    admin_calendar_cells = []
+    if is_laundry_manager:
+        admin_calendar_cells = _build_admin_month_calendar(
+            room_ranges=list(all_room_ranges),
+            holidays=holiday_dates,
+            year=calendar_year,
+            month=calendar_month,
+            block_filter=block_filter,
+        )
 
     schedule_blocks = {
         choice

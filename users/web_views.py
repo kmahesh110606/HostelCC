@@ -12,6 +12,7 @@ from django.shortcuts import redirect, render
 from hostels.models import HostelBlock, Room
 from mess.options import (
     MESS_TYPES,
+    build_block_mess_caterers_payload,
     build_block_mess_types_payload,
     canonical_mess_type,
     get_all_caterer_names,
@@ -103,9 +104,10 @@ def _onboard_user_from_signup(request: HttpRequest, user) -> str:
         block_name = request.POST.get("block", "").strip().upper()
         room_no = request.POST.get("room_no", "").strip().upper()
         mess_type = canonical_mess_type(request.POST.get("mess_type", ""))
+        caterer_name = request.POST.get("caterer_name", "").strip()
 
-        if not all([reg_no, block_name, room_no, mess_type]):
-            return "Registration number, block, room number and mess type are required for students."
+        if not all([reg_no, block_name, room_no, mess_type, caterer_name]):
+            return "Registration number, block, room number, mess type and caterer are required for students."
 
         block = HostelBlock.objects.filter(block_name=block_name).first()
         if not block:
@@ -116,6 +118,12 @@ def _onboard_user_from_signup(request: HttpRequest, user) -> str:
             return f"Invalid mess type for block {block_name}. Allowed: {', '.join(allowed_mess_types)}."
 
         room, _ = Room.objects.get_or_create(block=block, room_no=room_no, defaults={"capacity": 1})
+        mess_caterer = None
+        if caterer_name:
+            mess_caterer = Caterer.objects.filter(name=caterer_name, block_id=block.id, meal_types=mess_type).first()
+            if not mess_caterer:
+                return "Please choose a valid caterer for the selected block and mess type."
+
         user.role = User.Role.STUDENT
         user.username = _ensure_username(user.email, reg_no)
         user.job_title = ""
@@ -144,6 +152,7 @@ def _onboard_user_from_signup(request: HttpRequest, user) -> str:
                 "room": room,
                 "room_no": room_no,
                 "mess_allotment": mess_type,
+                "mess_caterer": mess_caterer,
             },
         )
     else:
@@ -351,6 +360,7 @@ def role_login(request: HttpRequest) -> HttpResponse:
             "mess_names": get_all_caterer_names(),
             "student_mess_types": list(MESS_TYPES.keys()),
             "block_mess_types_json": json.dumps(build_block_mess_types_payload()),
+            "block_mess_caterers_json": json.dumps(build_block_mess_caterers_payload()),
         },
     )
 

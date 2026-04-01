@@ -139,6 +139,7 @@ class SignupCompleteSerializer(serializers.Serializer):
     block = serializers.CharField(max_length=10, required=False, allow_blank=True)
     room_no = serializers.CharField(max_length=10, required=False, allow_blank=True)
     mess_type = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    caterer_name = serializers.CharField(max_length=120, required=False, allow_blank=True)
 
     role = serializers.CharField(max_length=20, required=False, allow_blank=True)
     job_title = serializers.CharField(max_length=120, required=False, allow_blank=True)

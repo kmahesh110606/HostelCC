@@ -51,6 +51,11 @@ class Complaint(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["category"]),
+            models.Index(fields=["status", "created_at"]),
+        ]
 
     @property
     def can_show_hostel_meta(self) -> bool:

@@ -288,10 +288,13 @@ class SignupCompleteView(APIView):
             block_name = (data.get("block") or "").strip().upper()
             room_no = (data.get("room_no") or "").strip().upper()
             mess_type = canonical_mess_type(data.get("mess_type"))
+            caterer_name = (data.get("caterer_name") or "").strip()
 
-            if not all([reg_no, block_name, room_no, mess_type]):
+            if not all([reg_no, block_name, room_no, mess_type, caterer_name]):
                 return Response(
-                    {"detail": "Registration number, block, room number and mess type are required for students."},
+                    {
+                        "detail": "Registration number, block, room number, mess type and caterer are required for students."
+                    },
                     status=400,
                 )
 
@@ -309,6 +312,17 @@ class SignupCompleteView(APIView):
                 )
 
             room, _ = Room.objects.get_or_create(block=block, room_no=room_no, defaults={"capacity": 1})
+            mess_caterer = None
+            if caterer_name:
+                from mess.models import Caterer
+
+                mess_caterer = Caterer.objects.filter(name=caterer_name, block_id=block.id, meal_types=mess_type).first()
+                if not mess_caterer:
+                    return Response(
+                        {"detail": "Please choose a valid caterer for the selected block and mess type."},
+                        status=400,
+                    )
+
             user.role = User.Role.STUDENT
             user.username = _ensure_username(user.email, reg_no)
             user.job_title = ""
@@ -324,6 +338,7 @@ class SignupCompleteView(APIView):
                     "room": room,
                     "room_no": room_no,
                     "mess_allotment": mess_type,
+                    "mess_caterer": mess_caterer,
                 },
             )
         else:
