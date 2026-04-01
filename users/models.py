@@ -102,6 +102,10 @@ class AppNotification(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["is_active", "audience", "-created_at"], name="notif_active_aud_ct_idx"),
+            models.Index(fields=["audience", "-created_at"], name="notif_aud_ct_idx"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.title} ({self.audience})"

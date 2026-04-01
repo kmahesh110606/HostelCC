@@ -55,6 +55,8 @@ class Complaint(models.Model):
             models.Index(fields=["status"]),
             models.Index(fields=["category"]),
             models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["category", "status", "created_at"], name="comp_cat_stat_ct_idx"),
+            models.Index(fields=["-created_at", "upvotes"], name="comp_created_up_idx"),
         ]
 
     @property

@@ -7,6 +7,7 @@ from datetime import date, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.dateparse import parse_date
@@ -535,24 +536,33 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
 
     admin_calendar_cells = []
     if is_laundry_manager:
-        admin_calendar_cells = _build_admin_month_calendar(
-            room_ranges=list(all_room_ranges),
-            holidays=holiday_dates,
-            year=calendar_year,
-            month=calendar_month,
-            block_filter=block_filter,
-        )
+        calendar_cache_key = f"laundry:admin-calendar:v1:{calendar_year}:{calendar_month}:{block_filter or 'ALL'}"
+        admin_calendar_cells = cache.get(calendar_cache_key)
+        if admin_calendar_cells is None:
+            admin_calendar_cells = _build_admin_month_calendar(
+                room_ranges=list(all_room_ranges),
+                holidays=holiday_dates,
+                year=calendar_year,
+                month=calendar_month,
+                block_filter=block_filter,
+            )
+            cache.set(calendar_cache_key, admin_calendar_cells, timeout=120)
 
-    schedule_blocks = {
-        choice
-        for choice in LaundrySchedule.objects.values_list("student__block__block_name", flat=True).distinct()
-        if choice
-    }
-    range_blocks = {
-        choice
-        for choice in LaundryRoomRange.objects.values_list("block_name", flat=True).distinct()
-        if choice
-    }
+    block_choices_cache_key = "laundry:block-choices:v1"
+    block_choices = cache.get(block_choices_cache_key)
+    if block_choices is None:
+        schedule_blocks = {
+            choice
+            for choice in LaundrySchedule.objects.values_list("student__block__block_name", flat=True).distinct()
+            if choice
+        }
+        range_blocks = {
+            choice
+            for choice in LaundryRoomRange.objects.values_list("block_name", flat=True).distinct()
+            if choice
+        }
+        block_choices = sorted(schedule_blocks.union(range_blocks))
+        cache.set(block_choices_cache_key, block_choices, timeout=300)
 
     return render(
         request,
@@ -567,7 +577,7 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
             "sort_by": sort_by,
             "room_ranges": room_ranges if is_laundry_manager else [],
             "day_choices": LaundrySchedule.DayChoices.choices,
-            "block_choices": sorted(schedule_blocks.union(range_blocks)),
+            "block_choices": block_choices,
             "calendar_days": calendar_days,
             "schedule_month_name": schedule_month_name,
             "schedule_year": schedule_year,

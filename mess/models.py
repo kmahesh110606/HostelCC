@@ -62,6 +62,11 @@ class Feedback(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["month", "created_at"], name="mess_fb_month_ct_idx"),
+            models.Index(fields=["student", "created_at"], name="mess_fb_student_ct_idx"),
+            models.Index(fields=["menu_item"], name="mess_fb_item_idx"),
+        ]
 
 
 class MenuPollOption(models.Model):
@@ -75,6 +80,9 @@ class MenuPollOption(models.Model):
 
     class Meta:
         unique_together = ("month", "item_name", "poll_type")
+        indexes = [
+            models.Index(fields=["month", "poll_type"], name="mess_poll_month_ty_idx"),
+        ]
 
 
 class MenuPollVote(models.Model):

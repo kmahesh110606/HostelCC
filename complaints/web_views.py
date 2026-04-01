@@ -3,7 +3,7 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
@@ -100,7 +100,12 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                 return redirect("community-feed")
 
         if action == "comment":
-            complaint = get_object_or_404(Complaint, id=request.POST.get("complaint_id"))
+            complaint_id_raw = (request.POST.get("complaint_id") or "").strip()
+            if not complaint_id_raw.isdigit():
+                messages.error(request, "Invalid complaint selected.")
+                return redirect("community-feed")
+
+            complaint = get_object_or_404(Complaint, id=int(complaint_id_raw))
             text = request.POST.get("comment_text", "").strip()
             if text:
                 ComplaintReply.objects.create(complaint=complaint, author=request.user, text=text)
@@ -186,9 +191,11 @@ def community_feed(request: HttpRequest) -> HttpResponse:
     block_filter = request.GET.get("block", "").strip().upper()
     sort_by = request.GET.get("sort", "newest").strip().lower()
 
-    complaints = Complaint.objects.select_related("student", "student__block", "author").prefetch_related(
-        "replies",
-        "replies__author",
+    replies_qs = ComplaintReply.objects.select_related("author").order_by("created_at")
+    complaints = (
+        Complaint.objects.select_related("student", "student__block", "author")
+        .annotate(reply_count=Count("replies"))
+        .prefetch_related(Prefetch("replies", queryset=replies_qs))
     )
 
     if query:
@@ -216,7 +223,7 @@ def community_feed(request: HttpRequest) -> HttpResponse:
         complaints = complaints.order_by("-created_at")
 
     # Paginate at QuerySet level BEFORE building complaint_items to avoid loading all records into memory
-    page_num = int(request.GET.get('page', 1))
+    page_num = request.GET.get('page', '1')
     paginator = Paginator(complaints, 10)  # 10 items per page
     page_obj = paginator.get_page(page_num)
     
@@ -264,7 +271,7 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                 'created_at': complaint.created_at.isoformat(),
                 'upvotes': complaint.upvotes,
                 'downvotes': complaint.downvotes,
-                'reply_count': complaint.replies.count(),
+                'reply_count': getattr(complaint, "reply_count", 0),
                 'media': complaint.media.url if complaint.media else None,
                 'media_type': complaint.media_type,
                 'can_manage': item['can_manage'],

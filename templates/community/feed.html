@@ -564,11 +564,11 @@
       <p style="margin-top: 8px; white-space: pre-wrap;">{{ item.obj.text }}</p>
       {% endif %}
 
-      {% if item.obj.media %}
+        {% if item.obj.media %}
         {% if item.obj.media_type == 'IMAGE' %}
-        <img src="{{ item.obj.media.url }}" alt="Complaint media" class="feed-media" />
+        <img src="{{ item.obj.media.url }}" alt="Complaint media" class="feed-media" loading="lazy" decoding="async" />
         {% elif item.obj.media_type == 'VIDEO' %}
-        <video controls class="feed-media">
+        <video controls preload="none" class="feed-media">
           <source src="{{ item.obj.media.url }}" />
         </video>
         {% endif %}
@@ -599,7 +599,7 @@
 
         <button type="button" class="action-pill comments open-comments-btn" data-modal-target="comments-modal-{{ item.obj.id }}" aria-label="Open comments for complaint {{ item.obj.id }}">
           <i class="ms-Icon ms-Icon--CommentSolid"></i>
-          <span class="vote-count">{{ item.obj.replies.count }}</span>
+          <span class="vote-count">{{ item.obj.reply_count }}</span>
         </button>
 
         {% if item.can_manage %}

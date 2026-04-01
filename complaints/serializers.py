@@ -74,6 +74,19 @@ class ComplaintSerializer(serializers.ModelSerializer):
             return obj.student.name
         return "Unknown"
 
+    def validate(self, attrs):
+        raw_text = attrs.get("text")
+        text = raw_text.strip() if isinstance(raw_text, str) else ""
+        media = attrs.get("media")
+        if media is None and self.instance is not None:
+            media = getattr(self.instance, "media", None)
+
+        if not text and not media:
+            raise serializers.ValidationError({"detail": "Add complaint text or attach image/video."})
+
+        attrs["text"] = text
+        return attrs
+
     def get_student_name(self, obj):
         return obj.student.name if obj.student else ""
 

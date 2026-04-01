@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -563,9 +564,15 @@ def dashboard_router(request: HttpRequest) -> HttpResponse:
         "ADMIN": "dashboard/admin.html",
     }
     template = role_to_template.get(request.user.role, "dashboard/student.html")
-    notifications = AppNotification.objects.filter(is_active=True).filter(
-        audience__in=[AppNotification.Audience.ALL, request.user.role]
-    )[:6]
+    cache_key = f"dashboard:notifications:v1:{request.user.role}"
+    notifications = cache.get(cache_key)
+    if notifications is None:
+        notifications = list(
+            AppNotification.objects.filter(is_active=True)
+            .filter(audience__in=[AppNotification.Audience.ALL, request.user.role])
+            .only("id", "title", "created_at", "audience", "level")[:6]
+        )
+        cache.set(cache_key, notifications, timeout=60)
     context = {"notifications": notifications}
     if request.user.role == User.Role.ADMIN:
         context["mess_names"] = get_all_caterer_names()

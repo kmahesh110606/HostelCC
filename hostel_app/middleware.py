@@ -2,6 +2,7 @@ import logging
 import random
 
 from django.conf import settings
+from django.http import JsonResponse
 from django.utils.deprecation import MiddlewareMixin
 
 logger = logging.getLogger("request_audit")
@@ -44,4 +45,15 @@ class RequestAuditMiddleware(MiddlewareMixin):
             user_agent,
             suspicious,
         )
+        return None
+
+
+class ApiSafeErrorMiddleware(MiddlewareMixin):
+    def process_exception(self, request, exception):
+        if request.path.startswith("/api/"):
+            logger.exception("Unhandled API exception at path=%s", request.path)
+            return JsonResponse(
+                {"detail": "Server error. Please try again shortly."},
+                status=500,
+            )
         return None
