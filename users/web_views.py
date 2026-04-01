@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.conf import settings
 from django.contrib import messages
@@ -22,6 +23,7 @@ from students.models import Student
 from students.utils import resolve_student_for_user
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 def _get_fixed_otp_code() -> str:
@@ -30,14 +32,17 @@ def _get_fixed_otp_code() -> str:
     return getattr(settings, "DEFAULT_OTP_CODE", "").strip()
 
 
-def _issue_otp(user) -> None:
+def _issue_otp(user) -> tuple[bool, str]:
     fixed_otp = _get_fixed_otp_code()
     challenge = OTPChallenge.create_for_user(user, code=fixed_otp or None)
 
     if fixed_otp:
-        return
+        return True, ""
 
-    if user.email:
+    if not user.email:
+        return False, "No email address is available for this account."
+
+    try:
         send_mail(
             subject="Hostel Management OTP",
             message=f"Your OTP is {challenge.otp_code}. It expires in 10 minutes.",
@@ -45,6 +50,10 @@ def _issue_otp(user) -> None:
             recipient_list=[user.email],
             fail_silently=False,
         )
+        return True, ""
+    except Exception:
+        logger.exception("Failed to send OTP email", extra={"email": user.email})
+        return False, "Unable to send OTP email right now. Please try again in a moment."
 
 
 def _is_allowed_signup_email(email: str) -> bool:
@@ -249,10 +258,15 @@ def role_login(request: HttpRequest) -> HttpResponse:
                 )
                 user.set_unusable_password()
                 user.save(update_fields=["password"])
-                _issue_otp(user)
-                request.session["auth_email"] = email
-                request.session["auth_stage"] = "signup-otp"
-                stage = "signup-otp"
+                otp_sent, otp_error = _issue_otp(user)
+                if not otp_sent:
+                    user.delete()
+                    error_message = otp_error
+                    stage = "signup-email"
+                else:
+                    request.session["auth_email"] = email
+                    request.session["auth_stage"] = "signup-otp"
+                    stage = "signup-otp"
 
         elif stage == "signup-otp":
             mode = "signup"
@@ -360,8 +374,14 @@ def forgot_password(request: HttpRequest) -> HttpResponse:
                     email = user.email
                     request.session["forgot_email"] = email
                     request.session["forgot_stage"] = "otp"
-                    _issue_otp(user)
-                    stage = "otp"
+                    otp_sent, otp_error = _issue_otp(user)
+                    if not otp_sent:
+                        error_message = otp_error
+                        request.session.pop("forgot_stage", None)
+                        request.session.pop("forgot_email", None)
+                        stage = "email"
+                    else:
+                        stage = "otp"
         else:
             email = posted_email or email
             user = User.objects.filter(email__iexact=email).first()

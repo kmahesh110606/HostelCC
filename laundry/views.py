@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from django.core.cache import cache
 from django.utils import timezone
@@ -13,8 +13,13 @@ from students.models import Student
 from students.utils import resolve_student_for_user
 from users.permissions import IsAdmin, IsLaundryPerson
 
-from .models import LaundryEvent, LaundryRoomRange, LaundrySchedule
-from .serializers import LaundryEventSerializer, LaundryRoomRangeSerializer, LaundryScheduleSerializer
+from .models import LaundryEvent, LaundryHoliday, LaundryRoomRange, LaundrySchedule
+from .serializers import (
+    LaundryEventSerializer,
+    LaundryHolidaySerializer,
+    LaundryRoomRangeSerializer,
+    LaundryScheduleSerializer,
+)
 
 
 def _normalize_upper(value: str | None) -> str:
@@ -138,11 +143,37 @@ def _today_day_code() -> str:
     return day_map[timezone.localdate().weekday()]
 
 
+def _active_holiday_dates() -> list[date]:
+    return list(
+        LaundryHoliday.objects.filter(is_active=True)
+        .order_by("holiday_date")
+        .values_list("holiday_date", flat=True)
+    )
+
+
+def _shift_date_for_holidays(source_date: date, holiday_dates: list[date]) -> date:
+    shifted = source_date
+    while True:
+        shift_days = sum(1 for holiday in holiday_dates if holiday <= shifted)
+        next_date = source_date + timedelta(days=shift_days)
+        if next_date == shifted:
+            return shifted
+        shifted = next_date
+
+
 def _matching_room_rules_for_date(block_name: str, target_date: date):
-    block_rules = LaundryRoomRange.objects.filter(is_active=True, block_name__iexact=block_name)
-    exact_rules = block_rules.filter(scheduled_date=target_date)
-    if exact_rules.exists():
-        return list(exact_rules)
+    block_rules = list(LaundryRoomRange.objects.filter(is_active=True, block_name__iexact=block_name))
+    holiday_dates = _active_holiday_dates()
+    shifted_exact_rules = []
+    for rule in block_rules:
+        if not rule.scheduled_date:
+            continue
+        effective_date = _shift_date_for_holidays(rule.scheduled_date, holiday_dates)
+        if effective_date == target_date:
+            shifted_exact_rules.append(rule)
+    if shifted_exact_rules:
+        return shifted_exact_rules
+
     weekday_code = {
         0: LaundrySchedule.DayChoices.MON,
         1: LaundrySchedule.DayChoices.TUE,
@@ -152,7 +183,7 @@ def _matching_room_rules_for_date(block_name: str, target_date: date):
         5: LaundrySchedule.DayChoices.SAT,
         6: LaundrySchedule.DayChoices.SUN,
     }[target_date.weekday()]
-    return list(block_rules.filter(scheduled_date__isnull=True, day_of_week=weekday_code))
+    return [rule for rule in block_rules if rule.scheduled_date is None and rule.day_of_week == weekday_code]
 
 
 def _parse_qr_text_payload(qr_text: str) -> dict[str, str] | None:
@@ -554,6 +585,18 @@ class LaundryEventViewSet(viewsets.ReadOnlyModelViewSet):
 class LaundryRoomRangeViewSet(viewsets.ModelViewSet):
     queryset = LaundryRoomRange.objects.all()
     serializer_class = LaundryRoomRangeSerializer
+
+    def get_permissions(self):
+        if self.action in ["create", "update", "partial_update", "destroy"]:
+            permission_classes = [IsLaundryPerson]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+
+class LaundryHolidayViewSet(viewsets.ModelViewSet):
+    queryset = LaundryHoliday.objects.all().order_by("holiday_date")
+    serializer_class = LaundryHolidaySerializer
 
     def get_permissions(self):
         if self.action in ["create", "update", "partial_update", "destroy"]:

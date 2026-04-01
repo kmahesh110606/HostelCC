@@ -3,7 +3,7 @@ import csv
 import io
 import json
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -11,7 +11,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.dateparse import parse_date
 
-from .models import LaundryEvent, LaundryRoomRange, LaundrySchedule
+from .models import LaundryEvent, LaundryHoliday, LaundryRoomRange, LaundrySchedule
 from students.utils import resolve_student_for_user
 
 
@@ -102,9 +102,16 @@ def _matching_room_rules_for_date(block_name: str, target_date: date, preloaded_
     else:
         block_rules = list(preloaded_rules)
 
-    exact_rules = [rule for rule in block_rules if rule.scheduled_date == target_date]
-    if exact_rules:
-        return exact_rules
+    holiday_dates = _active_holiday_dates()
+    shifted_exact_rules = []
+    for rule in block_rules:
+        if not rule.scheduled_date:
+            continue
+        effective_date = _shift_date_for_holidays(rule.scheduled_date, holiday_dates)
+        if effective_date == target_date:
+            shifted_exact_rules.append(rule)
+    if shifted_exact_rules:
+        return shifted_exact_rules
 
     weekday_code = {
         0: LaundrySchedule.DayChoices.MON,
@@ -116,6 +123,75 @@ def _matching_room_rules_for_date(block_name: str, target_date: date, preloaded_
         6: LaundrySchedule.DayChoices.SUN,
     }[target_date.weekday()]
     return [rule for rule in block_rules if rule.scheduled_date is None and rule.day_of_week == weekday_code]
+
+
+def _active_holiday_dates():
+    return list(
+        LaundryHoliday.objects.filter(is_active=True)
+        .order_by("holiday_date")
+        .values_list("holiday_date", flat=True)
+    )
+
+
+def _shift_date_for_holidays(source_date: date, holiday_dates):
+    shifted = source_date
+    while True:
+        shift_days = sum(1 for holiday in holiday_dates if holiday <= shifted)
+        next_date = source_date + timedelta(days=shift_days)
+        if next_date == shifted:
+            return shifted
+        shifted = next_date
+
+
+def _build_admin_month_calendar(room_ranges, holidays, year: int, month: int, block_filter: str = ""):
+    _, last_day = calendar.monthrange(year, month)
+    holiday_set = set(holidays)
+
+    ranges_by_block = {}
+    for rule in room_ranges:
+        block_key = (rule.block_name or "").strip().upper()
+        if not block_key:
+            continue
+        ranges_by_block.setdefault(block_key, []).append(rule)
+
+    blocks = sorted(ranges_by_block.keys())
+    cells = []
+    for day in range(1, last_day + 1):
+        current = date(year, month, day)
+        slots = []
+        if block_filter:
+            selected_blocks = [block_filter] if block_filter in ranges_by_block else []
+        else:
+            selected_blocks = blocks
+
+        for block in selected_blocks:
+            matching_rules = _matching_room_rules_for_date(block, current, preloaded_rules=ranges_by_block.get(block, []))
+            for rule in matching_rules:
+                slots.append(
+                    {
+                        "block": block,
+                        "room_from": rule.room_from,
+                        "room_to": rule.room_to,
+                    }
+                )
+
+        cells.append(
+            {
+                "day": day,
+                "date_iso": current.isoformat(),
+                "is_today": current == date.today(),
+                "is_holiday": current in holiday_set,
+                "slots": slots,
+            }
+        )
+
+    start_weekday = date(year, month, 1).weekday()
+    for _ in range(start_weekday):
+        cells.insert(0, {"day": "", "is_blank": True})
+    while len(cells) % 7 != 0:
+        cells.append({"day": "", "is_blank": True})
+
+    return cells
 
 
 def _parse_day_code(raw_value: str | None):
@@ -191,16 +267,60 @@ def _build_student_month_days(student_schedule, room_rules):
             if code == student_schedule.day_of_week:
                 highlight_days.add(day)
 
+    month_start = date(year, month, 1)
+    month_end = date(year, month, last_day)
+
+    events = list(
+        LaundryEvent.objects.filter(schedule=student_schedule, created_at__date__lte=month_end)
+        .order_by("created_at")
+    )
+    submitted_days = set()
+    pending_submission_dates = []
+    for event in events:
+        event_day = event.created_at.date()
+        if event.event_type == LaundryEvent.EventType.SUBMISSION:
+            pending_submission_dates.append(event_day)
+            if month_start <= event_day <= month_end:
+                submitted_days.add(event_day.day)
+        elif event.event_type == LaundryEvent.EventType.COLLECTION and pending_submission_dates:
+            pending_submission_dates.pop(0)
+
+    pending_days = {
+        submitted_date.day
+        for submitted_date in pending_submission_dates
+        if month_start <= submitted_date <= month_end
+    }
+
     days = []
     start_weekday = date(year, month, 1).weekday()
     for _ in range(start_weekday):
-        days.append({"day": "", "highlighted": False, "today": False})
+        days.append({"day": "", "highlighted": False, "today": False, "status": "blank"})
 
     for day in range(1, last_day + 1):
-        days.append({"day": day, "highlighted": day in highlight_days, "today": day == today.day})
+        current = date(year, month, day)
+        is_scheduled = day in highlight_days
+        status = "none"
+        if is_scheduled:
+            if day in pending_days:
+                status = "pending_collection"
+            elif day in submitted_days:
+                status = "submitted"
+            elif current < today:
+                status = "skipped"
+            else:
+                status = "scheduled"
+
+        days.append(
+            {
+                "day": day,
+                "highlighted": is_scheduled,
+                "today": day == today.day,
+                "status": status,
+            }
+        )
 
     while len(days) % 7 != 0:
-        days.append({"day": "", "highlighted": False, "today": False})
+        days.append({"day": "", "highlighted": False, "today": False, "status": "blank"})
 
     return days, month_name, year
 
@@ -308,9 +428,34 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
                 messages.error(request, "Invalid room range selected.")
             return redirect("laundry-portal")
 
+        if action == "add_holiday" and is_laundry_manager:
+            holiday_date_text = request.POST.get("holiday_date", "").strip()
+            holiday_name = request.POST.get("holiday_name", "").strip()
+            holiday_date = parse_date(holiday_date_text) if holiday_date_text else None
+            if not holiday_date:
+                messages.error(request, "Please provide a valid holiday date.")
+            else:
+                LaundryHoliday.objects.update_or_create(
+                    holiday_date=holiday_date,
+                    defaults={"name": holiday_name, "is_active": True},
+                )
+                messages.success(request, "Holiday declared. Date-wise laundry schedule will auto-shift.")
+            return redirect("laundry-portal")
+
+        if action == "delete_holiday" and is_laundry_manager:
+            holiday_id = request.POST.get("holiday_id", "").strip()
+            if holiday_id.isdigit():
+                LaundryHoliday.objects.filter(id=int(holiday_id)).delete()
+                messages.success(request, "Holiday removed.")
+            else:
+                messages.error(request, "Invalid holiday selected.")
+            return redirect("laundry-portal")
+
     block_filter = request.GET.get("block", "").strip().upper()
     status_filter = request.GET.get("status", "").strip().lower()
     sort_by = request.GET.get("sort", "day").strip().lower()
+    selected_month = request.GET.get("month", "").strip()
+    selected_year = request.GET.get("year", "").strip()
 
     manager_schedules = LaundrySchedule.objects.select_related("student", "student__block").all()
     if block_filter:
@@ -332,6 +477,7 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
     if block_filter:
         room_ranges = room_ranges.filter(block_name=block_filter)
     room_ranges = room_ranges.order_by("block_name", "scheduled_date", "day_of_week", "room_from")
+    holidays = LaundryHoliday.objects.filter(is_active=True).order_by("holiday_date")
 
     student_qr_text = ""
     if student_schedule:
@@ -356,6 +502,35 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
         student_room_rules = list(all_room_ranges.filter(block_name__iexact=student_block))
 
     calendar_days, schedule_month_name, schedule_year = _build_student_month_days(student_schedule, student_room_rules)
+
+    ready_for_next_submission = False
+    if student_schedule and student_schedule.collection_status:
+        if student_schedule.last_submission_at:
+            ready_after = student_schedule.last_submission_at.date() + timedelta(days=7)
+            ready_for_next_submission = date.today() >= ready_after
+        else:
+            ready_for_next_submission = True
+
+    today = date.today()
+    try:
+        calendar_month = int(selected_month) if selected_month else today.month
+    except ValueError:
+        calendar_month = today.month
+    try:
+        calendar_year = int(selected_year) if selected_year else today.year
+    except ValueError:
+        calendar_year = today.year
+    if calendar_month < 1 or calendar_month > 12:
+        calendar_month = today.month
+
+    holiday_dates = list(holidays.values_list("holiday_date", flat=True))
+    admin_calendar_cells = _build_admin_month_calendar(
+        room_ranges=list(all_room_ranges),
+        holidays=holiday_dates,
+        year=calendar_year,
+        month=calendar_month,
+        block_filter=block_filter,
+    )
 
     schedule_blocks = {
         choice
@@ -385,6 +560,11 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
             "calendar_days": calendar_days,
             "schedule_month_name": schedule_month_name,
             "schedule_year": schedule_year,
+            "ready_for_next_submission": ready_for_next_submission,
+            "holidays": holidays,
+            "admin_calendar_cells": admin_calendar_cells if is_laundry_manager else [],
+            "admin_calendar_month": calendar_month,
+            "admin_calendar_year": calendar_year,
         },
     )
 

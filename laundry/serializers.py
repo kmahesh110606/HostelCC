@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import LaundryEvent, LaundryRoomRange, LaundrySchedule
+from .models import LaundryEvent, LaundryHoliday, LaundryRoomRange, LaundrySchedule
 
 
 class LaundryScheduleSerializer(serializers.ModelSerializer):
@@ -49,4 +49,11 @@ class LaundryRoomRangeSerializer(serializers.ModelSerializer):
             "is_active",
             "created_at",
         ]
+        read_only_fields = ["created_at"]
+
+
+class LaundryHolidaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LaundryHoliday
+        fields = ["id", "holiday_date", "name", "is_active", "created_at"]
         read_only_fields = ["created_at"]

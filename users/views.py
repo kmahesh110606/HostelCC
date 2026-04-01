@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.core.mail import send_mail
@@ -33,6 +35,7 @@ from .serializers import (
 )
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 def _get_fixed_otp_code() -> str:
@@ -41,12 +44,14 @@ def _get_fixed_otp_code() -> str:
     return getattr(settings, "DEFAULT_OTP_CODE", "").strip()
 
 
-def _issue_otp_for_user(user):
+def _issue_otp_for_user(user) -> tuple[bool, str]:
     fixed_otp = _get_fixed_otp_code()
     challenge = OTPChallenge.create_for_user(user, code=fixed_otp or None)
     if fixed_otp:
-        return
-    if user.email:
+        return True, ""
+    if not user.email:
+        return False, "No email address is available for this account."
+    try:
         send_mail(
             subject="Hostel Management OTP",
             message=f"Your OTP is {challenge.otp_code}. It expires in 10 minutes.",
@@ -54,6 +59,10 @@ def _issue_otp_for_user(user):
             recipient_list=[user.email],
             fail_silently=False,
         )
+        return True, ""
+    except Exception:
+        logger.exception("Failed to send OTP email", extra={"email": user.email})
+        return False, "Unable to send OTP email right now. Please try again in a moment."
 
 
 def _is_allowed_signup_email(email: str) -> bool:
@@ -125,13 +134,17 @@ class RequestOTPView(APIView):
         if fixed_otp:
             return Response({"detail": "OTP generated in dev mode.", "dev_mode": True})
 
-        send_mail(
-            subject="Hostel Management OTP",
-            message=f"Your OTP is {challenge.otp_code}. It expires in 10 minutes.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+        try:
+            send_mail(
+                subject="Hostel Management OTP",
+                message=f"Your OTP is {challenge.otp_code}. It expires in 10 minutes.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+        except Exception:
+            logger.exception("Failed to send OTP email", extra={"email": user.email})
+            return Response({"detail": "Unable to send OTP email right now. Please try again shortly."}, status=503)
         return Response({"detail": "OTP sent to registered email.", "dev_mode": False})
 
 
@@ -215,6 +228,7 @@ class SignupRequestOTPView(APIView):
         if user and user.has_usable_password() and not user.must_change_password:
             return Response({"detail": "Account already exists. Please sign in."}, status=400)
 
+        created = False
         if not user:
             user = User.objects.create(
                 email=email,
@@ -223,10 +237,15 @@ class SignupRequestOTPView(APIView):
                 must_change_password=True,
                 is_email_verified=False,
             )
+            created = True
             user.set_unusable_password()
             user.save(update_fields=["password"])
 
-        _issue_otp_for_user(user)
+        otp_sent, otp_error = _issue_otp_for_user(user)
+        if not otp_sent:
+            if created:
+                user.delete()
+            return Response({"detail": otp_error}, status=503)
         return Response({"detail": "OTP sent to email.", "dev_mode": bool(_get_fixed_otp_code())})
 
 

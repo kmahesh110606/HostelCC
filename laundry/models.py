@@ -92,3 +92,17 @@ class LaundryRoomRange(models.Model):
     def __str__(self):
         slot = self.scheduled_date.isoformat() if self.scheduled_date else self.day_of_week
         return f"{self.block_name} {slot}: {self.room_from}-{self.room_to}"
+
+
+class LaundryHoliday(models.Model):
+    holiday_date = models.DateField(unique=True, db_index=True)
+    name = models.CharField(max_length=120, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["holiday_date"]
+
+    def __str__(self):
+        label = self.name.strip() if self.name else "Holiday"
+        return f"{self.holiday_date.isoformat()} - {label}"
