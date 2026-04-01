@@ -40,7 +40,7 @@ class Complaint(models.Model):
         related_name="community_posts",
     )
     category = models.CharField(max_length=30, choices=Category.choices)
-    text = models.TextField()
+    text = models.TextField(blank=True, default="")
     media = models.FileField(upload_to="complaints/media/", null=True, blank=True)
     media_type = models.CharField(max_length=10, choices=MediaType.choices, default=MediaType.TEXT)
     warden_tag = models.CharField(max_length=120, blank=True)

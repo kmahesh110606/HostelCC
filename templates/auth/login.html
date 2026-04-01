@@ -104,7 +104,7 @@
         </div>
       </div>
 
-      {% if email|lower|slice:'-16:' == '@vitstudent.ac.in' %}
+      {% if is_student_signup_email %}
       <h3>Student Details</h3>
       <div class="form-row">
         <div class="form-group">

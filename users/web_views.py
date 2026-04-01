@@ -62,12 +62,19 @@ def _issue_otp(user) -> tuple[bool, str]:
 
 
 def _is_allowed_signup_email(email: str) -> bool:
-    lower = email.lower()
-    return (
-        lower.endswith("@vitstudent.ac.in")
-        or lower.endswith("@vit.ac.in")
-        or lower == "1442space@gmail.com"
-    )
+    normalized = (email or "").strip().lower()
+    if normalized == "1442space@gmail.com":
+        return True
+    if "@" not in normalized:
+        return False
+
+    domain = normalized.rsplit("@", 1)[1]
+    return domain == "vitstudent.ac.in" or domain == "vit.ac.in" or domain.endswith(".vit.ac.in")
+
+
+def _is_student_signup_email(email: str) -> bool:
+    normalized = (email or "").strip().lower()
+    return normalized.endswith("@vitstudent.ac.in")
 
 
 def _ensure_username(email: str, registration_number: str = "") -> str:
@@ -85,7 +92,7 @@ def _ensure_username(email: str, registration_number: str = "") -> str:
 
 
 def _onboard_user_from_signup(request: HttpRequest, user) -> str:
-    email = user.email.lower()
+    email = (user.email or "").strip().lower()
     name = request.POST.get("name", "").strip()
     phone_country_code = request.POST.get("phone_country_code", "+91").strip()
     phone_number = request.POST.get("phone_number", "").strip()
@@ -99,7 +106,7 @@ def _onboard_user_from_signup(request: HttpRequest, user) -> str:
     user.phone_country_code = phone_country_code or "+91"
     user.phone_number = phone_number
 
-    if email.endswith("@vitstudent.ac.in"):
+    if _is_student_signup_email(email):
         reg_no = request.POST.get("registration_no", "").strip().upper()
         block_name = request.POST.get("block", "").strip().upper()
         room_no = request.POST.get("room_no", "").strip().upper()
@@ -344,6 +351,7 @@ def role_login(request: HttpRequest) -> HttpResponse:
             "mode": mode,
             "stage": stage,
             "email": email,  # always set
+            "is_student_signup_email": _is_student_signup_email(email),
             "error_message": error_message,
             "fixed_otp": _get_fixed_otp_code(),
             "next_url": next_url,

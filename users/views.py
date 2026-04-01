@@ -69,8 +69,19 @@ def _issue_otp_for_user(user) -> tuple[bool, str]:
 
 
 def _is_allowed_signup_email(email: str) -> bool:
-    lower = (email or "").lower()
-    return lower.endswith("@vitstudent.ac.in") or lower.endswith("@vit.ac.in") or lower == "1442space@gmail.com"
+    normalized = (email or "").strip().lower()
+    if normalized == "1442space@gmail.com":
+        return True
+    if "@" not in normalized:
+        return False
+
+    domain = normalized.rsplit("@", 1)[1]
+    return domain == "vitstudent.ac.in" or domain == "vit.ac.in" or domain.endswith(".vit.ac.in")
+
+
+def _is_student_signup_email(email: str) -> bool:
+    normalized = (email or "").strip().lower()
+    return normalized.endswith("@vitstudent.ac.in")
 
 
 def _ensure_username(email: str, registration_number: str = "") -> str:
@@ -283,7 +294,7 @@ class SignupCompleteView(APIView):
         user.phone_country_code = (data.get("phone_country_code") or "+91").strip() or "+91"
         user.phone_number = (data.get("phone_number") or "").strip()
 
-        if email.endswith("@vitstudent.ac.in"):
+        if _is_student_signup_email(email):
             reg_no = (data.get("registration_no") or "").strip().upper()
             block_name = (data.get("block") or "").strip().upper()
             room_no = (data.get("room_no") or "").strip().upper()

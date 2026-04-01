@@ -190,6 +190,14 @@ CACHES = {
     }
 }
 
+REQUEST_AUDIT_ENABLED = os.getenv("REQUEST_AUDIT_ENABLED", "True").lower() == "true"
+REQUEST_AUDIT_SAMPLE_RATE = float(os.getenv("REQUEST_AUDIT_SAMPLE_RATE", "0.1"))
+REQUEST_AUDIT_LOG_SUSPICIOUS_ONLY = os.getenv("REQUEST_AUDIT_LOG_SUSPICIOUS_ONLY", "False").lower() == "true"
+REQUEST_AUDIT_SKIP_PATH_PREFIXES = tuple(
+    _csv_env("REQUEST_AUDIT_SKIP_PATH_PREFIXES", "/static/,/media/,/favicon.ico,/health/,/api/health/")
+)
+REQUEST_AUDIT_LOG_LEVEL = os.getenv("REQUEST_AUDIT_LOG_LEVEL", "WARNING").upper()
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -207,7 +215,7 @@ LOGGING = {
     "loggers": {
         "request_audit": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": REQUEST_AUDIT_LOG_LEVEL,
             "propagate": False,
         }
     },
