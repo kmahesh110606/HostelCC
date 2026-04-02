@@ -479,16 +479,16 @@
       </form>
     </div>
 
+    {% if room_ranges %}
     <div id="room-ranges-bulk-actions" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 8px 0 10px; flex-wrap: wrap;">
       <p class="muted" style="margin: 0;">Use the action below to remove the room ranges currently shown in this view.</p>
-      {% if room_ranges %}
       <form method="post" class="room-ranges-delete-all-form" data-confirm-message="Delete {{ room_ranges|length }} room ranges currently shown? This cannot be undone.">
         {% csrf_token %}
         <input type="hidden" name="action" value="delete_all_room_ranges" />
         <button type="submit" class="button danger"><i class="ms-Icon ms-Icon--Delete"></i> Delete All Room Ranges</button>
       </form>
-      {% endif %}
     </div>
+    {% endif %}
 
     <div style="border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 12px; margin: 8px 0 14px;">
       <h3 style="margin: 0 0 10px;"><i class="ms-Icon ms-Icon--Calendar"></i> Declare Holiday</h3>

@@ -800,6 +800,7 @@
       if (complaintId) {
         const modal = document.getElementById('comments-modal-' + complaintId);
         if (modal) {
+          closeModal(modal);
           modal.remove();
         }
       }

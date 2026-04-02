@@ -1,4 +1,5 @@
 import os
+import hashlib
 from datetime import timedelta
 from pathlib import Path
 
@@ -17,6 +18,12 @@ if not ALLOWED_HOSTS or ALLOWED_HOSTS == [""]:
     import warnings
     warnings.warn("DJANGO_ALLOWED_HOSTS is not set. Allowing all hosts (not recommended for production).")
     ALLOWED_HOSTS = ["*"]
+
+raw_jwt_signing_key = (os.getenv("JWT_SIGNING_KEY", "") or SECRET_KEY).strip()
+if len(raw_jwt_signing_key.encode("utf-8")) < 32:
+    JWT_SIGNING_KEY = hashlib.sha256(raw_jwt_signing_key.encode("utf-8")).hexdigest()
+else:
+    JWT_SIGNING_KEY = raw_jwt_signing_key
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -147,6 +154,7 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.getenv("JWT_ACCESS_MINUTES", "30"))),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.getenv("JWT_REFRESH_DAYS", "1"))),
+    "SIGNING_KEY": JWT_SIGNING_KEY,
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
