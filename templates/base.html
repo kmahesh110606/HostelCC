@@ -126,6 +126,28 @@
       font-size: 16px;
     }
 
+    .nav-item .nav-icon {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      background-color: currentColor;
+      -webkit-mask-image: var(--icon-url);
+      mask-image: var(--icon-url);
+      -webkit-mask-size: contain;
+      mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      mask-position: center;
+    }
+
+    .nav-item .nav-icon--home { --icon-url: url('{% static 'icons/home_24_regular.svg' %}'); }
+    .nav-item .nav-icon--community { --icon-url: url('{% static 'icons/comment_24_regular.svg' %}'); }
+    .nav-item .nav-icon--mess { --icon-url: url('{% static 'icons/food_24_regular.svg' %}'); }
+    .nav-item .nav-icon--laundry { --icon-url: url('{% static 'icons/shopping_bag_24_regular.svg' %}'); }
+    .nav-item .nav-icon--notifications { --icon-url: url('{% static 'icons/service_bell_24_regular.svg' %}'); }
+    .nav-item .nav-icon--profile { --icon-url: url('{% static 'icons/person_circle_24_regular.svg' %}'); }
+
     .nav-item .ms-Icon,
     .role-badge .ms-Icon,
     .theme-toggle .ms-Icon,
@@ -563,22 +585,22 @@
       </button>
       <div class="nav-links" id="navLinks">
         <a class="button secondary nav-item" href="/" title="Home">
-          <i class="ms-Icon ms-Icon--Home"></i><span>Home</span>
+          <i class="nav-icon nav-icon--home" aria-hidden="true"></i><span>Home</span>
         </a>
         <a class="button secondary nav-item" href="/community/" title="Community">
-          <i class="ms-Icon ms-Icon--Comment"></i><span>Community</span>
+          <i class="nav-icon nav-icon--community" aria-hidden="true"></i><span>Community</span>
         </a>
         <a class="button secondary nav-item" href="/mess/" title="Mess">
-          <i class="ms-Icon ms-Icon--EatDrink"></i><span>Mess</span>
+          <i class="nav-icon nav-icon--mess" aria-hidden="true"></i><span>Mess</span>
         </a>
         <a class="button secondary nav-item" href="/laundry/" title="Laundry">
-          <i class="ms-Icon ms-Icon--Product"></i><span>Laundry</span>
+          <i class="nav-icon nav-icon--laundry" aria-hidden="true"></i><span>Laundry</span>
         </a>
         <a class="button secondary nav-item" href="/notifications/" title="Notifications">
-          <i class="ms-Icon ms-Icon--Ringer"></i><span>Notifications</span>
+          <i class="nav-icon nav-icon--notifications" aria-hidden="true"></i><span>Notifications</span>
         </a>
         <a class="button secondary nav-item" href="/profile/" title="View Profile">
-          <i class="ms-Icon ms-Icon--Contact"></i><span>Profile</span>
+          <i class="nav-icon nav-icon--profile" aria-hidden="true"></i><span>Profile</span>
         </a>
         <span class="role-badge">
           <i class="ms-Icon ms-Icon--Shield"></i>
