@@ -714,8 +714,8 @@
 
       const wrapper = document.createElement('div');
       wrapper.innerHTML = cardHtml.trim();
-      const card = wrapper.firstElementChild;
-      if (!card) {
+      const firstCard = wrapper.querySelector('.feed-card');
+      if (!firstCard) {
         return null;
       }
 
@@ -724,8 +724,13 @@
         emptyState.remove();
       }
 
-      communityFeedList.prepend(card);
-      return card;
+      const fragment = document.createDocumentFragment();
+      while (wrapper.firstChild) {
+        fragment.appendChild(wrapper.firstChild);
+      }
+
+      communityFeedList.prepend(fragment);
+      return firstCard;
     }
 
     function renderActiveComplaints(items) {
@@ -789,6 +794,14 @@
     function removeCard(card) {
       if (!card) {
         return;
+      }
+
+      const complaintId = card.getAttribute('data-complaint-id');
+      if (complaintId) {
+        const modal = document.getElementById('comments-modal-' + complaintId);
+        if (modal) {
+          modal.remove();
+        }
       }
 
       card.remove();
@@ -874,8 +887,11 @@
           }
 
           if (action === 'comment') {
-            if (card && data.comment) {
-              const complaintId = card.getAttribute('data-complaint-id');
+            const complaintIdInput = form.querySelector('input[name="complaint_id"]');
+            const complaintId = complaintIdInput ? complaintIdInput.value : '';
+            const complaintCard = complaintId ? document.getElementById('complaint-card-' + complaintId) : card;
+
+            if (complaintCard && data.comment) {
               const commentsBox = complaintId ? document.getElementById('comments-box-' + complaintId) : null;
               if (commentsBox) {
                 const emptyState = commentsBox.querySelector('.comments-empty-state');
@@ -885,7 +901,7 @@
                 commentsBox.insertAdjacentHTML('beforeend', buildCommentHtml(data.comment));
                 commentsBox.scrollTop = commentsBox.scrollHeight;
               }
-              updateReplyCount(card, data.reply_count || 0);
+              updateReplyCount(complaintCard, data.reply_count || 0);
             }
             form.reset();
             showNotice('Comment posted.', 'success');

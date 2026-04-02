@@ -232,11 +232,13 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                     media_type=_infer_media_type(uploaded),
                 )
                 if _is_xhr(request):
+                    current_page = (request.GET.get("page", "1") or "1").strip()
+                    can_insert_in_view = current_page in {"", "1"} and scope["sort_by"] == "newest"
                     return JsonResponse(
                         {
                             "success": True,
                             "complaint_id": complaint.id,
-                            "visible": _complaint_matches_current_filters(request, complaint),
+                            "visible": _complaint_matches_current_filters(request, complaint) and can_insert_in_view,
                             "card_html": _render_community_card(request, complaint),
                             "active_complaints": _build_active_complaints_payload(request),
                         }

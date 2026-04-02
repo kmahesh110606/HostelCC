@@ -1,44 +1,56 @@
 from django.core.management.base import BaseCommand
-from django.db import transaction
-from django.db.models import Count
-
-from mess.models import Feedback
+from django.db import connection
 
 
 class Command(BaseCommand):
     help = "Remove duplicate feedback rows for the same student, menu item, and month."
 
     def handle(self, *args, **options):
-        duplicate_groups = (
-            Feedback.objects.values("student_id", "menu_item", "month")
-            .annotate(total=Count("id"))
-            .filter(total__gt=1)
-        )
-
-        duplicate_group_count = duplicate_groups.count()
-        if duplicate_group_count == 0:
-            self.stdout.write(self.style.SUCCESS("No duplicate feedback rows found."))
-            return
-
-        ids_to_delete = []
-        for group in duplicate_groups.iterator():
-            group_ids = list(
-                Feedback.objects.filter(
-                    student_id=group["student_id"],
-                    menu_item=group["menu_item"],
-                    month=group["month"],
-                )
-                .order_by("created_at", "id")
-                .values_list("id", flat=True)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COUNT(*)
+                FROM (
+                    SELECT student_id, menu_item, month
+                    FROM mess_feedback
+                    GROUP BY student_id, menu_item, month
+                    HAVING COUNT(*) > 1
+                ) duplicate_groups
+                """
             )
-            if len(group_ids) > 1:
-                ids_to_delete.extend(group_ids[1:])
+            before_groups = int(cursor.fetchone()[0])
 
-        with transaction.atomic():
-            deleted_count, _ = Feedback.objects.filter(id__in=ids_to_delete).delete()
+            if before_groups == 0:
+                self.stdout.write(self.style.SUCCESS("No duplicate feedback rows found."))
+                return
+
+            cursor.execute(
+                """
+                DELETE FROM mess_feedback a
+                USING mess_feedback b
+                WHERE a.id > b.id
+                  AND a.student_id = b.student_id
+                  AND a.menu_item = b.menu_item
+                  AND a.month = b.month
+                """
+            )
+            deleted_count = cursor.rowcount
+
+            cursor.execute(
+                """
+                SELECT COUNT(*)
+                FROM (
+                    SELECT student_id, menu_item, month
+                    FROM mess_feedback
+                    GROUP BY student_id, menu_item, month
+                    HAVING COUNT(*) > 1
+                ) duplicate_groups
+                """
+            )
+            after_groups = int(cursor.fetchone()[0])
 
         self.stdout.write(
             self.style.WARNING(
-                f"Removed {deleted_count} duplicate feedback rows across {duplicate_group_count} duplicate groups."
+                f"Removed {deleted_count} duplicate feedback rows. Duplicate groups: {before_groups} -> {after_groups}."
             )
         )

@@ -479,7 +479,7 @@
       </form>
     </div>
 
-    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 8px 0 10px; flex-wrap: wrap;">
+    <div id="room-ranges-bulk-actions" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 8px 0 10px; flex-wrap: wrap;">
       <p class="muted" style="margin: 0;">Use the action below to remove the room ranges currently shown in this view.</p>
       {% if room_ranges %}
       <form method="post" class="room-ranges-delete-all-form" data-confirm-message="Delete {{ room_ranges|length }} room ranges currently shown? This cannot be undone.">
@@ -762,6 +762,7 @@
     const confirmCancelButton = document.getElementById('room-range-confirm-cancel');
 
     let pendingDeleteForm = null;
+    let noticeTimer = null;
 
     function showNotice(message, kind) {
       if (!laundryNotice) {
@@ -771,7 +772,11 @@
       laundryNotice.textContent = message;
       laundryNotice.className = 'laundry-notice show ' + (kind || 'success');
 
-      window.setTimeout(function () {
+      if (noticeTimer) {
+        window.clearTimeout(noticeTimer);
+      }
+
+      noticeTimer = window.setTimeout(function () {
         laundryNotice.className = 'laundry-notice';
       }, 3500);
     }
@@ -809,6 +814,11 @@
       }
 
       roomRangesTableBody.innerHTML = '<tr><td colspan="5" class="muted">No room ranges defined yet.</td></tr>';
+
+      const bulkActionsRow = document.getElementById('room-ranges-bulk-actions');
+      if (bulkActionsRow) {
+        bulkActionsRow.style.display = 'none';
+      }
     }
 
     function submitPendingDelete() {

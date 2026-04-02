@@ -12,20 +12,12 @@ def deduplicate_feedback(apps, schema_editor):
 
     schema_editor.execute(
         f"""
-        DELETE FROM {table_name}
-        WHERE id IN (
-            SELECT id
-            FROM (
-                SELECT
-                    id,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY student_id, menu_item, month
-                        ORDER BY created_at ASC, id ASC
-                    ) AS row_number
-                FROM {table_name}
-            ) duplicate_rows
-            WHERE row_number > 1
-        )
+        DELETE FROM {table_name} a
+        USING {table_name} b
+        WHERE a.id > b.id
+          AND a.student_id = b.student_id
+          AND a.menu_item = b.menu_item
+          AND a.month = b.month
         """
     )
 
