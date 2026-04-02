@@ -39,6 +39,7 @@
       --text: var(--light-text);
       --muted: var(--light-muted);
       --line: var(--light-line);
+      --icon-filter: invert(35%) sepia(86%) saturate(1515%) hue-rotate(186deg) brightness(94%) contrast(101%);
     }
     
     @media (prefers-color-scheme: dark) {
@@ -49,6 +50,7 @@
         --text: var(--dark-text);
         --muted: var(--dark-muted);
         --line: var(--dark-line);
+        --icon-filter: invert(74%) sepia(21%) saturate(1104%) hue-rotate(174deg) brightness(92%) contrast(90%);
       }
     }
     
@@ -59,6 +61,7 @@
       --text: var(--dark-text);
       --muted: var(--dark-muted);
       --line: var(--dark-line);
+      --icon-filter: invert(74%) sepia(21%) saturate(1104%) hue-rotate(174deg) brightness(92%) contrast(90%);
     }
     
     html[data-theme="light"] {
@@ -68,6 +71,7 @@
       --text: var(--light-text);
       --muted: var(--light-muted);
       --line: var(--light-line);
+      --icon-filter: invert(35%) sepia(86%) saturate(1515%) hue-rotate(186deg) brightness(94%) contrast(101%);
     }
 
     * { box-sizing: border-box; }
@@ -190,22 +194,23 @@
     .ms-Icon {
       font-size: 14px;
       line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1em;
+      height: 1em;
+      vertical-align: -0.125em;
     }
 
     .ms-Icon::before {
-      content: '';
-      display: inline-block;
+      content: none;
+    }
+
+    .ms-icon-img {
       width: 1em;
       height: 1em;
-      background-color: currentColor;
-      -webkit-mask-image: var(--icon-url);
-      mask-image: var(--icon-url);
-      -webkit-mask-size: contain;
-      mask-size: contain;
-      -webkit-mask-repeat: no-repeat;
-      mask-repeat: no-repeat;
-      -webkit-mask-position: center;
-      mask-position: center;
+      display: block;
+      filter: var(--icon-filter);
     }
 
     .ms-Icon--GlobalNavButton { --icon-url: url('{% static 'icons/list_24_regular.svg' %}'); }
@@ -680,6 +685,27 @@
         navLinks.classList.toggle('is-open');
       });
     }
+
+    function hydrateStaticIcons() {
+      document.querySelectorAll('.ms-Icon').forEach((iconEl) => {
+        if (iconEl.querySelector('img.ms-icon-img')) return;
+
+        const iconUrlRaw = getComputedStyle(iconEl).getPropertyValue('--icon-url').trim();
+        const urlMatch = iconUrlRaw.match(/url\(["']?([^"')]+)["']?\)/);
+        if (!urlMatch) return;
+
+        const img = document.createElement('img');
+        img.className = 'ms-icon-img';
+        img.src = urlMatch[1];
+        img.alt = '';
+        img.setAttribute('aria-hidden', 'true');
+        img.decoding = 'async';
+        img.loading = 'eager';
+        iconEl.prepend(img);
+      });
+    }
+
+    hydrateStaticIcons();
   </script>
 </body>
 </html>
