@@ -268,8 +268,8 @@
 
 <div class="mess-shell">
   <section class="tab mess-tab">
-    <span class="label">Mess Menu</span>
-    <h2>Weekly Menu</h2>
+    <span class="label"><i class="ms-Icon ms-Icon--EatDrink"></i> Mess Menu</span>
+    <h2><i class="ms-Icon ms-Icon--BookOpen"></i> Weekly Menu</h2>
     <p class="muted">Select a day to view breakfast, lunch, snacks, and dinner.</p>
 
     {% if student %}
@@ -281,7 +281,7 @@
         <option value="{{ mess_type }}" {% if mess_type == selected_mess_type %}selected{% endif %}>{{ mess_type }}</option>
         {% endfor %}
       </select>
-      <button type="submit" class="button secondary">Load Menu Type</button>
+      <button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Refresh"></i> Load Menu Type</button>
     </form>
     {% endif %}
 
@@ -325,13 +325,13 @@
   </section>
 
   <section class="tab mess-tab">
-    <span class="label">Feedback And Polls</span>
-    <h2>{{ month }} Student Actions</h2>
+    <span class="label"><i class="ms-Icon ms-Icon--People"></i> Feedback And Polls</span>
+    <h2><i class="ms-Icon ms-Icon--AllApps"></i> {{ month }} Student Actions</h2>
     <p class="muted">Rate food and vote on the meeting poll from one place.</p>
 
     <div class="action-grid" style="margin-top: 10px;">
       <article class="action-card">
-        <h3>Rate Food</h3>
+        <h3><i class="ms-Icon ms-Icon--Like"></i> Rate Food</h3>
         <p class="muted">Choose day, meal time, and menu item from dropdowns before rating.</p>
 
         <form method="post" style="margin-top: 8px;">
@@ -384,12 +384,12 @@
             <input id="rate-comment" name="comment" placeholder="Share what worked or what should improve" />
           </div>
 
-          <button type="submit" style="margin-top: 12px;">Submit Rating</button>
+          <button type="submit" style="margin-top: 12px;"><i class="ms-Icon ms-Icon--Send"></i> Submit Rating</button>
         </form>
       </article>
 
       <article class="action-card">
-        <h3>Poll For Mess Meeting</h3>
+        <h3><i class="ms-Icon ms-Icon--AllApps"></i> Poll For Mess Meeting</h3>
         <p class="muted">Open the poll modal to like additions and dislike removals.</p>
         <button
           type="button"
@@ -397,7 +397,7 @@
           class="poll-trigger"
           {% if not poll_is_active %}disabled{% endif %}
         >
-          {% if poll_is_active %}Open Active Poll{% else %}Poll Not Active Yet{% endif %}
+          <i class="ms-Icon ms-Icon--AllApps"></i> {% if poll_is_active %}Open Active Poll{% else %}Poll Not Active Yet{% endif %}
         </button>
         <p class="inline-note">
           {% if poll_is_active %}
@@ -478,7 +478,7 @@
           <input type="hidden" name="action" value="vote_poll" />
           <input type="hidden" name="option_id" value="{{ option.id }}" />
           <span>{{ option.item_name }} ({{ option.total_votes }})</span>
-          {% if student %}<button type="submit" class="button secondary">Like</button>{% endif %}
+          {% if student %}<button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Like"></i> Like</button>{% endif %}
         </form>
         {% empty %}
         <p class="muted">No add-item options yet.</p>
@@ -493,7 +493,7 @@
           <input type="hidden" name="action" value="vote_poll" />
           <input type="hidden" name="option_id" value="{{ option.id }}" />
           <span>{{ option.item_name }} ({{ option.total_votes }})</span>
-          {% if student %}<button type="submit" class="button secondary">Dislike</button>{% endif %}
+          {% if student %}<button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Dislike"></i> Dislike</button>{% endif %}
         </form>
         {% empty %}
         <p class="muted">No remove-item options yet.</p>

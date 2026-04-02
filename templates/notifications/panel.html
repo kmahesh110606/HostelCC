@@ -107,8 +107,8 @@
 </style>
 <div class="tabs notifications-layout{% if not is_admin %} notifications-layout--single{% endif %}">
   <section class="tab notifications-panel">
-    <span class="label"><i class="fas fa-bell"></i> Notification Panel</span>
-    <h2>Campus Alerts</h2>
+    <span class="label"><i class="ms-Icon ms-Icon--Ringer"></i> Notification Panel</span>
+    <h2><i class="ms-Icon ms-Icon--Ringer"></i> Campus Alerts</h2>
     <p class="muted">Reply alerts, mess meeting reminders, and hostel meeting updates are listed here.</p>
 
     <div class="notifications-list">
@@ -121,7 +121,7 @@
         <p class="notification-message">{{ n.message }}</p>
         {% if n.poster %}
           {% if '.pdf' in n.poster.name|lower %}
-          <p style="margin: 0 0 8px;"><a class="button secondary" href="{{ n.poster.url }}" target="_blank" rel="noopener">Open Poster PDF</a></p>
+          <p style="margin: 0 0 8px;"><a class="button secondary" href="{{ n.poster.url }}" target="_blank" rel="noopener"><i class="ms-Icon ms-Icon--Document"></i> Open Poster PDF</a></p>
           {% else %}
           <img src="{{ n.poster.url }}" alt="Notification poster" class="notification-poster" />
           {% endif %}
@@ -133,7 +133,7 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="delete" />
             <input type="hidden" name="notification_id" value="{{ n.id }}" />
-            <button type="submit" class="button secondary">Delete</button>
+            <button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Delete"></i> Delete</button>
           </form>
         </div>
         {% endif %}
@@ -146,8 +146,8 @@
 
   {% if is_admin %}
   <section class="tab">
-    <span class="label"><i class="fas fa-pen"></i> Admin</span>
-    <h2>Create Notification</h2>
+    <span class="label"><i class="ms-Icon ms-Icon--Compose"></i> Admin</span>
+    <h2><i class="ms-Icon ms-Icon--Compose"></i> Create Notification</h2>
     <p class="muted">This publishes to both website and Flutter app dashboards.</p>
 
     <form method="post" enctype="multipart/form-data" style="display: grid; gap: 10px; margin-top: 12px;">
@@ -190,7 +190,7 @@
         </div>
       </div>
       <div class="form-actions">
-        <button type="submit"><i class="fas fa-paper-plane"></i> Publish</button>
+        <button type="submit"><i class="ms-Icon ms-Icon--Send"></i> Publish</button>
       </div>
     </form>
   </section>

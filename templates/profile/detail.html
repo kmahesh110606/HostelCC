@@ -2,8 +2,8 @@
 {% block content %}
 <div class="tabs" style="grid-template-columns: 1fr; max-width: 840px; margin-inline: auto;">
   <section class="tab">
-    <span class="label">Profile</span>
-    <h2>User Profile</h2>
+    <span class="label"><i class="ms-Icon ms-Icon--Contact"></i> Profile</span>
+    <h2><i class="ms-Icon ms-Icon--Contact"></i> User Profile</h2>
     <p class="muted">Account and hostel details for your login.</p>
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 14px;">
@@ -43,7 +43,7 @@
 
     {% if student %}
     <div style="margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px;">
-      <h3 style="margin-bottom: 6px;">Monthly Mess Change</h3>
+      <h3 style="margin-bottom: 6px;"><i class="ms-Icon ms-Icon--CalendarDay"></i> Monthly Mess Change</h3>
       {% if student.mess_change_unlocked %}
       <p class="muted">Admin has unlocked your profile this month. Pick a caterer from your block and current mess type, then submit once.</p>
       <form method="post" style="display: grid; gap: 10px; max-width: 360px; margin-top: 10px;">
@@ -58,7 +58,7 @@
             {% endfor %}
           </select>
         </div>
-        <button type="submit">Save Caterer Preference</button>
+        <button type="submit"><i class="ms-Icon ms-Icon--Accept"></i> Save Caterer Preference</button>
       </form>
       {% else %}
       <p class="muted">Mess change is locked. Admin can unlock your profile during the monthly change window.</p>
@@ -67,14 +67,14 @@
     {% endif %}
 
     <div class="row" style="margin-top: 16px;">
-      <a class="button" href="/accounts/forgot-password/">Forgot Password</a>
-      <a class="button secondary" href="/community/">Open Community</a>
+      <a class="button" href="/accounts/forgot-password/"><i class="ms-Icon ms-Icon--Shield"></i> Forgot Password</a>
+      <a class="button secondary" href="/community/"><i class="ms-Icon ms-Icon--Comment"></i> Open Community</a>
     </div>
   </section>
 
   {% if user.role == 'ADMIN' %}
   <section class="tab" style="margin-top: 14px;">
-    <h2>Admin: Unlock Student Mess Changes</h2>
+    <h2><i class="ms-Icon ms-Icon--Settings"></i> Admin: Unlock Student Mess Changes</h2>
     <p class="muted">Enable this once per month so a student can update mess allotment from their profile.</p>
     <form method="post" style="display: grid; gap: 10px; max-width: 520px; margin-top: 8px;">
       {% csrf_token %}
@@ -92,7 +92,7 @@
         <input type="checkbox" id="mess_change_unlocked" name="mess_change_unlocked" checked />
         <label for="mess_change_unlocked">Unlock selected student</label>
       </div>
-      <button type="submit">Update Access</button>
+      <button type="submit"><i class="ms-Icon ms-Icon--Accept"></i> Update Access</button>
     </form>
   </section>
   {% endif %}
