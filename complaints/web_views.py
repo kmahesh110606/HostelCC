@@ -426,6 +426,7 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                 'author_name': item['author_name'],
                 'block_name': item['block_name'],
                 'registration_no': item['registration_no'],
+                'room_no': item['room_no'],
                 'created_at': complaint.created_at.isoformat(),
                 'upvotes': complaint.upvotes,
                 'downvotes': complaint.downvotes,

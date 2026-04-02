@@ -7,7 +7,9 @@
         <span class="tag-chip"><i class="ms-Icon ms-Icon--DateTime2"></i> {{ item.obj.created_at|date:'d M Y, h:i A' }}</span>
       </div>
       <h3 style="margin: 2px 0 4px;">{{ item.author_name }}</h3>
-      <p class="muted" style="margin: 0;">Reg No: {{ item.registration_no|default:'N/A' }} | Room: {{ item.room_no|default:'N/A' }}</p>
+      <p class="muted" style="margin: 0; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; font-variant: all-small-caps;">
+        REG NO {{ item.registration_no|default:'N/A' }} | BLOCK {{ item.block_name|default:'N/A' }} | ROOM NO {{ item.room_no|default:'N/A' }}
+      </p>
     </div>
 
     <div style="display: grid; gap: 8px;">
