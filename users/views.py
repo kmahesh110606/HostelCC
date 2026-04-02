@@ -2,7 +2,8 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
-from django.core.mail import send_mail
+from django.core.cache import cache
+from users.otp_queue import OtpEmailJob, enqueue_otp_email
 from rest_framework import viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -55,16 +56,16 @@ def _issue_otp_for_user(user) -> tuple[bool, str]:
     if not from_email:
         return False, "Email service is not configured. Please contact admin."
     try:
-        send_mail(
-            subject="Hostel Management OTP",
-            message=f"Your OTP is {challenge.otp_code}. It expires in 10 minutes.",
-            from_email=from_email,
-            recipient_list=[user.email],
-            fail_silently=False,
+        enqueue_otp_email(
+            OtpEmailJob(
+                email=user.email,
+                otp_code=challenge.otp_code,
+                from_email=from_email,
+            )
         )
         return True, ""
     except Exception:
-        logger.exception("Failed to send OTP email", extra={"email": user.email})
+        logger.exception("Failed to queue OTP email", extra={"email": user.email})
         return False, "Unable to send OTP email right now. Please try again in a moment."
 
 
@@ -153,15 +154,15 @@ class RequestOTPView(APIView):
             return Response({"detail": "Email service is not configured. Please contact admin."}, status=503)
 
         try:
-            send_mail(
-                subject="Hostel Management OTP",
-                message=f"Your OTP is {challenge.otp_code}. It expires in 10 minutes.",
-                from_email=from_email,
-                recipient_list=[user.email],
-                fail_silently=False,
+            enqueue_otp_email(
+                OtpEmailJob(
+                    email=user.email,
+                    otp_code=challenge.otp_code,
+                    from_email=from_email,
+                )
             )
         except Exception:
-            logger.exception("Failed to send OTP email", extra={"email": user.email})
+            logger.exception("Failed to queue OTP email", extra={"email": user.email})
             return Response({"detail": "Unable to send OTP email right now. Please try again shortly."}, status=503)
         return Response({"detail": "OTP sent to registered email.", "dev_mode": False})
 
@@ -207,9 +208,10 @@ class SignupOptionsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        block_mess_types = build_block_mess_types_payload()
-        return Response(
-            {
+        cache_key = "signup-options:v2"
+        payload = cache.get(cache_key)
+        if payload is None:
+            payload = {
                 "country_codes": ["+91", "+1", "+44", "+65", "+971"],
                 "block_choices": [{"value": code, "label": label} for code, label in HostelBlock.BlockName.choices],
                 "staff_roles": [
@@ -222,10 +224,11 @@ class SignupOptionsView(APIView):
                 "department_choices": [{"value": code, "label": label} for code, label in User.Department.choices],
                 "mess_names": get_all_caterer_names(),
                 "student_mess_types": list(MESS_TYPES.keys()),
-                "block_mess_types": block_mess_types,
+                "block_mess_types": build_block_mess_types_payload(),
                 "block_mess_caterers": build_block_mess_caterers_payload(),
             }
-        )
+            cache.set(cache_key, payload, timeout=3600)
+        return Response(payload)
 
 
 class SignupRequestOTPView(APIView):

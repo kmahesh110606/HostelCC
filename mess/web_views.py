@@ -4,6 +4,7 @@ import csv
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Avg, Count, Q
+from django.db import IntegrityError
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -97,14 +98,17 @@ def mess_portal(request: HttpRequest) -> HttpResponse:
             if item_name:
                 menu_item = f"{menu_item}>{item_name}"
 
-            Feedback.objects.create(
-                student=student,
-                menu_item=menu_item,
-                rating=rating,
-                comment=comment,
-                month=month,
-            )
-            messages.success(request, "Rating submitted.")
+            try:
+                Feedback.objects.create(
+                    student=student,
+                    menu_item=menu_item,
+                    rating=rating,
+                    comment=comment,
+                    month=month,
+                )
+                messages.success(request, "Rating submitted.")
+            except IntegrityError:
+                messages.warning(request, "You have already rated this menu item this month. Your previous rating was not updated.")
             return redirect("mess-portal")
 
         if action == "create_poll":

@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
-from django.core.mail import send_mail
+from users.otp_queue import OtpEmailJob, enqueue_otp_email
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 
@@ -49,16 +49,16 @@ def _issue_otp(user) -> tuple[bool, str]:
         return False, "Email service is not configured. Please contact admin."
 
     try:
-        send_mail(
-            subject="Hostel Management OTP",
-            message=f"Your OTP is {challenge.otp_code}. It expires in 10 minutes.",
-            from_email=from_email,
-            recipient_list=[user.email],
-            fail_silently=False,
+        enqueue_otp_email(
+            OtpEmailJob(
+                email=user.email,
+                otp_code=challenge.otp_code,
+                from_email=from_email,
+            )
         )
         return True, ""
     except Exception:
-        logger.exception("Failed to send OTP email", extra={"email": user.email})
+        logger.exception("Failed to queue OTP email", extra={"email": user.email})
         return False, "Unable to send OTP email right now. Please try again in a moment."
 
 

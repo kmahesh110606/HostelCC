@@ -44,6 +44,17 @@ services:
     ports:
       - "8000:8000"
 
+  worker:
+    build: .
+    command: sh -c "python manage.py process_otp_queue"
+    env_file:
+      - .env
+    depends_on:
+      - pgbouncer
+      - redis
+    volumes:
+      - ./:/app
+
   nginx:
     image: nginx:1.27-alpine
     depends_on:

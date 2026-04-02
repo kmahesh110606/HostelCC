@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from functools import lru_cache
 
 MESS_TYPES = OrderedDict(
     [
@@ -127,6 +128,7 @@ def get_allowed_caterers_for_block_and_type(block_name: str | None, mess_type: s
     return list(BLOCK_MESS_CATERERS.get(block, {}).get(normalized_mess_type, []))
 
 
+@lru_cache(maxsize=1)
 def get_all_caterer_names() -> list[str]:
     seen: OrderedDict[str, None] = OrderedDict()
     for block_rows in BLOCK_MESS_CATERERS.values():
@@ -136,6 +138,7 @@ def get_all_caterer_names() -> list[str]:
     return list(seen.keys())
 
 
+@lru_cache(maxsize=1)
 def build_block_mess_types_payload() -> dict[str, list[str]]:
     payload: dict[str, list[str]] = {}
     for block in ["A", "B", "C", "D1", "D2", "E"]:
@@ -143,6 +146,7 @@ def build_block_mess_types_payload() -> dict[str, list[str]]:
     return payload
 
 
+@lru_cache(maxsize=1)
 def build_block_caterers_payload() -> dict[str, list[str]]:
     payload: dict[str, list[str]] = {}
     for block in ["A", "B", "C", "D1", "D2", "E"]:
@@ -150,6 +154,7 @@ def build_block_caterers_payload() -> dict[str, list[str]]:
     return payload
 
 
+@lru_cache(maxsize=1)
 def build_block_mess_caterers_payload() -> dict[str, dict[str, list[str]]]:
     payload: dict[str, dict[str, list[str]]] = {}
     for block, by_type in BLOCK_MESS_CATERERS.items():

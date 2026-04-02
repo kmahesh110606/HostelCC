@@ -5,6 +5,8 @@ from .models import LaundryEvent, LaundryHoliday, LaundryRoomRange, LaundrySched
 
 class LaundryScheduleSerializer(serializers.ModelSerializer):
     student_roll_no = serializers.CharField(source="student.roll_no", read_only=True)
+    block_name = serializers.CharField(source="student.block.block_name", read_only=True)
+    room_no = serializers.CharField(source="student.room_no", read_only=True)
 
     class Meta:
         model = LaundrySchedule
@@ -12,6 +14,8 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
             "id",
             "student",
             "student_roll_no",
+            "block_name",
+            "room_no",
             "day_of_week",
             "holidays",
             "qr_token",

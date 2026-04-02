@@ -1,5 +1,6 @@
 from django.core.cache import cache
 from django.db.models import Avg, Count, Q
+from django.db import IntegrityError
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
@@ -158,7 +159,24 @@ class FeedbackViewSet(viewsets.ModelViewSet):
         student = Student.objects.filter(user=self.request.user).first()
         if not student:
             raise PermissionDenied("Only mapped students can submit mess feedback.")
-        serializer.save(student=student, month=timezone.now().strftime("%Y-%m"))
+        
+        month = timezone.now().strftime("%Y-%m")
+        menu_item = serializer.validated_data.get("menu_item", "")
+        
+        # Check if student already rated this menu item this month
+        if Feedback.objects.filter(student=student, menu_item=menu_item, month=month).exists():
+            raise ValidationError(
+                "You have already rated this menu item this month. "
+                "You can only rate each menu item once per month."
+            )
+        
+        try:
+            serializer.save(student=student, month=month)
+        except IntegrityError:
+            raise ValidationError(
+                "You have already rated this menu item this month. "
+                "You can only rate each menu item once per month."
+            )
 
     @action(detail=True, methods=["post"])
     def reply(self, request, pk=None):
@@ -234,13 +252,21 @@ class PollViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.Gener
 
         existing_vote = MenuPollVote.objects.filter(student=student, option_id=option_id).first()
         if existing_vote:
-            serializer = MenuPollVoteSerializer(existing_vote)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(
+                {"detail": "You have already voted for this option."},
+                status=status.HTTP_200_OK
+            )
 
-        serializer = MenuPollVoteSerializer(data={"student": student.id, "option": option_id})
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        try:
+            serializer = MenuPollVoteSerializer(data={"student": student.id, "option": option_id})
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except IntegrityError:
+            return Response(
+                {"detail": "You have already voted for this option."},
+                status=status.HTTP_200_OK
+            )
 
 
 class MessChangeRequestViewSet(viewsets.ModelViewSet):

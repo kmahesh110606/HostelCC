@@ -5,9 +5,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HostelCC</title>
-  <link rel="stylesheet" href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.001/assets/icons/fabric-icons.css">
-  <link rel="stylesheet" href="https://static2.sharepointonline.com/files/fabric/assets/icons/fabric-icons.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/office-ui-fabric-core/11.0.0/css/fabric.min.css">
   <style>
     :root {
       /* Light Mode */
@@ -189,43 +186,43 @@
       mask-position: center;
     }
 
-    .ms-Icon--GlobalNavButton { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/list.svg'); }
-    .ms-Icon--Home { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/house-door.svg'); }
-    .ms-Icon--Comment { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/chat-text.svg'); }
-    .ms-Icon--CommentSolid { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/chat-left-dots-fill.svg'); }
-    .ms-Icon--EatDrink { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/cup-hot.svg'); }
-    .ms-Icon--Product { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/basket2.svg'); }
-    .ms-Icon--Ringer { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/bell.svg'); }
-    .ms-Icon--Contact { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/person-circle.svg'); }
-    .ms-Icon--Shield { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/shield-check.svg'); }
-    .ms-Icon--SignOut { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/box-arrow-right.svg'); }
-    .ms-Icon--ClearNight { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/moon-stars.svg'); }
-    .ms-Icon--ClearDay { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/sun.svg'); }
-    .ms-Icon--Filter { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/funnel.svg'); }
-    .ms-Icon--Add { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/plus-circle.svg'); }
-    .ms-Icon--Delete { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/trash.svg'); }
-    .ms-Icon--Send { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/send.svg'); }
-    .ms-Icon--QRCode { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/qr-code.svg'); }
-    .ms-Icon--AllApps { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/grid-3x3-gap.svg'); }
-    .ms-Icon--Tag { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/tag.svg'); }
-    .ms-Icon--Pinned { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/pin-angle.svg'); }
-    .ms-Icon--DateTime2 { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/clock.svg'); }
-    .ms-Icon--Up { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/arrow-up-circle.svg'); }
-    .ms-Icon--Down { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/arrow-down-circle.svg'); }
-    .ms-Icon--CompletedSolid { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/check-circle-fill.svg'); }
-    .ms-Icon--ChromeClose { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/x-lg.svg'); }
-    .ms-Icon--Calendar { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/calendar-event.svg'); }
-    .ms-Icon--Recent { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/clock-history.svg'); }
-    .ms-Icon--Clock { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/alarm.svg'); }
-    .ms-Icon--Print { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/printer.svg'); }
-    .ms-Icon--CalendarWeek { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/calendar-week.svg'); }
-    .ms-Icon--CheckboxComposite { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/check2-square.svg'); }
-    .ms-Icon--Settings { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/gear.svg'); }
-    .ms-Icon--Accept { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/check2.svg'); }
-    .ms-Icon--People { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/people.svg'); }
-    .ms-Icon--Like { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/hand-thumbs-up.svg'); }
-    .ms-Icon--Dislike { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/hand-thumbs-down.svg'); }
-    .ms-Icon--ViewList { --icon-url: url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/list-ul.svg'); }
+    .ms-Icon--GlobalNavButton { --icon-url: url('{% static 'icons/bootstrap-icons.svg#list' %}'); }
+    .ms-Icon--Home { --icon-url: url('{% static 'icons/bootstrap-icons.svg#house-door' %}'); }
+    .ms-Icon--Comment { --icon-url: url('{% static 'icons/bootstrap-icons.svg#chat-text' %}'); }
+    .ms-Icon--CommentSolid { --icon-url: url('{% static 'icons/bootstrap-icons.svg#chat-left-dots-fill' %}'); }
+    .ms-Icon--EatDrink { --icon-url: url('{% static 'icons/bootstrap-icons.svg#cup-hot' %}'); }
+    .ms-Icon--Product { --icon-url: url('{% static 'icons/bootstrap-icons.svg#basket2' %}'); }
+    .ms-Icon--Ringer { --icon-url: url('{% static 'icons/bootstrap-icons.svg#bell' %}'); }
+    .ms-Icon--Contact { --icon-url: url('{% static 'icons/bootstrap-icons.svg#person-circle' %}'); }
+    .ms-Icon--Shield { --icon-url: url('{% static 'icons/bootstrap-icons.svg#shield-check' %}'); }
+    .ms-Icon--SignOut { --icon-url: url('{% static 'icons/bootstrap-icons.svg#box-arrow-right' %}'); }
+    .ms-Icon--ClearNight { --icon-url: url('{% static 'icons/bootstrap-icons.svg#moon-stars' %}'); }
+    .ms-Icon--ClearDay { --icon-url: url('{% static 'icons/bootstrap-icons.svg#sun' %}'); }
+    .ms-Icon--Filter { --icon-url: url('{% static 'icons/bootstrap-icons.svg#funnel' %}'); }
+    .ms-Icon--Add { --icon-url: url('{% static 'icons/bootstrap-icons.svg#plus-circle' %}'); }
+    .ms-Icon--Delete { --icon-url: url('{% static 'icons/bootstrap-icons.svg#trash' %}'); }
+    .ms-Icon--Send { --icon-url: url('{% static 'icons/bootstrap-icons.svg#send' %}'); }
+    .ms-Icon--QRCode { --icon-url: url('{% static 'icons/bootstrap-icons.svg#qr-code' %}'); }
+    .ms-Icon--AllApps { --icon-url: url('{% static 'icons/bootstrap-icons.svg#grid-3x3-gap' %}'); }
+    .ms-Icon--Tag { --icon-url: url('{% static 'icons/bootstrap-icons.svg#tag' %}'); }
+    .ms-Icon--Pinned { --icon-url: url('{% static 'icons/bootstrap-icons.svg#pin-angle' %}'); }
+    .ms-Icon--DateTime2 { --icon-url: url('{% static 'icons/bootstrap-icons.svg#clock' %}'); }
+    .ms-Icon--Up { --icon-url: url('{% static 'icons/bootstrap-icons.svg#arrow-up-circle' %}'); }
+    .ms-Icon--Down { --icon-url: url('{% static 'icons/bootstrap-icons.svg#arrow-down-circle' %}'); }
+    .ms-Icon--CompletedSolid { --icon-url: url('{% static 'icons/bootstrap-icons.svg#check-circle-fill' %}'); }
+    .ms-Icon--ChromeClose { --icon-url: url('{% static 'icons/bootstrap-icons.svg#x-lg' %}'); }
+    .ms-Icon--Calendar { --icon-url: url('{% static 'icons/bootstrap-icons.svg#calendar-event' %}'); }
+    .ms-Icon--Recent { --icon-url: url('{% static 'icons/bootstrap-icons.svg#clock-history' %}'); }
+    .ms-Icon--Clock { --icon-url: url('{% static 'icons/bootstrap-icons.svg#alarm' %}'); }
+    .ms-Icon--Print { --icon-url: url('{% static 'icons/bootstrap-icons.svg#printer' %}'); }
+    .ms-Icon--CalendarWeek { --icon-url: url('{% static 'icons/bootstrap-icons.svg#calendar-week' %}'); }
+    .ms-Icon--CheckboxComposite { --icon-url: url('{% static 'icons/bootstrap-icons.svg#check2-square' %}'); }
+    .ms-Icon--Settings { --icon-url: url('{% static 'icons/bootstrap-icons.svg#gear' %}'); }
+    .ms-Icon--Accept { --icon-url: url('{% static 'icons/bootstrap-icons.svg#check2' %}'); }
+    .ms-Icon--People { --icon-url: url('{% static 'icons/bootstrap-icons.svg#people' %}'); }
+    .ms-Icon--Like { --icon-url: url('{% static 'icons/bootstrap-icons.svg#hand-thumbs-up' %}'); }
+    .ms-Icon--Dislike { --icon-url: url('{% static 'icons/bootstrap-icons.svg#hand-thumbs-down' %}'); }
+    .ms-Icon--ViewList { --icon-url: url('{% static 'icons/bootstrap-icons.svg#list-ul' %}'); }
     
     .nav-inner > div:first-child h1 {
       font-size: 24px;

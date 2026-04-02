@@ -62,6 +62,7 @@ class Feedback(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        unique_together = ("student", "menu_item", "month")
         indexes = [
             models.Index(fields=["month", "created_at"], name="mess_fb_month_ct_idx"),
             models.Index(fields=["student", "created_at"], name="mess_fb_student_ct_idx"),
