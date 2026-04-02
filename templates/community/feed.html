@@ -387,6 +387,30 @@
     overflow: hidden;
   }
 
+  .community-notice {
+    display: none;
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--panel) 88%, var(--line) 12%);
+    color: var(--text);
+  }
+
+  .community-notice.show {
+    display: block;
+  }
+
+  .community-notice.success {
+    border-color: rgba(16, 124, 16, 0.35);
+    background: rgba(16, 124, 16, 0.08);
+  }
+
+  .community-notice.error {
+    border-color: rgba(232, 17, 35, 0.35);
+    background: rgba(232, 17, 35, 0.08);
+  }
+
   @media (max-width: 1080px) {
     .community-layout {
       grid-template-columns: 1fr;
@@ -443,6 +467,8 @@
     New Complaint
   </button>
 </div>
+
+<div id="community-notice" class="community-notice" role="status" aria-live="polite"></div>
 
 <div class="community-layout">
   <aside class="community-panel side-panel">
@@ -501,7 +527,7 @@
 
     {% if show_management_panel %}
     <h3 style="margin-top: 18px;">Active Complaints</h3>
-    <div class="active-list">
+    <div class="active-list" id="active-complaints-list">
       {% for active in active_complaints %}
       <div class="active-item">
         <div class="tag-row">
@@ -525,151 +551,15 @@
       <p class="muted">Supervisors manage their department, wardens manage all departments, and status updates stay inside comments.</p>
     </div>
 
-    {% for item in complaint_items %}
-    <article class="feed-card">
-      <div class="meta-row">
-        <div>
-          <div class="tag-row">
-            <span class="tag-chip"><i class="ms-Icon ms-Icon--Tag"></i> {{ item.obj.get_category_display }}</span>
-            <span class="tag-chip"><i class="ms-Icon ms-Icon--Pinned"></i> Block {{ item.block_name|default:'N/A' }}</span>
-            <span class="tag-chip"><i class="ms-Icon ms-Icon--DateTime2"></i> {{ item.obj.created_at|date:'d M Y, h:i A' }}</span>
-          </div>
-          <h3 style="margin: 2px 0 4px;">{{ item.author_name }}</h3>
-          <p class="muted" style="margin: 0;">Reg No: {{ item.registration_no|default:'N/A' }} | Room: {{ item.room_no|default:'N/A' }}</p>
-        </div>
-
-        <div style="display: grid; gap: 8px;">
-          <span class="status-chip">
-            {% if item.obj.status == 'OPEN' %}
-              <span class="status-dot status-dot-active"></span> Active
-            {% elif item.obj.status == 'IN_PROGRESS' %}
-              <span class="status-dot status-dot-progress"></span> In Progress
-            {% else %}
-              <span class="status-dot status-dot-closed"></span> Closed
-            {% endif %}
-          </span>
-
-          {% if item.can_delete %}
-          <form method="post" onsubmit="return confirm('Delete this post?')">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete" />
-            <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
-            <button type="submit" class="button secondary" style="width: 100%;"><i class="ms-Icon ms-Icon--Delete"></i> Delete</button>
-          </form>
-          {% endif %}
-        </div>
+    <div id="community-feed-list" style="display: grid; gap: 12px;">
+      {% for item in complaint_items %}
+      {% include 'community/_complaint_card.html' with item=item status_choices=status_choices %}
+      {% empty %}
+      <div id="community-empty-state" class="community-panel">
+        <p class="muted">No posts yet. Be the first to post a complaint.</p>
       </div>
-
-      {% if item.obj.text %}
-      <p style="margin-top: 8px; white-space: pre-wrap;">{{ item.obj.text }}</p>
-      {% endif %}
-
-        {% if item.obj.media %}
-        {% if item.obj.media_type == 'IMAGE' %}
-        <img src="{{ item.obj.media.url }}" alt="Complaint media" class="feed-media" loading="lazy" decoding="async" />
-        {% elif item.obj.media_type == 'VIDEO' %}
-        <video controls preload="none" class="feed-media">
-          <source src="{{ item.obj.media.url }}" />
-        </video>
-        {% endif %}
-      {% endif %}
-
-      <div class="actions-row">
-        <form method="post" class="vote-form" data-direction="up">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="vote" />
-          <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
-          <input type="hidden" name="direction" value="up" />
-          <button type="submit" class="action-pill upvote vote-up" aria-label="Upvote complaint {{ item.obj.id }}">
-            <i class="ms-Icon ms-Icon--Up"></i>
-            <span class="vote-count">{{ item.obj.upvotes }}</span>
-          </button>
-        </form>
-
-        <form method="post" class="vote-form" data-direction="down">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="vote" />
-          <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
-          <input type="hidden" name="direction" value="down" />
-          <button type="submit" class="action-pill downvote vote-down" aria-label="Downvote complaint {{ item.obj.id }}">
-            <i class="ms-Icon ms-Icon--Down"></i>
-            <span class="vote-count">{{ item.obj.downvotes }}</span>
-          </button>
-        </form>
-
-        <button type="button" class="action-pill comments open-comments-btn" data-modal-target="comments-modal-{{ item.obj.id }}" aria-label="Open comments for complaint {{ item.obj.id }}">
-          <i class="ms-Icon ms-Icon--CommentSolid"></i>
-          <span class="vote-count">{{ item.obj.reply_count }}</span>
-        </button>
-
-        {% if item.can_manage %}
-        <form method="post" class="row manage-status-form" style="gap: 8px; align-items: center;">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="set_status" />
-          <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
-          <select name="status" style="width: 170px; margin: 0;">
-            {% for code, label in status_choices %}
-            <option value="{{ code }}" {% if item.obj.status == code %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-          <button type="submit"><i class="ms-Icon ms-Icon--CompletedSolid"></i> Update Status</button>
-        </form>
-        {% endif %}
-      </div>
-    </article>
-
-    <div id="comments-modal-{{ item.obj.id }}" class="comment-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title-{{ item.obj.id }}">
-      <div class="comment-modal-backdrop" data-modal-close></div>
-      <div class="comment-modal-card">
-        <div class="comment-modal-header">
-          <h4 id="modal-title-{{ item.obj.id }}" class="comment-modal-title">
-            <i class="ms-Icon ms-Icon--Comment"></i>
-            Complaint #{{ item.obj.id }} Comments
-          </h4>
-          <button type="button" class="comment-modal-close" data-modal-close aria-label="Close comments modal">
-            <i class="ms-Icon ms-Icon--ChromeClose"></i>
-          </button>
-        </div>
-
-        <div class="comment-modal-content">
-          <div class="comments-box">
-            {% for reply in item.obj.replies.all %}
-            <div class="comment-item {% if '[Status Update]' in reply.text %}activity{% endif %}">
-              <div class="comment-metadata">
-                <strong>{{ reply.author.get_full_name|default:reply.author.username }}</strong>
-                <span>{{ reply.created_at|date:'d M Y, h:i A' }}</span>
-              </div>
-              <div>{{ reply.text }}</div>
-            </div>
-            {% empty %}
-            <p class="muted" style="margin: 0;">No comments yet. Start the discussion.</p>
-            {% endfor %}
-          </div>
-        </div>
-
-        <div class="comment-modal-footer">
-          <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="comment" />
-            <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
-            <div class="form-row" style="align-items: end;">
-              <div class="form-group" style="margin: 0;">
-                <label for="comment_{{ item.obj.id }}">Add Comment</label>
-                <input id="comment_{{ item.obj.id }}" name="comment_text" required placeholder="Write a response or status update" />
-              </div>
-              <div class="form-group" style="margin: 0;">
-                <button type="submit"><i class="ms-Icon ms-Icon--Send"></i> Comment</button>
-              </div>
-            </div>
-          </form>
-        </div>
-      </div>
+      {% endfor %}
     </div>
-    {% empty %}
-    <div class="community-panel">
-      <p class="muted">No posts yet. Be the first to post a complaint.</p>
-    </div>
-    {% endfor %}
   </section>
 </div>
 
@@ -686,7 +576,7 @@
       </button>
     </div>
     <div class="comment-modal-content">
-      <form method="post" enctype="multipart/form-data" style="display: grid; gap: 10px;">
+      <form id="community-create-form" class="community-create-form" method="post" enctype="multipart/form-data" style="display: grid; gap: 10px;">
         {% csrf_token %}
         <input type="hidden" name="action" value="create" />
         <div class="form-group required">
@@ -716,98 +606,326 @@
 
 <script>
   (function () {
-    const openButtons = document.querySelectorAll('[data-modal-target]');
-    const closeButtons = document.querySelectorAll('[data-modal-close]');
-    const voteForms = document.querySelectorAll('.vote-form');
+    const communityFeedList = document.getElementById('community-feed-list');
+    const activeComplaintsList = document.getElementById('active-complaints-list');
+    const communityNotice = document.getElementById('community-notice');
 
-    function closeModal(modal) {
-      modal.classList.remove('open');
-      modal.setAttribute('aria-hidden', 'true');
-      document.body.classList.remove('modal-open');
+    const statusMeta = {
+      OPEN: { label: 'Active', dotClass: 'status-dot-active' },
+      IN_PROGRESS: { label: 'In Progress', dotClass: 'status-dot-progress' },
+      CLOSED: { label: 'Closed', dotClass: 'status-dot-closed' },
+    };
+
+    let noticeTimer = null;
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function truncateText(text, length) {
+      if (!text || text.length <= length) {
+        return text || '';
+      }
+      return text.slice(0, Math.max(0, length - 3)) + '...';
+    }
+
+    function showNotice(message, kind) {
+      if (!communityNotice) {
+        return;
+      }
+
+      communityNotice.textContent = message;
+      communityNotice.className = 'community-notice show ' + (kind || 'success');
+      communityNotice.hidden = false;
+
+      if (noticeTimer) {
+        window.clearTimeout(noticeTimer);
+      }
+
+      noticeTimer = window.setTimeout(function () {
+        communityNotice.className = 'community-notice';
+        communityNotice.hidden = true;
+      }, 4000);
     }
 
     function openModal(modal) {
+      if (!modal) {
+        return;
+      }
+
       modal.classList.add('open');
       modal.setAttribute('aria-hidden', 'false');
       document.body.classList.add('modal-open');
     }
 
-    openButtons.forEach(function (button) {
-      button.addEventListener('click', function () {
-        const modalId = button.getAttribute('data-modal-target');
-        const modal = document.getElementById(modalId);
+    function closeModal(modal) {
+      if (!modal) {
+        return;
+      }
+
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+    }
+
+    function requestJson(form) {
+      return fetch(window.location.pathname + window.location.search, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      }).then(async function (response) {
+        let data = {};
+        try {
+          data = await response.json();
+        } catch (error) {
+          data = {};
+        }
+
+        if (!response.ok || data.success === false) {
+          throw new Error(data.error || 'Unable to complete that action right now.');
+        }
+
+        return data;
+      });
+    }
+
+    function ensureEmptyState() {
+      if (!communityFeedList) {
+        return;
+      }
+
+      if (communityFeedList.querySelector('.feed-card')) {
+        return;
+      }
+
+      if (!document.getElementById('community-empty-state')) {
+        communityFeedList.innerHTML = '<div id="community-empty-state" class="community-panel"><p class="muted">No posts yet. Be the first to post a complaint.</p></div>';
+      }
+    }
+
+    function insertComplaintCard(cardHtml) {
+      if (!communityFeedList || !cardHtml) {
+        return null;
+      }
+
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = cardHtml.trim();
+      const card = wrapper.firstElementChild;
+      if (!card) {
+        return null;
+      }
+
+      const emptyState = document.getElementById('community-empty-state');
+      if (emptyState) {
+        emptyState.remove();
+      }
+
+      communityFeedList.prepend(card);
+      return card;
+    }
+
+    function renderActiveComplaints(items) {
+      if (!activeComplaintsList) {
+        return;
+      }
+
+      if (!items || !items.length) {
+        activeComplaintsList.innerHTML = '<p class="muted">No active complaints currently.</p>';
+        return;
+      }
+
+      activeComplaintsList.innerHTML = items.map(function (item) {
+        return '<div class="active-item">' +
+          '<div class="tag-row">' +
+          '<span class="status-dot status-dot-active"></span>' +
+          '<strong>#' + escapeHtml(String(item.id)) + '</strong>' +
+          '<span class="tag-chip">' + escapeHtml(item.category_label || 'Complaint') + '</span>' +
+          '</div>' +
+          '<p class="muted" style="margin: 0;">' + escapeHtml(truncateText(item.text || '', 90)) + '</p>' +
+          '</div>';
+      }).join('');
+    }
+
+    function updateStatusChip(card, status, statusLabel) {
+      if (!card) {
+        return;
+      }
+
+      const chip = card.querySelector('.status-chip');
+      if (!chip) {
+        return;
+      }
+
+      const meta = statusMeta[status] || statusMeta.OPEN;
+      chip.innerHTML = '<span class="status-dot ' + meta.dotClass + '"></span> ' + escapeHtml(statusLabel || meta.label || status);
+    }
+
+    function updateReplyCount(card, count) {
+      if (!card) {
+        return;
+      }
+
+      const replyCount = card.querySelector('.open-comments-btn .vote-count');
+      if (replyCount) {
+        replyCount.textContent = String(count);
+      }
+    }
+
+    function buildCommentHtml(comment) {
+      const activityClass = comment.is_activity ? ' activity' : '';
+      return '<div class="comment-item' + activityClass + '">' +
+        '<div class="comment-metadata">' +
+        '<strong>' + escapeHtml(comment.author_name || 'Unknown') + '</strong>' +
+        '<span>' + escapeHtml(comment.created_at_label || '') + '</span>' +
+        '</div>' +
+        '<div>' + escapeHtml(comment.text || '') + '</div>' +
+        '</div>';
+    }
+
+    function removeCard(card) {
+      if (!card) {
+        return;
+      }
+
+      card.remove();
+      ensureEmptyState();
+    }
+
+    document.addEventListener('click', function (event) {
+      const openTrigger = event.target.closest('[data-modal-target]');
+      if (openTrigger) {
+        const modal = document.getElementById(openTrigger.getAttribute('data-modal-target'));
         if (modal) {
           openModal(modal);
         }
-      });
-    });
+        return;
+      }
 
-    closeButtons.forEach(function (button) {
-      button.addEventListener('click', function () {
-        const modal = button.closest('.comment-modal');
+      const closeTrigger = event.target.closest('[data-modal-close]');
+      if (closeTrigger) {
+        const modal = closeTrigger.closest('.comment-modal');
         if (modal) {
           closeModal(modal);
         }
-      });
+      }
     });
 
-    voteForms.forEach(function (form) {
-      form.addEventListener('submit', function (event) {
-        event.preventDefault();
+    document.addEventListener('submit', function (event) {
+      const form = event.target instanceof HTMLFormElement ? event.target : event.target.closest('form');
+      if (!form || event.defaultPrevented) {
+        return;
+      }
 
-        const formData = new FormData(form);
-        const card = form.closest('.feed-card');
-        if (!card) {
-          form.submit();
-          return;
-        }
+      const shouldHandle = form.matches('.vote-form, .community-comment-form, .community-status-form, .community-delete-form, #community-create-form');
+      if (!shouldHandle) {
+        return;
+      }
 
-        fetch(form.getAttribute('action') || window.location.pathname, {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        })
-        .then(function (response) {
-          return response.json();
-        })
+      event.preventDefault();
+
+      requestJson(form)
         .then(function (data) {
-          if (!data.success) {
+          const actionInput = form.querySelector('input[name="action"]');
+          const action = actionInput ? actionInput.value : '';
+          const card = form.closest('.feed-card');
+
+          if (action === 'vote') {
+            if (!card) {
+              return;
+            }
+
+            const upButton = card.querySelector('.vote-up');
+            const downButton = card.querySelector('.vote-down');
+
+            if (upButton) {
+              const countNode = upButton.querySelector('.vote-count');
+              if (countNode) {
+                countNode.textContent = data.upvotes;
+              }
+              upButton.classList.toggle('active', data.user_vote === 'up');
+            }
+
+            if (downButton) {
+              const countNode = downButton.querySelector('.vote-count');
+              if (countNode) {
+                countNode.textContent = data.downvotes;
+              }
+              downButton.classList.toggle('active', data.user_vote === 'down');
+            }
             return;
           }
 
-          const upButton = card.querySelector('.vote-up');
-          const downButton = card.querySelector('.vote-down');
-
-          if (upButton) {
-            const countNode = upButton.querySelector('.vote-count');
-            if (countNode) {
-              countNode.textContent = data.upvotes;
+          if (action === 'create') {
+            const modal = form.closest('.comment-modal');
+            if (modal) {
+              closeModal(modal);
             }
-            upButton.classList.toggle('active', data.user_vote === 'up');
+            form.reset();
+            if (data.visible !== false) {
+              insertComplaintCard(data.card_html);
+            }
+            renderActiveComplaints(data.active_complaints || []);
+            showNotice('Complaint posted successfully.', 'success');
+            return;
           }
 
-          if (downButton) {
-            const countNode = downButton.querySelector('.vote-count');
-            if (countNode) {
-              countNode.textContent = data.downvotes;
+          if (action === 'comment') {
+            if (card && data.comment) {
+              const complaintId = card.getAttribute('data-complaint-id');
+              const commentsBox = complaintId ? document.getElementById('comments-box-' + complaintId) : null;
+              if (commentsBox) {
+                const emptyState = commentsBox.querySelector('.comments-empty-state');
+                if (emptyState) {
+                  emptyState.remove();
+                }
+                commentsBox.insertAdjacentHTML('beforeend', buildCommentHtml(data.comment));
+                commentsBox.scrollTop = commentsBox.scrollHeight;
+              }
+              updateReplyCount(card, data.reply_count || 0);
             }
-            downButton.classList.toggle('active', data.user_vote === 'down');
+            form.reset();
+            showNotice('Comment posted.', 'success');
+            return;
+          }
+
+          if (action === 'set_status') {
+            if (card) {
+              if (data.visible === false) {
+                removeCard(card);
+              } else {
+                updateStatusChip(card, data.status, data.status_label);
+              }
+            }
+            renderActiveComplaints(data.active_complaints || []);
+            showNotice('Complaint status updated.', 'success');
+            return;
+          }
+
+          if (action === 'delete') {
+            if (card) {
+              removeCard(card);
+            }
+            renderActiveComplaints(data.active_complaints || []);
+            showNotice('Post deleted.', 'success');
           }
         })
-        .catch(function () {
-          form.submit();
+        .catch(function (error) {
+          showNotice(error.message || 'Unable to complete that action.', 'error');
         });
-      });
     });
 
     document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape') {
-        document.querySelectorAll('.comment-modal.open').forEach(function (modal) {
-          closeModal(modal);
-        });
+      if (event.key !== 'Escape') {
+        return;
       }
+
+      document.querySelectorAll('.comment-modal.open').forEach(function (modal) {
+        closeModal(modal);
+      });
     });
 
   })();

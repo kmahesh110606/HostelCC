@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils.dateparse import parse_date
 
@@ -22,6 +22,21 @@ def _is_laundry_manager_or_admin(user) -> bool:
 
 def _is_admin(user) -> bool:
     return getattr(user, "role", "") == "ADMIN"
+
+
+_LAUNDRY_ADMIN_CACHE_VERSION_KEY = "laundry:admin-data-version"
+
+
+def _get_laundry_admin_cache_version() -> int:
+    version = cache.get(_LAUNDRY_ADMIN_CACHE_VERSION_KEY, 1)
+    try:
+        return int(version)
+    except (TypeError, ValueError):
+        return 1
+
+
+def _bump_laundry_admin_cache_version() -> None:
+    cache.set(_LAUNDRY_ADMIN_CACHE_VERSION_KEY, _get_laundry_admin_cache_version() + 1, timeout=None)
 
 
 def _room_number_as_int(value: str):
@@ -371,6 +386,7 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
                     room_to=room_to,
                     is_active=True,
                 )
+                _bump_laundry_admin_cache_version()
                 if scheduled_date:
                     messages.success(request, "Date-wise room range schedule added.")
                 else:
@@ -423,6 +439,7 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
                 created_count += 1
 
             if created_count:
+                _bump_laundry_admin_cache_version()
                 messages.success(request, f"Bulk upload complete. Added {created_count} room-range slots.")
             if error_rows:
                 preview = " ".join(error_rows[:5])
@@ -432,10 +449,40 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
         if action == "delete_room_range" and is_laundry_manager:
             range_id = request.POST.get("room_range_id", "").strip()
             if range_id.isdigit():
-                LaundryRoomRange.objects.filter(id=int(range_id)).delete()
-                messages.success(request, "Room range schedule removed.")
+                deleted_count, _ = LaundryRoomRange.objects.filter(id=int(range_id)).delete()
+                if deleted_count:
+                    _bump_laundry_admin_cache_version()
+                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        return JsonResponse({"success": True, "deleted_count": deleted_count})
+                    messages.success(request, "Room range schedule removed.")
+                else:
+                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        return JsonResponse({"success": False, "error": "Room range not found."}, status=404)
+                    messages.error(request, "Room range not found.")
             else:
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return JsonResponse({"success": False, "error": "Invalid room range selected."}, status=400)
                 messages.error(request, "Invalid room range selected.")
+            return redirect("laundry-portal")
+
+        if action == "delete_all_room_ranges" and is_laundry_manager:
+            visible_room_ranges = LaundryRoomRange.objects.filter(is_active=True)
+            current_block_filter = request.GET.get("block", "").strip().upper()
+            if current_block_filter:
+                visible_room_ranges = visible_room_ranges.filter(block_name=current_block_filter)
+
+            deleted_count = visible_room_ranges.count()
+            visible_room_ranges.delete()
+            if deleted_count:
+                _bump_laundry_admin_cache_version()
+
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse({"success": True, "deleted_count": deleted_count})
+
+            if deleted_count:
+                messages.success(request, f"Removed {deleted_count} room ranges.")
+            else:
+                messages.info(request, "No room ranges matched the current view.")
             return redirect("laundry-portal")
 
         if action == "add_holiday" and is_laundry_manager:
@@ -449,14 +496,19 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
                     holiday_date=holiday_date,
                     defaults={"name": holiday_name, "is_active": True},
                 )
+                _bump_laundry_admin_cache_version()
                 messages.success(request, "Holiday declared. Date-wise laundry schedule will auto-shift.")
             return redirect("laundry-portal")
 
         if action == "delete_holiday" and is_laundry_manager:
             holiday_id = request.POST.get("holiday_id", "").strip()
             if holiday_id.isdigit():
-                LaundryHoliday.objects.filter(id=int(holiday_id)).delete()
-                messages.success(request, "Holiday removed.")
+                deleted_count, _ = LaundryHoliday.objects.filter(id=int(holiday_id)).delete()
+                if deleted_count:
+                    _bump_laundry_admin_cache_version()
+                    messages.success(request, "Holiday removed.")
+                else:
+                    messages.error(request, "Holiday not found.")
             else:
                 messages.error(request, "Invalid holiday selected.")
             return redirect("laundry-portal")
@@ -536,7 +588,8 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
 
     admin_calendar_cells = []
     if is_laundry_manager:
-        calendar_cache_key = f"laundry:admin-calendar:v1:{calendar_year}:{calendar_month}:{block_filter or 'ALL'}"
+        cache_version = _get_laundry_admin_cache_version()
+        calendar_cache_key = f"laundry:admin-calendar:v{cache_version}:{calendar_year}:{calendar_month}:{block_filter or 'ALL'}"
         admin_calendar_cells = cache.get(calendar_cache_key)
         if admin_calendar_cells is None:
             admin_calendar_cells = _build_admin_month_calendar(
@@ -548,7 +601,7 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
             )
             cache.set(calendar_cache_key, admin_calendar_cells, timeout=120)
 
-    block_choices_cache_key = "laundry:block-choices:v1"
+    block_choices_cache_key = f"laundry:block-choices:v{_get_laundry_admin_cache_version()}"
     block_choices = cache.get(block_choices_cache_key)
     if block_choices is None:
         schedule_blocks = {

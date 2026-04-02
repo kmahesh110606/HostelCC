@@ -1,0 +1,139 @@
+<article class="feed-card" id="complaint-card-{{ item.obj.id }}" data-complaint-id="{{ item.obj.id }}">
+  <div class="meta-row">
+    <div>
+      <div class="tag-row">
+        <span class="tag-chip"><i class="ms-Icon ms-Icon--Tag"></i> {{ item.obj.get_category_display }}</span>
+        <span class="tag-chip"><i class="ms-Icon ms-Icon--Pinned"></i> Block {{ item.block_name|default:'N/A' }}</span>
+        <span class="tag-chip"><i class="ms-Icon ms-Icon--DateTime2"></i> {{ item.obj.created_at|date:'d M Y, h:i A' }}</span>
+      </div>
+      <h3 style="margin: 2px 0 4px;">{{ item.author_name }}</h3>
+      <p class="muted" style="margin: 0;">Reg No: {{ item.registration_no|default:'N/A' }} | Room: {{ item.room_no|default:'N/A' }}</p>
+    </div>
+
+    <div style="display: grid; gap: 8px;">
+      <span class="status-chip" id="status-chip-{{ item.obj.id }}">
+        {% if item.obj.status == 'OPEN' %}
+          <span class="status-dot status-dot-active"></span> Active
+        {% elif item.obj.status == 'IN_PROGRESS' %}
+          <span class="status-dot status-dot-progress"></span> In Progress
+        {% else %}
+          <span class="status-dot status-dot-closed"></span> Closed
+        {% endif %}
+      </span>
+
+      {% if item.can_delete %}
+      <form method="post" class="community-delete-form" onsubmit="return confirm('Delete this post?')">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete" />
+        <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
+        <button type="submit" class="button secondary" style="width: 100%;"><i class="ms-Icon ms-Icon--Delete"></i> Delete</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if item.obj.text %}
+  <p style="margin-top: 8px; white-space: pre-wrap;">{{ item.obj.text }}</p>
+  {% endif %}
+
+  {% if item.obj.media %}
+  {% if item.obj.media_type == 'IMAGE' %}
+  <img src="{{ item.obj.media.url }}" alt="Complaint media" class="feed-media" loading="lazy" decoding="async" />
+  {% elif item.obj.media_type == 'VIDEO' %}
+  <video controls preload="none" class="feed-media">
+    <source src="{{ item.obj.media.url }}" />
+  </video>
+  {% endif %}
+  {% endif %}
+
+  <div class="actions-row">
+    <form method="post" class="vote-form" data-direction="up">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="vote" />
+      <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
+      <input type="hidden" name="direction" value="up" />
+      <button type="submit" class="action-pill upvote vote-up" aria-label="Upvote complaint {{ item.obj.id }}">
+        <i class="ms-Icon ms-Icon--Up"></i>
+        <span class="vote-count">{{ item.obj.upvotes }}</span>
+      </button>
+    </form>
+
+    <form method="post" class="vote-form" data-direction="down">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="vote" />
+      <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
+      <input type="hidden" name="direction" value="down" />
+      <button type="submit" class="action-pill downvote vote-down" aria-label="Downvote complaint {{ item.obj.id }}">
+        <i class="ms-Icon ms-Icon--Down"></i>
+        <span class="vote-count">{{ item.obj.downvotes }}</span>
+      </button>
+    </form>
+
+    <button type="button" class="action-pill comments open-comments-btn" data-modal-target="comments-modal-{{ item.obj.id }}" aria-label="Open comments for complaint {{ item.obj.id }}">
+      <i class="ms-Icon ms-Icon--CommentSolid"></i>
+      <span id="reply-count-{{ item.obj.id }}" class="vote-count">{{ item.obj.reply_count|default:0 }}</span>
+    </button>
+
+    {% if item.can_manage %}
+    <form method="post" class="row manage-status-form community-status-form" style="gap: 8px; align-items: center;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="set_status" />
+      <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
+      <select name="status" style="width: 170px; margin: 0;">
+        {% for code, label in status_choices %}
+        <option value="{{ code }}" {% if item.obj.status == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit"><i class="ms-Icon ms-Icon--CompletedSolid"></i> Update Status</button>
+    </form>
+    {% endif %}
+  </div>
+</article>
+
+<div id="comments-modal-{{ item.obj.id }}" class="comment-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title-{{ item.obj.id }}">
+  <div class="comment-modal-backdrop" data-modal-close></div>
+  <div class="comment-modal-card">
+    <div class="comment-modal-header">
+      <h4 id="modal-title-{{ item.obj.id }}" class="comment-modal-title">
+        <i class="ms-Icon ms-Icon--Comment"></i>
+        Complaint #{{ item.obj.id }} Comments
+      </h4>
+      <button type="button" class="comment-modal-close" data-modal-close aria-label="Close comments modal">
+        <i class="ms-Icon ms-Icon--ChromeClose"></i>
+      </button>
+    </div>
+
+    <div class="comment-modal-content">
+      <div class="comments-box" id="comments-box-{{ item.obj.id }}">
+        {% for reply in item.obj.replies.all %}
+        <div class="comment-item {% if '[Status Update]' in reply.text %}activity{% endif %}">
+          <div class="comment-metadata">
+            <strong>{{ reply.author.get_full_name|default:reply.author.username }}</strong>
+            <span>{{ reply.created_at|date:'d M Y, h:i A' }}</span>
+          </div>
+          <div>{{ reply.text }}</div>
+        </div>
+        {% empty %}
+        <p class="muted comments-empty-state" style="margin: 0;">No comments yet. Start the discussion.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="comment-modal-footer">
+      <form method="post" class="community-comment-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="comment" />
+        <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
+        <div class="form-row" style="align-items: end;">
+          <div class="form-group" style="margin: 0;">
+            <label for="comment_{{ item.obj.id }}">Add Comment</label>
+            <input id="comment_{{ item.obj.id }}" name="comment_text" required placeholder="Write a response or status update" />
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <button type="submit"><i class="ms-Icon ms-Icon--Send"></i> Comment</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

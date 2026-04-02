@@ -20,6 +20,72 @@
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   }
 
+  .laundry-notice {
+    display: none;
+    margin: 0 0 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--panel) 88%, var(--line) 12%);
+  }
+
+  .laundry-notice.show {
+    display: block;
+  }
+
+  .laundry-notice.success {
+    border-color: rgba(16, 124, 16, 0.35);
+    background: rgba(16, 124, 16, 0.08);
+  }
+
+  .laundry-notice.error {
+    border-color: rgba(232, 17, 35, 0.35);
+    background: rgba(232, 17, 35, 0.08);
+  }
+
+  .button.danger {
+    background: #c50f1f;
+    border-color: #c50f1f;
+    color: #fff;
+  }
+
+  .button.danger:hover {
+    background: #a80010;
+    border-color: #a80010;
+    color: #fff;
+  }
+
+  body.modal-open {
+    overflow: hidden;
+  }
+
+  .laundry-confirm-dialog {
+    border: none;
+    padding: 0;
+    background: transparent;
+    width: min(520px, calc(100vw - 32px));
+  }
+
+  .laundry-confirm-dialog::backdrop {
+    background: rgba(13, 18, 28, 0.58);
+    backdrop-filter: blur(3px);
+  }
+
+  .laundry-confirm-card {
+    border-radius: 16px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    padding: 18px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+  }
+
+  .laundry-confirm-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 18px;
+  }
+
   .status-pill {
     display: inline-flex;
     align-items: center;
@@ -339,6 +405,7 @@
     <span class="label"><i class="ms-Icon ms-Icon--Settings"></i> Laundry Operations</span>
     <h2>Room-Range Scheduling & Tracking</h2>
     <p class="muted">Admins and laundry managers can define room ranges for exact dates (and optional weekday fallback) and track student status.</p>
+    <div id="laundry-notice" class="laundry-notice" role="status" aria-live="polite"></div>
 
     <div style="border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 12px; margin: 8px 0 14px;">
       <h3 style="margin: 0 0 10px;"><i class="ms-Icon ms-Icon--Add"></i> Add Block Room Range Slot</h3>
@@ -410,6 +477,17 @@
           <button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Upload"></i> Upload CSV</button>
         </div>
       </form>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 8px 0 10px; flex-wrap: wrap;">
+      <p class="muted" style="margin: 0;">Use the action below to remove the room ranges currently shown in this view.</p>
+      {% if room_ranges %}
+      <form method="post" class="room-ranges-delete-all-form" data-confirm-message="Delete {{ room_ranges|length }} room ranges currently shown? This cannot be undone.">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_all_room_ranges" />
+        <button type="submit" class="button danger"><i class="ms-Icon ms-Icon--Delete"></i> Delete All Room Ranges</button>
+      </form>
+      {% endif %}
     </div>
 
     <div style="border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 12px; margin: 8px 0 14px;">
@@ -546,7 +624,7 @@
             <th>Action</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="room-ranges-table-body">
           {% for rule in room_ranges %}
           <tr>
             <td>{{ rule.block_name }}</td>
@@ -562,11 +640,11 @@
             <td>{{ rule.room_from }}</td>
             <td>{{ rule.room_to }}</td>
             <td>
-              <form method="post" onsubmit="return confirm('Delete this room range?');">
+              <form method="post" class="room-range-delete-form" data-confirm-message="Delete this room range?">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="delete_room_range" />
                 <input type="hidden" name="room_range_id" value="{{ rule.id }}" />
-                <button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Delete"></i> Delete</button>
+                <button type="submit" class="button danger"><i class="ms-Icon ms-Icon--Delete"></i> Delete</button>
               </form>
             </td>
           </tr>
@@ -662,9 +740,162 @@
   {% endif %}
 </div>
 
+<dialog id="room-range-confirm-dialog" class="laundry-confirm-dialog" aria-labelledby="room-range-confirm-title">
+  <div class="laundry-confirm-card">
+    <h3 id="room-range-confirm-title" style="margin: 0 0 10px;">Confirm deletion</h3>
+    <p id="room-range-confirm-message" class="muted" style="margin: 0;">This action cannot be undone.</p>
+    <div class="laundry-confirm-actions">
+      <button type="button" id="room-range-confirm-cancel" class="button secondary">Cancel</button>
+      <button type="button" id="room-range-confirm-submit" class="button danger">Delete</button>
+    </div>
+  </div>
+</dialog>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
   (function () {
+    const roomRangesTableBody = document.getElementById('room-ranges-table-body');
+    const laundryNotice = document.getElementById('laundry-notice');
+    const confirmDialog = document.getElementById('room-range-confirm-dialog');
+    const confirmMessage = document.getElementById('room-range-confirm-message');
+    const confirmDeleteButton = document.getElementById('room-range-confirm-submit');
+    const confirmCancelButton = document.getElementById('room-range-confirm-cancel');
+
+    let pendingDeleteForm = null;
+
+    function showNotice(message, kind) {
+      if (!laundryNotice) {
+        return;
+      }
+
+      laundryNotice.textContent = message;
+      laundryNotice.className = 'laundry-notice show ' + (kind || 'success');
+
+      window.setTimeout(function () {
+        laundryNotice.className = 'laundry-notice';
+      }, 3500);
+    }
+
+    function openConfirmDialog(form) {
+      pendingDeleteForm = form;
+      if (confirmMessage) {
+        confirmMessage.textContent = form.getAttribute('data-confirm-message') || 'Delete this room range?';
+      }
+
+      if (confirmDialog && typeof confirmDialog.showModal === 'function') {
+        confirmDialog.showModal();
+        document.body.classList.add('modal-open');
+      } else {
+        const shouldDelete = window.confirm(confirmMessage ? confirmMessage.textContent : 'Delete this room range?');
+        if (shouldDelete) {
+          submitPendingDelete();
+        } else {
+          pendingDeleteForm = null;
+        }
+      }
+    }
+
+    function closeConfirmDialog() {
+      pendingDeleteForm = null;
+      if (confirmDialog && confirmDialog.open) {
+        confirmDialog.close();
+      }
+      document.body.classList.remove('modal-open');
+    }
+
+    function renderEmptyRoomRangesState() {
+      if (!roomRangesTableBody) {
+        return;
+      }
+
+      roomRangesTableBody.innerHTML = '<tr><td colspan="5" class="muted">No room ranges defined yet.</td></tr>';
+    }
+
+    function submitPendingDelete() {
+      if (!pendingDeleteForm) {
+        return;
+      }
+
+      const form = pendingDeleteForm;
+      pendingDeleteForm = null;
+
+      fetch(window.location.pathname + window.location.search, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+      .then(async function (response) {
+        let data = {};
+        try {
+          data = await response.json();
+        } catch (error) {
+          data = {};
+        }
+
+        if (!response.ok || data.success === false) {
+          throw new Error(data.error || 'Unable to complete that deletion.');
+        }
+
+        return data;
+      })
+      .then(function (data) {
+        const isBulkDelete = form.matches('.room-ranges-delete-all-form');
+        if (isBulkDelete) {
+          renderEmptyRoomRangesState();
+          showNotice(data.deleted_count ? ('Removed ' + data.deleted_count + ' room ranges.') : 'No room ranges matched the current view.', 'success');
+        } else {
+          const row = form.closest('tr');
+          if (row) {
+            row.remove();
+          }
+          if (roomRangesTableBody && !roomRangesTableBody.querySelector('tr')) {
+            renderEmptyRoomRangesState();
+          }
+          showNotice('Room range removed.', 'success');
+        }
+        closeConfirmDialog();
+      })
+      .catch(function (error) {
+        closeConfirmDialog();
+        showNotice(error.message || 'Unable to complete that deletion.', 'error');
+      });
+    }
+
+    document.addEventListener('submit', function (event) {
+      const form = event.target instanceof HTMLFormElement ? event.target : event.target.closest('form');
+      if (!form) {
+        return;
+      }
+
+      if (form.matches('.room-range-delete-form, .room-ranges-delete-all-form')) {
+        event.preventDefault();
+        openConfirmDialog(form);
+      }
+    });
+
+    if (confirmDeleteButton) {
+      confirmDeleteButton.addEventListener('click', submitPendingDelete);
+    }
+
+    if (confirmCancelButton) {
+      confirmCancelButton.addEventListener('click', closeConfirmDialog);
+    }
+
+    if (confirmDialog) {
+      confirmDialog.addEventListener('click', function (event) {
+        if (event.target === confirmDialog) {
+          closeConfirmDialog();
+        }
+      });
+
+      confirmDialog.addEventListener('close', function () {
+        document.body.classList.remove('modal-open');
+        pendingDeleteForm = null;
+      });
+    }
+
     const value = "{{ student_qr_text|escapejs }}";
     const target = document.getElementById('student-qr-code');
     if (!value || !target || typeof QRCode === 'undefined') {
