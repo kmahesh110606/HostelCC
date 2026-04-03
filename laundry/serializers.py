@@ -145,6 +145,8 @@ def _today_status(schedule: LaundrySchedule) -> dict[str, str]:
 
     if collected_today:
         return {"code": "collected", "label": "Collected"}
+    if schedule.laundry_done_at and schedule.submission_status:
+        return {"code": "ready_for_collection", "label": "Ready for Collection"}
     if schedule.submission_status and not schedule.collection_status:
         return {"code": "in_progress", "label": "In Progress"}
     if _is_submission_day(schedule, today) and not submitted_today:
@@ -160,6 +162,8 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
     room_no = serializers.CharField(source="student.room_no", read_only=True)
     last_submission_at = serializers.DateTimeField(read_only=True, default_timezone=timezone.get_current_timezone())
     due_collection_by = serializers.DateTimeField(read_only=True, default_timezone=timezone.get_current_timezone())
+    laundry_done_at = serializers.DateTimeField(read_only=True, default_timezone=timezone.get_current_timezone())
+    token_assigned_at = serializers.DateTimeField(read_only=True, default_timezone=timezone.get_current_timezone())
     today_status_code = serializers.SerializerMethodField()
     today_status_label = serializers.SerializerMethodField()
     next_submission_date = serializers.SerializerMethodField()
@@ -185,6 +189,8 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
             # Lightweight status for large manager/admin lists to avoid timeout.
             if obj.collection_status and not obj.submission_status:
                 computed = {"code": "collected", "label": "Collected"}
+            elif obj.laundry_done_at and obj.submission_status:
+                computed = {"code": "ready_for_collection", "label": "Ready for Collection"}
             elif obj.submission_status and not obj.collection_status:
                 computed = {"code": "in_progress", "label": "In Progress"}
             else:
@@ -235,7 +241,10 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
             "qr_token",
             "submission_status",
             "collection_status",
+            "assigned_token_code",
             "last_submission_at",
+            "laundry_done_at",
+            "token_assigned_at",
             "due_collection_by",
             "today_status_code",
             "today_status_label",

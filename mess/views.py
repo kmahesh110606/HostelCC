@@ -2,6 +2,7 @@ from django.core.cache import cache
 from django.db.models import Avg, Count, Q
 from django.db import IntegrityError
 from django.utils import timezone
+import json
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rest_framework import mixins, status, viewsets
@@ -15,7 +16,7 @@ from students.models import Student
 from students.utils import resolve_student_for_user
 from mess.options import canonical_mess_type
 
-from .models import Caterer, Feedback, MenuPollOption, MenuPollVote, MessChangeRequest, MessMenu
+from .models import Caterer, Feedback, MenuPollOption, MenuPollVote, MessChangeRequest, MessMenu, NightMessLog
 from .serializers import (
     CatererSerializer,
     FeedbackSerializer,
@@ -23,6 +24,7 @@ from .serializers import (
     MenuPollVoteSerializer,
     MessChangeRequestSerializer,
     MessMenuSerializer,
+    NightMessLogSerializer,
 )
 
 
@@ -32,6 +34,42 @@ def _parse_feedback_menu_item(menu_item: str):
     meal_code = parts[1] if len(parts) >= 2 else ""
     item_name = parts[2] if len(parts) >= 3 else (parts[-1] if parts else "")
     return day_code, meal_code, item_name
+
+
+def _is_night_mess_staff(user) -> bool:
+    role = getattr(user, "role", "")
+    if role in {"WARDEN", "SUPERVISOR", "ADMIN"}:
+        return True
+    return getattr(user, "department", "") == "SECURITY"
+
+
+def _parse_night_mess_qr(qr_text: str) -> dict[str, str] | None:
+    text = (qr_text or "").strip()
+    if not text:
+        return None
+
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        parsed = None
+
+    if isinstance(parsed, dict):
+        payload: dict[str, str] = {}
+        for key in ("roll_no", "email", "room_no", "block_name"):
+            value = parsed.get(key)
+            if value is not None and str(value).strip():
+                payload[key] = str(value).strip()
+        return payload or None
+
+    parts = [part.strip() for part in text.split("|")]
+    if len(parts) >= 1 and parts[0]:
+        return {
+            "roll_no": parts[0],
+            "email": parts[1] if len(parts) > 1 else "",
+            "room_no": parts[2] if len(parts) > 2 else "",
+            "block_name": parts[3] if len(parts) > 3 else "",
+        }
+    return None
 
 
 class MessMenuViewSet(viewsets.ModelViewSet):
@@ -332,3 +370,178 @@ class MessChangeRequestViewSet(viewsets.ModelViewSet):
         change_request.status = MessChangeRequest.Status.REJECTED
         change_request.save(update_fields=["status"])
         return Response(self.get_serializer(change_request).data)
+
+
+class NightMessLogViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    queryset = NightMessLog.objects.select_related(
+        "student",
+        "student__block",
+        "student__user",
+        "checked_out_by",
+        "returned_by",
+    ).all()
+    serializer_class = NightMessLogSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if user.role == "STUDENT":
+            student = resolve_student_for_user(user)
+            if not student:
+                return queryset.none()
+            return queryset.filter(student=student)
+
+        if _is_night_mess_staff(user):
+            return queryset
+
+        return queryset.none()
+
+    @action(detail=False, methods=["get"], url_path="status")
+    def status(self, request):
+        user = request.user
+        if user.role != "STUDENT":
+            raise PermissionDenied("Night mess status is only available for student accounts.")
+
+        student = resolve_student_for_user(user)
+        if not student:
+            return Response({"in_night_mess": False, "message": "Student profile not found."})
+
+        active_log = (
+            NightMessLog.objects.filter(student=student, returned_at__isnull=True)
+            .order_by("-checked_out_at")
+            .first()
+        )
+        if active_log:
+            return Response(
+                {
+                    "in_night_mess": True,
+                    "message": "You are in Night Mess now. Scan again before returning.",
+                    "active_log": self.get_serializer(active_log).data,
+                }
+            )
+
+        return Response(
+            {
+                "in_night_mess": False,
+                "message": "You are not marked in Night Mess.",
+                "active_log": None,
+            }
+        )
+
+    @action(detail=False, methods=["get"], url_path=r"qr/(?P<student_id>[^/.]+)")
+    def qr_for_student(self, request, student_id=None):
+        student = Student.objects.select_related("block", "user").filter(id=student_id).first()
+        if not student:
+            return Response({"detail": "Student not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.role == "STUDENT":
+            own_student = resolve_student_for_user(request.user)
+            if not own_student or own_student.id != student.id:
+                raise PermissionDenied("You can only access your own Night Mess QR.")
+        elif not _is_night_mess_staff(request.user):
+            raise PermissionDenied("Not allowed to access Night Mess QR data.")
+
+        student_email = (
+            (student.user.email if student.user else "") or (student.user.username if student.user else "") or ""
+        )
+        payload = {
+            "type": "night_mess",
+            "roll_no": student.roll_no,
+            "email": student_email.strip().lower(),
+            "room_no": student.room_no,
+            "block_name": student.block.block_name if student.block else "",
+        }
+        qr_text = json.dumps(payload, separators=(",", ":"))
+
+        return Response(
+            {
+                "student_id": student.id,
+                "roll_no": student.roll_no,
+                "room_no": student.room_no,
+                "block_name": student.block.block_name if student.block else "",
+                "qr_text": qr_text,
+            }
+        )
+
+    @action(detail=False, methods=["post"], url_path="scan")
+    def scan(self, request):
+        if not _is_night_mess_staff(request.user):
+            raise PermissionDenied("Only wardens, supervisors, admins, and security staff can scan Night Mess QR.")
+
+        parsed = _parse_night_mess_qr((request.data.get("qr_text") or "").strip())
+        if not parsed:
+            return Response({"detail": "Invalid qr_text payload."}, status=status.HTTP_400_BAD_REQUEST)
+
+        roll_no = (parsed.get("roll_no") or "").strip().upper()
+        if not roll_no:
+            return Response({"detail": "roll_no is required in QR payload."}, status=status.HTTP_400_BAD_REQUEST)
+
+        student = Student.objects.select_related("block", "user").filter(roll_no=roll_no).first()
+        if not student:
+            return Response({"detail": f"Student {roll_no} not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        qr_room = (parsed.get("room_no") or "").strip().upper()
+        if qr_room and student.room_no.strip().upper() != qr_room:
+            return Response({"detail": f"Room mismatch. Expected {student.room_no}, got {qr_room}."}, status=status.HTTP_400_BAD_REQUEST)
+
+        qr_block = (parsed.get("block_name") or "").strip().upper()
+        student_block = (student.block.block_name if student.block else "").strip().upper()
+        if qr_block and student_block != qr_block:
+            return Response({"detail": f"Block mismatch. Expected {student_block}, got {qr_block}."}, status=status.HTTP_400_BAD_REQUEST)
+
+        qr_email = (parsed.get("email") or "").strip().lower()
+        student_email = ((student.user.email if student.user else "") or "").strip().lower()
+        if qr_email and student_email and qr_email != student_email:
+            return Response({"detail": "Email mismatch in QR payload."}, status=status.HTTP_400_BAD_REQUEST)
+
+        active_log = (
+            NightMessLog.objects.filter(student=student, returned_at__isnull=True)
+            .order_by("-checked_out_at")
+            .first()
+        )
+
+        if active_log:
+            active_log.returned_at = timezone.now()
+            active_log.returned_by = request.user
+            active_log.save(update_fields=["returned_at", "returned_by"])
+            return Response(
+                {
+                    "status": "returned",
+                    "message": "Night Mess return marked successfully.",
+                    "in_night_mess": False,
+                    "student_name": student.name,
+                    "student_roll_no": student.roll_no,
+                    "room_no": student.room_no,
+                    "block_name": student.block.block_name if student.block else "",
+                    "log": self.get_serializer(active_log).data,
+                }
+            )
+
+        created_log = NightMessLog.objects.create(
+            student=student,
+            checked_out_by=request.user,
+        )
+        return Response(
+            {
+                "status": "checked_out",
+                "message": "Night Mess out-time marked successfully.",
+                "in_night_mess": True,
+                "student_name": student.name,
+                "student_roll_no": student.roll_no,
+                "room_no": student.room_no,
+                "block_name": student.block.block_name if student.block else "",
+                "log": self.get_serializer(created_log).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=["get"], url_path="overdue")
+    def overdue(self, request):
+        if not _is_night_mess_staff(request.user):
+            raise PermissionDenied("Only staff can view overdue Night Mess entries.")
+
+        queryset = self.get_queryset().filter(returned_at__isnull=True)
+        overdue_logs = [log for log in queryset if log.is_overdue]
+        serialized = self.get_serializer(overdue_logs, many=True)
+        return Response(serialized.data)

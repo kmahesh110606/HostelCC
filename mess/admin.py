@@ -12,6 +12,7 @@ from .models import (
     MessMenu,
     MessMenuArchive,
     MessMonthlyArchive,
+    NightMessLog,
 )
 
 
@@ -221,4 +222,25 @@ class MessMonthlyArchiveAdmin(admin.ModelAdmin):
 class MessChangeRequestAdmin(admin.ModelAdmin):
     list_display = ("student", "requested_mess", "month", "status")
     list_filter = ("status", "month")
+
+
+@admin.register(NightMessLog)
+class NightMessLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "student",
+        "checked_out_at",
+        "returned_at",
+        "checked_out_by",
+        "returned_by",
+        "is_overdue_display",
+    )
+    list_filter = ("checked_out_at", "returned_at")
+    search_fields = ("student__roll_no", "student__name", "student__room_no", "student__block__block_name")
+    readonly_fields = ("checked_out_at", "returned_at")
+
+    def is_overdue_display(self, obj: NightMessLog) -> bool:
+        return obj.is_overdue
+
+    is_overdue_display.boolean = True
+    is_overdue_display.short_description = "Overdue (> 1:00 AM)"
 

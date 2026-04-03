@@ -25,7 +25,10 @@ class LaundrySchedule(models.Model):
     qr_token = models.CharField(max_length=100, default=uuid.uuid4, editable=False)
     submission_status = models.BooleanField(default=False)
     collection_status = models.BooleanField(default=False)
+    assigned_token_code = models.CharField(max_length=40, blank=True, default="")
     last_submission_at = models.DateTimeField(null=True, blank=True)
+    laundry_done_at = models.DateTimeField(null=True, blank=True)
+    token_assigned_at = models.DateTimeField(null=True, blank=True)
     due_collection_by = models.DateTimeField(null=True, blank=True)
 
     def mark_submission(self):
@@ -35,9 +38,24 @@ class LaundrySchedule(models.Model):
             raise ValueError("Student already submitted laundry today.")
         self.submission_status = True
         self.collection_status = False
+        self.laundry_done_at = None
         self.last_submission_at = now
         self.due_collection_by = now + timedelta(days=7)
-        self.save(update_fields=["submission_status", "collection_status", "last_submission_at", "due_collection_by"])
+        self.save(
+            update_fields=[
+                "submission_status",
+                "collection_status",
+                "laundry_done_at",
+                "last_submission_at",
+                "due_collection_by",
+            ]
+        )
+
+    def mark_done(self):
+        if not self.submission_status:
+            raise ValueError("No active laundry submission found.")
+        self.laundry_done_at = timezone.now()
+        self.save(update_fields=["laundry_done_at"])
 
     def mark_collection(self):
         now = timezone.now()
@@ -47,13 +65,26 @@ class LaundrySchedule(models.Model):
             raise ValueError("Collection window exceeded 1 week.")
         self.collection_status = True
         self.submission_status = False
+        self.assigned_token_code = ""
+        self.laundry_done_at = None
+        self.token_assigned_at = None
         self.due_collection_by = None
-        self.save(update_fields=["collection_status", "submission_status", "due_collection_by"])
+        self.save(
+            update_fields=[
+                "collection_status",
+                "submission_status",
+                "assigned_token_code",
+                "laundry_done_at",
+                "token_assigned_at",
+                "due_collection_by",
+            ]
+        )
 
 
 class LaundryEvent(models.Model):
     class EventType(models.TextChoices):
         SUBMISSION = "SUBMISSION", "Submission"
+        COMPLETE = "COMPLETE", "Completed"
         COLLECTION = "COLLECTION", "Collection"
 
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="laundry_events")

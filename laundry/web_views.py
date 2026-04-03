@@ -14,6 +14,7 @@ from django.utils.dateparse import parse_date
 from django.utils import timezone
 
 from .models import LaundryEvent, LaundryHoliday, LaundryRoomRange, LaundrySchedule
+from .qr_utils import build_qr_svg
 from students.models import Student
 from students.utils import resolve_student_for_user
 
@@ -39,6 +40,102 @@ def _get_laundry_admin_cache_version() -> int:
 
 def _bump_laundry_admin_cache_version() -> None:
     cache.set(_LAUNDRY_ADMIN_CACHE_VERSION_KEY, _get_laundry_admin_cache_version() + 1, timeout=None)
+
+
+def _normalize_block_name(value: str | None) -> str:
+    return re.sub(r"[^A-Z0-9]", "", (value or "").strip().upper())
+
+
+def _parse_token_code(value: str | None):
+    text = (value or "").strip().upper()
+    match = re.fullmatch(r"CDLS-([A-Z0-9]+)-(\d{4})", text)
+    if not match:
+        return None
+
+    token_no = int(match.group(2))
+    if token_no < 1000 or token_no > 2000:
+        return None
+
+    return {
+        "token_code": f"CDLS-{match.group(1)}-{token_no:04d}",
+        "block_name": match.group(1),
+        "token_no": token_no,
+    }
+
+
+def _build_token_tag_download_html(block_name: str, token_start: int, token_end: int) -> str:
+    tag_cards = []
+    for token_no in range(token_start, token_end + 1):
+        token_code = f"CDLS-{block_name}-{token_no:04d}"
+        qr_svg = build_qr_svg(token_code, box_size=6, border=2)
+        if not qr_svg:
+            continue
+
+        tag_cards.append(
+            f"""
+            <div class="tag-card">
+              <div class="tag-qr">{qr_svg}</div>
+              <div class="tag-code">{token_code}</div>
+            </div>
+            """
+        )
+
+    cards_html = "\n".join(tag_cards)
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laundry Token Tags - {block_name}</title>
+  <style>
+    @page {{ size: A4; margin: 10mm; }}
+    body {{ font-family: Arial, sans-serif; margin: 0; color: #111; }}
+    .page-header {{ margin-bottom: 10px; }}
+    .page-title {{ font-size: 20px; font-weight: 700; margin: 0; }}
+    .page-subtitle {{ font-size: 12px; color: #444; margin: 4px 0 0; }}
+    .tag-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+    .tag-card {{ border: 1px solid #222; border-radius: 10px; padding: 10px; min-height: 175px; display: flex; flex-direction: column; align-items: center; justify-content: center; page-break-inside: avoid; }}
+    .tag-qr svg {{ width: 118px; height: 118px; }}
+    .tag-code {{ margin-top: 8px; font-size: 12px; font-weight: 700; text-align: center; word-break: break-word; }}
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <h1 class="page-title">Laundry Token Tags</h1>
+    <p class="page-subtitle">Block: {block_name} | Tokens: {token_start:04d}-{token_end:04d}</p>
+  </div>
+  <div class="tag-grid">
+    {cards_html}
+  </div>
+</body>
+</html>"""
+
+
+def _get_token_assignment_rows(block_filter: str = ""):
+    queryset = (
+        LaundrySchedule.objects.select_related("student", "student__block", "student__user")
+        .filter(submission_status=True)
+        .exclude(assigned_token_code="")
+        .order_by("student__block__block_name", "student__room_no", "student__roll_no")
+    )
+    if block_filter:
+        queryset = queryset.filter(student__block__block_name__iexact=block_filter)
+
+    rows = []
+    for schedule in queryset:
+        student = schedule.student
+        rows.append(
+            {
+                "token_code": schedule.assigned_token_code,
+                "student_roll_no": student.roll_no if student else "",
+                "student_name": student.name if student else "",
+                "block_name": student.block.block_name if student and student.block else "",
+                "room_no": student.room_no if student else "",
+                "assigned_at": timezone.localtime(schedule.token_assigned_at) if schedule.token_assigned_at else None,
+                "ready_at": timezone.localtime(schedule.laundry_done_at) if schedule.laundry_done_at else None,
+            }
+        )
+    return rows
 
 
 def _room_number_as_int(value: str):

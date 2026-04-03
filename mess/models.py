@@ -1,4 +1,8 @@
+from datetime import datetime, time, timedelta
+
+from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from hostels.models import HostelBlock
 from mess.options import DEFAULT_MESS_TYPE, MESS_TYPE_CHOICES
@@ -143,3 +147,44 @@ class MessChangeRequest(models.Model):
     month = models.CharField(max_length=7)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class NightMessLog(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="night_mess_logs")
+    checked_out_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    checked_out_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="night_mess_checkout_logs",
+    )
+    returned_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    returned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="night_mess_return_logs",
+    )
+
+    class Meta:
+        ordering = ["-checked_out_at"]
+        indexes = [
+            models.Index(fields=["student", "-checked_out_at"], name="night_mess_student_ct_idx"),
+            models.Index(fields=["returned_at", "-checked_out_at"], name="night_mess_return_ct_idx"),
+        ]
+
+    @property
+    def deadline_at(self):
+        local_checkout = timezone.localtime(self.checked_out_at)
+        deadline_date = local_checkout.date() + timedelta(days=1)
+        naive_deadline = datetime.combine(deadline_date, time(hour=1, minute=0))
+        return timezone.make_aware(naive_deadline, timezone.get_current_timezone())
+
+    @property
+    def is_overdue(self) -> bool:
+        return self.returned_at is None and timezone.now() > self.deadline_at
+
+    def __str__(self) -> str:
+        return f"{self.student.roll_no} @ {self.checked_out_at.isoformat()}"

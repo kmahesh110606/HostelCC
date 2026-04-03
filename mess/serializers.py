@@ -3,7 +3,7 @@ from rest_framework import serializers
 from mess.options import DEFAULT_MESS_TYPE, canonical_mess_type
 from students.utils import resolve_student_for_user
 
-from .models import Caterer, Feedback, MenuPollOption, MenuPollVote, MessChangeRequest, MessMenu
+from .models import Caterer, Feedback, MenuPollOption, MenuPollVote, MessChangeRequest, MessMenu, NightMessLog
 
 
 class MessMenuSerializer(serializers.ModelSerializer):
@@ -133,3 +133,40 @@ class MessChangeRequestSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop("requested_caterer_id", None)
         return super().create(validated_data)
+
+
+class NightMessLogSerializer(serializers.ModelSerializer):
+    student_roll_no = serializers.CharField(source="student.roll_no", read_only=True)
+    student_name = serializers.CharField(source="student.name", read_only=True)
+    block_name = serializers.CharField(source="student.block.block_name", read_only=True)
+    room_no = serializers.CharField(source="student.room_no", read_only=True)
+    checked_out_by_username = serializers.CharField(source="checked_out_by.username", read_only=True)
+    returned_by_username = serializers.CharField(source="returned_by.username", read_only=True)
+    is_overdue = serializers.SerializerMethodField()
+    deadline_at = serializers.SerializerMethodField()
+
+    def get_is_overdue(self, obj: NightMessLog) -> bool:
+        return obj.is_overdue
+
+    def get_deadline_at(self, obj: NightMessLog):
+        return obj.deadline_at
+
+    class Meta:
+        model = NightMessLog
+        fields = [
+            "id",
+            "student",
+            "student_roll_no",
+            "student_name",
+            "block_name",
+            "room_no",
+            "checked_out_at",
+            "checked_out_by",
+            "checked_out_by_username",
+            "returned_at",
+            "returned_by",
+            "returned_by_username",
+            "deadline_at",
+            "is_overdue",
+        ]
+        read_only_fields = fields

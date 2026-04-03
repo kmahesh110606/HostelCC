@@ -91,6 +91,25 @@
     min-width: 520px;
   }
 
+  .laundry-table-tokens {
+    min-width: 720px;
+  }
+
+  .token-download-form {
+    display: grid;
+    gap: 10px;
+  }
+
+  .token-download-note {
+    margin: 0;
+  }
+
+  .token-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   .monthly-calendar-form {
     margin: 0 0 8px;
   }
@@ -499,6 +518,9 @@
         {% if due_collection_local %}
         <p class="muted laundry-meta"><i class="ms-Icon ms-Icon--Clock"></i> Due Collection By (IST): {{ due_collection_local|date:'Y-m-d h:i A' }}</p>
         {% endif %}
+        {% if student_schedule.assigned_token_code %}
+        <p class="muted laundry-meta"><i class="ms-Icon ms-Icon--Tag"></i> Current Token: <strong>{{ student_schedule.assigned_token_code }}</strong>{% if student_schedule.laundry_done_at %} <span class="status-pill"><span class="dot dot-blue"></span> Ready for collection</span>{% endif %}</p>
+        {% endif %}
         <p class="muted laundry-meta"><i class="ms-Icon ms-Icon--CalendarDay"></i> Next Submission Date: {% if next_submission_date %}{{ next_submission_date|date:'Y-m-d (l)' }}{% else %}N/A{% endif %}</p>
 
         <div class="student-qr-wrap">
@@ -539,6 +561,74 @@
     <h2>Room-Range Scheduling & Tracking</h2>
     <p class="muted">Admins and laundry managers can define room ranges for exact dates (and optional weekday fallback) and track student status.</p>
     <div id="laundry-notice" class="laundry-notice" role="status" aria-live="polite"></div>
+
+    {% if is_admin %}
+    <div class="laundry-section-card">
+      <h3 class="laundry-section-title"><i class="ms-Icon ms-Icon--Print"></i> Download Token Tags</h3>
+      <p class="muted token-download-note">Download printable QR tags for a block. The tag text uses the format <strong>CDLS-&lt;BlockName&gt;-&lt;TokenNo&gt;</strong> and the range is fixed to 1000-2000.</p>
+      <form method="get" action="{% url 'laundry-export-token-tags' %}" class="token-download-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="token_tag_block">Block</label>
+            <select id="token_tag_block" name="block_name" required>
+              <option value="">Select block</option>
+              {% for block in block_choices %}
+              <option value="{{ block }}" {% if block_filter == block %}selected{% endif %}>{{ block }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Token Range</label>
+            <input type="text" value="1000 - 2000" readonly />
+          </div>
+        </div>
+        <input type="hidden" name="start" value="1000" />
+        <input type="hidden" name="end" value="2000" />
+        <div class="form-actions form-actions-start">
+          <button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Download"></i> Download Printable QR Tags</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if token_assignment_rows %}
+    <div class="laundry-section-card">
+      <h3 class="laundry-section-title"><i class="ms-Icon ms-Icon--Tag"></i> Current Token Assignments</h3>
+      <p class="muted token-download-note">Who has which token right now.</p>
+      <div class="table-wrap table-wrap-top">
+        <table class="laundry-table laundry-table-tokens">
+          <thead>
+            <tr>
+              <th>Token</th>
+              <th>Student</th>
+              <th>Block</th>
+              <th>Room</th>
+              <th>Status</th>
+              <th>Assigned At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for token_row in token_assignment_rows %}
+            <tr>
+              <td><strong>{{ token_row.token_code }}</strong></td>
+              <td>{{ token_row.student_name }}<br /><span class="muted">{{ token_row.student_roll_no }}</span></td>
+              <td>{{ token_row.block_name|default:'-' }}</td>
+              <td>{{ token_row.room_no|default:'-' }}</td>
+              <td>
+                {% if token_row.ready_at %}
+                <span class="status-pill token-status-pill"><span class="dot dot-blue"></span> Ready for collection</span>
+                {% else %}
+                <span class="status-pill token-status-pill"><span class="dot dot-yellow"></span> In progress</span>
+                {% endif %}
+              </td>
+              <td>{% if token_row.assigned_at %}{{ token_row.assigned_at|date:'Y-m-d h:i A' }}{% else %}-{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
 
     <div class="laundry-section-card">
       <h3 class="laundry-section-title"><i class="ms-Icon ms-Icon--Add"></i> Add Block Room Range Slot</h3>

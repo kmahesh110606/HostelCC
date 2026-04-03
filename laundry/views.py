@@ -3,6 +3,7 @@ import re
 from datetime import date, timedelta
 
 from django.core.cache import cache
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -14,6 +15,7 @@ from students.utils import resolve_student_for_user
 from users.permissions import IsAdmin, IsLaundryPerson
 
 from .models import LaundryEvent, LaundryHoliday, LaundryRoomRange, LaundrySchedule
+from .qr_utils import build_qr_svg
 from .serializers import (
     LaundryEventSerializer,
     LaundryHolidaySerializer,
@@ -59,6 +61,99 @@ _DAY_SORT_ORDER = {
     LaundrySchedule.DayChoices.SAT: 5,
     LaundrySchedule.DayChoices.SUN: 6,
 }
+
+
+def _normalize_block_name(value: str | None) -> str:
+        normalized = re.sub(r"[^A-Z0-9]", "", (value or "").strip().upper())
+        return normalized
+
+
+def _parse_tag_token_text(raw: str | None):
+        text = (raw or "").strip().upper()
+        if not text:
+                return None
+        match = re.fullmatch(r"CDLS-([A-Z0-9]+)-(\d{4})", text)
+        if not match:
+                return None
+        block_name = match.group(1)
+        token_no = int(match.group(2))
+        if token_no < 1000 or token_no > 2000:
+                return None
+        return {
+                "token_code": f"CDLS-{block_name}-{token_no:04d}",
+                "block_name": block_name,
+                "token_no": token_no,
+        }
+
+
+def _build_tags_printable_html(block_name: str, token_start: int, token_end: int) -> str:
+        cards = []
+        for token_no in range(token_start, token_end + 1):
+                token_code = f"CDLS-{block_name}-{token_no:04d}"
+                qr_svg = build_qr_svg(token_code, box_size=6, border=2)
+                if not qr_svg:
+                        continue
+                cards.append(
+                        """
+                        <div class=\"card\">
+                            <div class=\"qr\">{qr}</div>
+                            <div class=\"token\">{token}</div>
+                        </div>
+                        """.format(
+                                qr=qr_svg,
+                                token=token_code,
+                        )
+                )
+
+        cards_html = "\n".join(cards)
+        return f"""<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+    <meta charset=\"utf-8\" />
+    <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" />
+    <title>Laundry Token Tags - {block_name}</title>
+    <style>
+        @page {{ size: A4; margin: 10mm; }}
+        * {{ box-sizing: border-box; }}
+        body {{ font-family: Arial, sans-serif; margin: 0; color: #111; }}
+        .header {{ margin-bottom: 8px; }}
+        .title {{ font-size: 18px; font-weight: 700; }}
+        .subtitle {{ font-size: 12px; color: #444; margin-top: 3px; }}
+        .grid {{
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }}
+        .card {{
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 8px;
+            min-height: 170px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            page-break-inside: avoid;
+        }}
+        .qr svg {{ width: 112px; height: 112px; }}
+        .token {{
+            margin-top: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: center;
+            word-break: break-word;
+        }}
+    </style>
+</head>
+<body>
+    <div class=\"header\">
+        <div class=\"title\">Laundry Bag QR Tags</div>
+        <div class=\"subtitle\">Block: {block_name} | Tokens: {token_start:04d}-{token_end:04d}</div>
+    </div>
+    <div class=\"grid\">{cards_html}</div>
+</body>
+</html>
+"""
 
 
 def _infer_student_day_from_room_ranges(student):
@@ -293,6 +388,7 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
             "mark_submission",
             "mark_collection",
             "scan_qr_payload",
+            "export_token_tags",
         ]:
             permission_classes = [IsLaundryPerson]
         else:
@@ -384,17 +480,82 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"], url_path="scan")
     def scan_qr_payload(self, request):
         """
-        Scan QR and mark submission/collection. Accepts two formats:
+        Scan QR and process laundry event. Accepts two formats:
         1. Token-based (legacy): student_id + qr_token
         2. Text payload (new): JSON payload or "regno|mail|room|block"
+
+        For submission, managers should pass both student qr_text and tag token text as token_qr_text.
         """
         qr_text = (request.data.get("qr_text") or "").strip()
+        token_qr_text = (request.data.get("token_qr_text") or "").strip()
         student_id = request.data.get("student_id")
         qr_token = (request.data.get("qr_token") or "").strip()
         event_type = (request.data.get("event_type") or LaundryEvent.EventType.SUBMISSION).strip().upper()
 
+        if event_type not in {
+            LaundryEvent.EventType.SUBMISSION,
+            LaundryEvent.EventType.COMPLETE,
+            LaundryEvent.EventType.COLLECTION,
+        }:
+            return Response(
+                {"detail": f"Unknown event type: {event_type}", "color": "red"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if event_type == LaundryEvent.EventType.COMPLETE:
+            parsed_token = _parse_tag_token_text(token_qr_text or qr_text)
+            if not parsed_token:
+                return Response(
+                    {
+                        "detail": "Invalid laundry tag token. Expected format CDLS-<BLOCK>-<1000-2000>.",
+                        "color": "red",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            schedule = (
+                LaundrySchedule.objects.select_related("student", "student__block", "student__user")
+                .filter(submission_status=True, assigned_token_code=parsed_token["token_code"])
+                .first()
+            )
+            if not schedule:
+                return Response(
+                    {"detail": "This token is not mapped to an active laundry submission.", "color": "red"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if schedule.laundry_done_at:
+                return Response(
+                    {"detail": "Laundry already marked as done for this token.", "color": "red"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            schedule.mark_done()
+            LaundryEvent.objects.create(
+                student=schedule.student,
+                schedule=schedule,
+                event_type=LaundryEvent.EventType.COMPLETE,
+                scanned_by=request.user,
+            )
+
+            return Response(
+                {
+                    "status": "ok",
+                    "message": "Laundry marked ready for collection.",
+                    "event_type": LaundryEvent.EventType.COMPLETE,
+                    "color": "green",
+                    "student_id": schedule.student_id,
+                    "schedule_id": schedule.id,
+                    "student_name": schedule.student.name,
+                    "student_roll_no": schedule.student.roll_no,
+                    "room_no": schedule.student.room_no,
+                    "block_name": schedule.student.block.block_name if schedule.student.block else "",
+                    "assigned_token_code": schedule.assigned_token_code,
+                }
+            )
+
         parsed_qr = None
-        if qr_text:
+        if qr_text and event_type != LaundryEvent.EventType.COMPLETE:
             parsed_qr = _parse_qr_text_payload(qr_text)
             if not parsed_qr:
                 return Response(
@@ -489,12 +650,6 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if event_type not in {LaundryEvent.EventType.SUBMISSION, LaundryEvent.EventType.COLLECTION}:
-            return Response(
-                {"detail": f"Unknown event type: {event_type}", "color": "red"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         if event_type == LaundryEvent.EventType.SUBMISSION:
             is_allowed, reason = _is_submission_allowed_for_today(schedule)
             if not is_allowed:
@@ -520,7 +675,44 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
                 )
             
             try:
+                parsed_token = _parse_tag_token_text(token_qr_text)
+                if not parsed_token:
+                    return Response(
+                        {
+                            "detail": "Token tag QR is required for submission and must match CDLS-<BLOCK>-<1000-2000>.",
+                            "color": "red",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                student_block = _normalize_block_name(schedule.student.block.block_name if schedule.student.block else "")
+                if student_block and parsed_token["block_name"] != student_block:
+                    return Response(
+                        {
+                            "detail": f"Token block mismatch. Expected {student_block}, got {parsed_token['block_name']}.",
+                            "color": "red",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                token_in_use = (
+                    LaundrySchedule.objects.filter(
+                        submission_status=True,
+                        assigned_token_code=parsed_token["token_code"],
+                    )
+                    .exclude(id=schedule.id)
+                    .exists()
+                )
+                if token_in_use:
+                    return Response(
+                        {"detail": "Token is already assigned to another active laundry bag.", "color": "red"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
                 schedule.mark_submission()
+                schedule.assigned_token_code = parsed_token["token_code"]
+                schedule.token_assigned_at = timezone.now()
+                schedule.save(update_fields=["assigned_token_code", "token_assigned_at"])
                 action = LaundryEvent.EventType.SUBMISSION
                 color = "orange"
                 result_msg = "Laundry submission registered."
@@ -541,8 +733,20 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+            if not schedule.laundry_done_at:
+                return Response(
+                    {
+                        "detail": "Laundry is not marked done yet. Scan token at completion first.",
+                        "color": "red",
+                        "student_id": schedule.student_id,
+                        "schedule_id": schedule.id,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             
             try:
+                token_before_collection = schedule.assigned_token_code
                 schedule.mark_collection()
                 action = LaundryEvent.EventType.COLLECTION
                 color = "green"
@@ -572,8 +776,46 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
                 "student_roll_no": schedule.student.roll_no,
                 "room_no": schedule.student.room_no,
                 "block_name": schedule.student.block.block_name if schedule.student.block else "",
+                "assigned_token_code": token_before_collection if event_type == LaundryEvent.EventType.COLLECTION else schedule.assigned_token_code,
             }
         )
+
+    @action(detail=False, methods=["get"], url_path="export-token-tags")
+    def export_token_tags(self, request):
+        block_name = _normalize_block_name(request.query_params.get("block_name"))
+        token_start_raw = (request.query_params.get("start") or "1000").strip()
+        token_end_raw = (request.query_params.get("end") or "2000").strip()
+
+        if not block_name:
+            return Response(
+                {"detail": "block_name is required.", "color": "red"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            token_start = int(token_start_raw)
+            token_end = int(token_end_raw)
+        except ValueError:
+            return Response(
+                {"detail": "start and end must be integers.", "color": "red"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if token_start < 1000 or token_end > 2000 or token_start > token_end:
+            return Response(
+                {
+                    "detail": "Token range must be within 1000-2000 and start must be <= end.",
+                    "color": "red",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        html = _build_tags_printable_html(block_name, token_start, token_end)
+        response = HttpResponse(html, content_type="text/html; charset=utf-8")
+        response["Content-Disposition"] = (
+            f'attachment; filename="laundry-tags-{block_name}-{token_start:04d}-{token_end:04d}.html"'
+        )
+        return response
 
 
 class LaundryEventViewSet(viewsets.ReadOnlyModelViewSet):
