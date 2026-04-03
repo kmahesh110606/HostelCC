@@ -1,7 +1,9 @@
 import json
+import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import DatabaseError
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -12,6 +14,9 @@ from students.utils import resolve_student_for_user
 
 from .models import CloakroomEntry
 from .views import _parse_student_qr, _resolve_student_from_payload
+
+
+logger = logging.getLogger(__name__)
 
 
 def _append_note(existing: str, extra: str) -> str:
@@ -121,16 +126,21 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
                 messages.error(request, "Cloak room service is locked for this student.")
                 return redirect("cloakroom-portal")
 
-            last_token = CloakroomEntry.objects.order_by("-token_no").values_list("token_no", flat=True).first() or 1000
-            entry = CloakroomEntry.objects.create(
-                student=target_student,
-                token_no=last_token + 1,
-                item_name=item_name,
-                storage_room_no=storage_room_no,
-                notes=notes,
-                status=CloakroomEntry.Status.SUBMITTED,
-                submitted_by=request.user,
-            )
+            try:
+                last_token = CloakroomEntry.objects.order_by("-token_no").values_list("token_no", flat=True).first() or 1000
+                entry = CloakroomEntry.objects.create(
+                    student=target_student,
+                    token_no=last_token + 1,
+                    item_name=item_name,
+                    storage_room_no=storage_room_no,
+                    notes=notes,
+                    status=CloakroomEntry.Status.SUBMITTED,
+                    submitted_by=request.user,
+                )
+            except DatabaseError:
+                logger.exception("Cloakroom submit failed due to database error")
+                messages.error(request, "Cloak room is temporarily unavailable. Please try again in a few minutes.")
+                return redirect("cloakroom-portal")
             messages.success(request, f"Item submitted. Token #{entry.token_no}.")
             return redirect("cloakroom-portal")
 
@@ -194,12 +204,17 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
                 messages.info(request, "This token is already marked as returned.")
                 return redirect("cloakroom-portal")
 
-            entry.status = CloakroomEntry.Status.RETURNED
-            entry.returned_by = request.user
-            entry.returned_at = timezone.now()
-            if return_notes:
-                entry.notes = _append_note(entry.notes, f"Return note: {return_notes}")
-            entry.save(update_fields=["status", "returned_by", "returned_at", "notes"])
+            try:
+                entry.status = CloakroomEntry.Status.RETURNED
+                entry.returned_by = request.user
+                entry.returned_at = timezone.now()
+                if return_notes:
+                    entry.notes = _append_note(entry.notes, f"Return note: {return_notes}")
+                entry.save(update_fields=["status", "returned_by", "returned_at", "notes"])
+            except DatabaseError:
+                logger.exception("Cloakroom return failed due to database error")
+                messages.error(request, "Cloak room is temporarily unavailable. Please try again in a few minutes.")
+                return redirect("cloakroom-portal")
             messages.success(request, f"Token #{entry.token_no} marked as collected.")
             return redirect("cloakroom-portal")
 
@@ -238,15 +253,20 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
                 messages.error(request, "Choose a filter: token range, block name, or room no.")
                 return redirect("cloakroom-portal")
 
-            queryset = CloakroomEntry.objects.filter(status=CloakroomEntry.Status.SUBMITTED)
-            if token_start is not None and token_end is not None:
-                queryset = queryset.filter(token_no__gte=token_start, token_no__lte=token_end)
-            if block_name:
-                queryset = queryset.filter(student__block__block_name__iexact=block_name)
-            if room_no:
-                queryset = queryset.filter(student__room_no__iexact=room_no)
+            try:
+                queryset = CloakroomEntry.objects.filter(status=CloakroomEntry.Status.SUBMITTED)
+                if token_start is not None and token_end is not None:
+                    queryset = queryset.filter(token_no__gte=token_start, token_no__lte=token_end)
+                if block_name:
+                    queryset = queryset.filter(student__block__block_name__iexact=block_name)
+                if room_no:
+                    queryset = queryset.filter(student__room_no__iexact=room_no)
 
-            entries = list(queryset.select_related("student", "student__block")[:500])
+                entries = list(queryset.select_related("student", "student__block")[:500])
+            except DatabaseError:
+                logger.exception("Cloakroom move failed due to database error")
+                messages.error(request, "Cloak room is temporarily unavailable. Please try again in a few minutes.")
+                return redirect("cloakroom-portal")
             if not entries:
                 messages.error(request, "No submitted items matched your move filters.")
                 return redirect("cloakroom-portal")
@@ -268,12 +288,17 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
             messages.success(request, f"Moved {moved} item(s) to {target_storage}.")
             return redirect("cloakroom-portal")
 
-    if student:
-        entries = list(CloakroomEntry.objects.filter(student=student)[:40])
-    elif can_manage:
-        entries = list(CloakroomEntry.objects.select_related("student", "student__block")[:80])
-    else:
+    try:
+        if student:
+            entries = list(CloakroomEntry.objects.filter(student=student)[:40])
+        elif can_manage:
+            entries = list(CloakroomEntry.objects.select_related("student", "student__block")[:80])
+        else:
+            entries = []
+    except DatabaseError:
+        logger.exception("Cloakroom portal list load failed due to database error")
         entries = []
+        messages.error(request, "Cloak room data is temporarily unavailable. Please try again shortly.")
 
     return render(
         request,
