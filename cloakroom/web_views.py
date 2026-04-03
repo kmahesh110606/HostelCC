@@ -9,6 +9,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
+from laundry.models import LaundrySchedule
 from students.models import Student
 from students.utils import resolve_student_for_user
 
@@ -19,6 +20,31 @@ from .views import _parse_student_qr, _resolve_student_from_payload
 logger = logging.getLogger(__name__)
 
 
+REQUIRED_CLOAKROOM_ITEMS = (
+    ("CHAIR", "Chair"),
+    ("BUCKET", "Bucket"),
+    ("CARTON", "Carton"),
+    ("SUITCASE", "Suitcase"),
+    ("MATTRESS", "Mattress"),
+)
+
+_ITEM_CODE_TO_LABEL = {code: label for code, label in REQUIRED_CLOAKROOM_ITEMS}
+
+_ITEM_ALIASES = {
+    "chair": "CHAIR",
+    "bucket": "BUCKET",
+    "carton": "CARTON",
+    "cartonbox": "CARTON",
+    "box": "CARTON",
+    "suitcase": "SUITCASE",
+    "bag": "SUITCASE",
+    "bags": "SUITCASE",
+    "bagssuitcase": "SUITCASE",
+    "mattress": "MATTRESS",
+    "matress": "MATTRESS",
+}
+
+
 def _append_note(existing: str, extra: str) -> str:
     left = (existing or "").strip()
     right = (extra or "").strip()
@@ -27,6 +53,75 @@ def _append_note(existing: str, extra: str) -> str:
     if not left:
         return right
     return f"{left}\n{right}"
+
+
+def _normalize_item_code(item_name: str) -> str | None:
+    key = "".join(ch for ch in (item_name or "").strip().lower() if ch.isalnum())
+    if not key:
+        return None
+    return _ITEM_ALIASES.get(key)
+
+
+def _student_qr_payload_text(student, user) -> str:
+    qr_token = ""
+    try:
+        schedule = LaundrySchedule.objects.only("student_id", "qr_token").filter(student_id=student.id).first()
+        if schedule:
+            qr_token = str(schedule.qr_token)
+    except Exception:
+        qr_token = ""
+
+    return json.dumps(
+        {
+            "student_id": student.id,
+            "qr_token": qr_token,
+            "roll_no": student.roll_no,
+            "email": (user.email or user.username or "").strip().lower(),
+            "room_no": student.room_no,
+            "block_name": student.block.block_name if student.block else "",
+        },
+        separators=(",", ":"),
+    )
+
+
+def _build_item_status_rows(entries):
+    latest_by_code = {}
+    for entry in entries:
+        code = _normalize_item_code(entry.item_name)
+        if not code:
+            continue
+        if code not in latest_by_code:
+            latest_by_code[code] = entry
+
+    rows = []
+    for code, label in REQUIRED_CLOAKROOM_ITEMS:
+        entry = latest_by_code.get(code)
+        if not entry:
+            rows.append(
+                {
+                    "label": label,
+                    "status": "Not Submitted",
+                    "token": "-",
+                    "storage_room_no": "-",
+                    "is_collected": False,
+                    "is_pending": False,
+                }
+            )
+            continue
+
+        is_collected = entry.status == CloakroomEntry.Status.RETURNED
+        rows.append(
+            {
+                "label": label,
+                "status": "Collected" if is_collected else "Submitted",
+                "token": "-" if is_collected else str(entry.token_no),
+                "storage_room_no": entry.storage_room_no,
+                "is_collected": is_collected,
+                "is_pending": not is_collected,
+            }
+        )
+
+    return rows
 
 
 def _resolve_student_for_cloakroom_portal(user):
@@ -109,6 +204,12 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
             storage_room_no = (request.POST.get("storage_room_no") or "").strip().upper()
             notes = (request.POST.get("notes") or "").strip()
 
+            item_code = _normalize_item_code(item_name)
+            if not item_code:
+                allowed = ", ".join(label for _, label in REQUIRED_CLOAKROOM_ITEMS)
+                messages.error(request, f"Allowed items: {allowed}.")
+                return redirect("cloakroom-portal")
+
             if not qr_text or not item_name or not storage_room_no:
                 messages.error(request, "QR text, item name, and storage room are required.")
                 return redirect("cloakroom-portal")
@@ -126,12 +227,28 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
                 messages.error(request, "Cloak room service is locked for this student.")
                 return redirect("cloakroom-portal")
 
+            prior_item_names = list(CloakroomEntry.objects.filter(student=target_student).values_list("item_name", flat=True))
+            chair_submitted = any(_normalize_item_code(name) == "CHAIR" for name in prior_item_names)
+            if item_code != "CHAIR" and not chair_submitted:
+                messages.error(request, "Chair must be submitted first before other items.")
+                return redirect("cloakroom-portal")
+
+            pending_names = list(
+                CloakroomEntry.objects.filter(
+                    student=target_student,
+                    status=CloakroomEntry.Status.SUBMITTED,
+                ).values_list("item_name", flat=True)
+            )
+            if any(_normalize_item_code(name) == item_code for name in pending_names):
+                messages.error(request, "This item is already pending collection for this student.")
+                return redirect("cloakroom-portal")
+
             try:
                 last_token = CloakroomEntry.objects.order_by("-token_no").values_list("token_no", flat=True).first() or 1000
                 entry = CloakroomEntry.objects.create(
                     student=target_student,
                     token_no=last_token + 1,
-                    item_name=item_name,
+                    item_name=_ITEM_CODE_TO_LABEL[item_code],
                     storage_room_no=storage_room_no,
                     notes=notes,
                     status=CloakroomEntry.Status.SUBMITTED,
@@ -300,6 +417,15 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
         entries = []
         messages.error(request, "Cloak room data is temporarily unavailable. Please try again shortly.")
 
+    student_qr_text = ""
+    item_status_rows = []
+    if student:
+        try:
+            student_qr_text = _student_qr_payload_text(student, request.user)
+        except Exception:
+            student_qr_text = ""
+        item_status_rows = _build_item_status_rows(entries)
+
     return render(
         request,
         "cloakroom/portal.html",
@@ -308,6 +434,9 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
             "cloakroom_unlocked": cloakroom_unlocked,
             "entries": entries,
             "can_manage_cloakroom": can_manage,
+            "required_item_choices": [label for _, label in REQUIRED_CLOAKROOM_ITEMS],
+            "student_qr_text": student_qr_text,
+            "item_status_rows": item_status_rows,
             "sample_qr": json.dumps(
                 {
                     "roll_no": student.roll_no if student else "22BCE0001",

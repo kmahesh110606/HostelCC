@@ -38,6 +38,60 @@
   .cloakroom-status.returned {
     color: #0f6a2c;
   }
+
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .status-chip.pending {
+    background: rgba(255, 185, 0, 0.18);
+    color: #8a5b00;
+  }
+
+  .status-chip.collected {
+    background: rgba(16, 124, 16, 0.18);
+    color: #0f6a2c;
+  }
+
+  .status-chip.empty {
+    background: rgba(127, 127, 127, 0.14);
+    color: var(--muted);
+  }
+
+  .student-qr-wrap {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+  }
+
+  .student-qr-canvas {
+    width: 230px;
+    min-height: 230px;
+    display: grid;
+    place-items: center;
+    background: #fff;
+    border-radius: 10px;
+    padding: 8px;
+  }
+
+  .item-status-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+  }
+
+  .item-status-table th,
+  .item-status-table td {
+    border-bottom: 1px solid var(--line);
+    padding: 8px 6px;
+    text-align: left;
+    font-size: 13px;
+  }
 </style>
 
 <div class="tabs">
@@ -50,6 +104,50 @@
     {% endif %}
 
     <div class="cloakroom-grid">
+      {% if student %}
+      <article class="cloakroom-card">
+        <h3>Student QR (Use same as Laundry)</h3>
+        {% if student_qr_text %}
+        <div class="student-qr-wrap">
+          <div id="cloakroom-student-qr" class="student-qr-canvas"></div>
+          <button id="print-cloakroom-qr" type="button" class="secondary">Print QR</button>
+          <p class="muted" style="margin: 0;">Use this QR for cloak room scans.</p>
+        </div>
+        {% else %}
+        <p class="muted">QR could not be generated right now.</p>
+        {% endif %}
+      </article>
+
+      <article class="cloakroom-card">
+        <h3>Required Items Status</h3>
+        <p class="muted" style="margin-top: 0;">Submission order: Chair first, then Bucket/Carton/Suitcase/Mattress.</p>
+        <table class="item-status-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Status</th>
+              <th>Token</th>
+              <th>Stored In</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in item_status_rows %}
+            <tr>
+              <td>{{ row.label }}</td>
+              <td>
+                <span class="status-chip {% if row.is_collected %}collected{% elif row.is_pending %}pending{% else %}empty{% endif %}">
+                  {{ row.status }}
+                </span>
+              </td>
+              <td>{{ row.token }}</td>
+              <td>{{ row.storage_room_no }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </article>
+      {% endif %}
+
       {% if can_manage_cloakroom %}
       <article class="cloakroom-card">
         <h3>Staff: Submit Item</h3>
@@ -60,7 +158,14 @@
           <textarea id="qr_text" name="qr_text" rows="3" required placeholder='{{ sample_qr }}'></textarea>
 
           <label for="item_name">Item Name</label>
-          <input id="item_name" name="item_name" placeholder="Backpack / Laptop / Suitcase" required />
+          <select id="item_name" name="item_name" required>
+            <option value="">Select item</option>
+            {% for item in required_item_choices %}
+            <option value="{{ item }}">{{ item }}</option>
+            {% endfor %}
+          </select>
+
+          <p class="muted" style="margin-top: 8px; margin-bottom: 8px;">Chair must be submitted first for each student.</p>
 
           <label for="storage_room_no">Storage Room No</label>
           <input id="storage_room_no" name="storage_room_no" placeholder="CR-1" required />
@@ -150,4 +255,48 @@
     </section>
   </section>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  (function () {
+    const value = "{{ student_qr_text|escapejs }}";
+    const target = document.getElementById("cloakroom-student-qr");
+    if (value && target && typeof QRCode !== "undefined") {
+      target.innerHTML = "";
+      new QRCode(target, {
+        text: value,
+        width: 210,
+        height: 210,
+        colorDark: "#111111",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    }
+
+    const printButton = document.getElementById("print-cloakroom-qr");
+    if (!printButton || !target) {
+      return;
+    }
+    printButton.addEventListener("click", function () {
+      const qrImage = target.querySelector("img") || target.querySelector("canvas");
+      if (!qrImage) {
+        return;
+      }
+      const dataUrl = qrImage.tagName === "IMG" ? qrImage.src : qrImage.toDataURL("image/png");
+      const popup = window.open("", "_blank", "width=600,height=760");
+      if (!popup) {
+        return;
+      }
+      popup.document.write(
+        '<html><head><title>Cloak Room QR</title></head><body style="font-family:Segoe UI,Arial,sans-serif;display:grid;place-items:center;padding:24px;">' +
+          '<h2>Student Cloak Room QR</h2>' +
+          '<img src="' + dataUrl + '" style="width:280px;height:280px;" />' +
+          '</body></html>'
+      );
+      popup.document.close();
+      popup.focus();
+      popup.print();
+    });
+  })();
+</script>
 {% endblock %}

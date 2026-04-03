@@ -15,6 +15,31 @@ from .models import CloakroomEntry
 from .serializers import CloakroomEntrySerializer
 
 
+REQUIRED_CLOAKROOM_ITEMS = (
+    ("CHAIR", "Chair"),
+    ("BUCKET", "Bucket"),
+    ("CARTON", "Carton"),
+    ("SUITCASE", "Suitcase"),
+    ("MATTRESS", "Mattress"),
+)
+
+_ITEM_CODE_TO_LABEL = {code: label for code, label in REQUIRED_CLOAKROOM_ITEMS}
+
+_ITEM_ALIASES = {
+    "chair": "CHAIR",
+    "bucket": "BUCKET",
+    "carton": "CARTON",
+    "cartonbox": "CARTON",
+    "box": "CARTON",
+    "suitcase": "SUITCASE",
+    "bag": "SUITCASE",
+    "bags": "SUITCASE",
+    "bagssuitcase": "SUITCASE",
+    "mattress": "MATTRESS",
+    "matress": "MATTRESS",
+}
+
+
 def _can_manage_cloakroom(user) -> bool:
     role = getattr(user, "role", "")
     return role in {"ADMIN", "SUPERVISOR", "WARDEN", "DIRECTOR", "LAUNDRY_PERSON"}
@@ -84,6 +109,13 @@ def _append_note(existing: str, extra: str) -> str:
     return f"{left}\n{right}"
 
 
+def _normalize_item_code(item_name: str) -> str | None:
+    key = "".join(ch for ch in (item_name or "").strip().lower() if ch.isalnum())
+    if not key:
+        return None
+    return _ITEM_ALIASES.get(key)
+
+
 class CloakroomEntryViewSet(viewsets.GenericViewSet):
     serializer_class = CloakroomEntrySerializer
     permission_classes = [IsAuthenticated]
@@ -129,6 +161,11 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
         if not storage_room_no:
             raise ValidationError({"storage_room_no": "Storage room number is required."})
 
+        item_code = _normalize_item_code(item_name)
+        if not item_code:
+            allowed = ", ".join(label for _, label in REQUIRED_CLOAKROOM_ITEMS)
+            raise ValidationError({"item_name": f"Allowed items: {allowed}."})
+
         parsed = _parse_student_qr(qr_text)
         if not parsed:
             raise ValidationError({"qr_text": "Invalid student QR format."})
@@ -139,10 +176,23 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
         if not student.cloakroom_unlocked:
             raise ValidationError({"detail": "Cloak room service is locked for this student."})
 
+        prior_item_names = list(CloakroomEntry.objects.filter(student=student).values_list("item_name", flat=True))
+        chair_submitted = any(_normalize_item_code(name) == "CHAIR" for name in prior_item_names)
+        if item_code != "CHAIR" and not chair_submitted:
+            raise ValidationError({"item_name": "Chair must be submitted first before other items."})
+
+        already_pending = CloakroomEntry.objects.filter(
+            student=student,
+            status=CloakroomEntry.Status.SUBMITTED,
+        )
+        already_pending_names = list(already_pending.values_list("item_name", flat=True))
+        if any(_normalize_item_code(name) == item_code for name in already_pending_names):
+            raise ValidationError({"item_name": "This item is already pending collection for the student."})
+
         entry = CloakroomEntry.objects.create(
             student=student,
             token_no=_next_token_no(),
-            item_name=item_name,
+            item_name=_ITEM_CODE_TO_LABEL[item_code],
             storage_room_no=storage_room_no,
             notes=notes,
             status=CloakroomEntry.Status.SUBMITTED,
