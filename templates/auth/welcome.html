@@ -1,12 +1,35 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="tabs" style="grid-template-columns: 1fr; max-width: 900px; margin-inline: auto;">
+<style>
+  .welcome-shell {
+    grid-template-columns: 1fr;
+    max-width: 900px;
+    margin-inline: auto;
+  }
+
+  .welcome-feature-grid {
+    margin-top: 8px;
+  }
+
+  .welcome-guidelines-title {
+    margin-top: 16px;
+  }
+
+  .welcome-guidelines-list {
+    line-height: 1.8;
+  }
+
+  .welcome-actions {
+    margin-top: 14px;
+  }
+</style>
+<div class="tabs welcome-shell">
   <section class="tab">
     <span class="label">Welcome</span>
     <h2>Welcome to HostelCC</h2>
     <p class="muted">Your account is now ready. Here is what you can do next.</p>
 
-    <div class="tabs" style="margin-top: 8px;">
+    <div class="tabs welcome-feature-grid">
       <section class="tab">
         <h3>Community</h3>
         <p class="muted">Post complaints with tags, photos/videos, vote, and comment in thread-style feed.</p>
@@ -21,15 +44,15 @@
       </section>
     </div>
 
-    <h3 style="margin-top: 16px;">Code of Conduct</h3>
-    <ul class="muted" style="line-height: 1.8;">
+    <h3 class="welcome-guidelines-title">Code of Conduct</h3>
+    <ul class="muted welcome-guidelines-list">
       <li>Be respectful in posts, comments, and ratings.</li>
       <li>No abusive or hateful content.</li>
       <li>Use correct tags and factual descriptions for faster resolution.</li>
       <li>Misleading or violating posts may be removed by admins.</li>
     </ul>
 
-    <div class="row" style="margin-top: 14px;">
+    <div class="row welcome-actions">
       <a class="button" href="/dashboard/">Go to Dashboard</a>
       <a class="button secondary" href="/community/">Open Community</a>
       <a class="button secondary" href="/mess/">Open Mess</a>

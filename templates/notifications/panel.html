@@ -87,6 +87,20 @@
     margin: 0;
   }
 
+  .notification-pdf-link-wrap {
+    margin: 0 0 8px;
+  }
+
+  .notification-create-form {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .notification-form-row {
+    margin: 0;
+  }
+
   @media (max-width: 1100px) {
     .notifications-layout {
       grid-template-columns: 1fr;
@@ -121,7 +135,7 @@
         <p class="notification-message">{{ n.message }}</p>
         {% if n.poster %}
           {% if '.pdf' in n.poster.name|lower %}
-          <p style="margin: 0 0 8px;"><a class="button secondary" href="{{ n.poster.url }}" target="_blank" rel="noopener"><i class="ms-Icon ms-Icon--Document"></i> Open Poster PDF</a></p>
+          <p class="notification-pdf-link-wrap"><a class="button secondary" href="{{ n.poster.url }}" target="_blank" rel="noopener"><i class="ms-Icon ms-Icon--Document"></i> Open Poster PDF</a></p>
           {% else %}
           <img src="{{ n.poster.url }}" alt="Notification poster" class="notification-poster" />
           {% endif %}
@@ -150,7 +164,7 @@
     <h2><i class="ms-Icon ms-Icon--Compose"></i> Create Notification</h2>
     <p class="muted">This publishes to both website and Flutter app dashboards.</p>
 
-    <form method="post" enctype="multipart/form-data" style="display: grid; gap: 10px; margin-top: 12px;">
+    <form method="post" enctype="multipart/form-data" class="notification-create-form">
       {% csrf_token %}
       <input type="hidden" name="action" value="create" />
       <div class="form-group">
@@ -161,7 +175,7 @@
         <label>Message</label>
         <textarea name="message" rows="4" required></textarea>
       </div>
-      <div class="form-row" style="margin: 0;">
+      <div class="form-row notification-form-row">
         <div class="form-group">
           <label>Audience</label>
           <select name="audience">

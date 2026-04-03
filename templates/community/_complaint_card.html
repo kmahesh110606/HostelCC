@@ -6,13 +6,13 @@
         <span class="tag-chip"><i class="ms-Icon ms-Icon--Pinned"></i> Block {{ item.block_name|default:'N/A' }}</span>
         <span class="tag-chip"><i class="ms-Icon ms-Icon--DateTime2"></i> {{ item.obj.created_at|date:'d M Y, h:i A' }}</span>
       </div>
-      <h3 style="margin: 2px 0 4px;">{{ item.author_name }}</h3>
-      <p class="muted" style="margin: 0; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; font-variant: all-small-caps;">
+      <h3 class="complaint-author">{{ item.author_name }}</h3>
+      <p class="muted complaint-submeta">
         REG NO {{ item.registration_no|default:'N/A' }} | BLOCK {{ item.block_name|default:'N/A' }} | ROOM NO {{ item.room_no|default:'N/A' }}
       </p>
     </div>
 
-    <div style="display: grid; gap: 8px;">
+    <div class="complaint-side-actions">
       <span class="status-chip" id="status-chip-{{ item.obj.id }}">
         {% if item.obj.status == 'OPEN' %}
           <span class="status-dot status-dot-active"></span> Active
@@ -28,14 +28,14 @@
         {% csrf_token %}
         <input type="hidden" name="action" value="delete" />
         <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
-        <button type="submit" class="button secondary" style="width: 100%;"><i class="ms-Icon ms-Icon--Delete"></i> Delete</button>
+        <button type="submit" class="button secondary button-full"><i class="ms-Icon ms-Icon--Delete"></i> Delete</button>
       </form>
       {% endif %}
     </div>
   </div>
 
   {% if item.obj.text %}
-  <p style="margin-top: 8px; white-space: pre-wrap;">{{ item.obj.text }}</p>
+  <p class="complaint-text">{{ item.obj.text }}</p>
   {% endif %}
 
   {% if item.obj.media %}
@@ -84,18 +84,18 @@
     </form>
 
     <button type="button" class="action-pill comments open-comments-btn" data-modal-target="comments-modal-{{ item.obj.id }}" aria-label="Open comments for complaint {{ item.obj.id }}">
-      <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:block; color:#0078D4; fill:none; stroke:currentColor; stroke-width:2;">
+      <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" class="comments-icon">
         <path d="M5 5.75A2.75 2.75 0 0 1 7.75 3h8.5A2.75 2.75 0 0 1 19 5.75v6.5A2.75 2.75 0 0 1 16.25 15H10.1l-3.33 3.04c-.72.66-1.88.15-1.88-.83V15.3A2.75 2.75 0 0 1 5 12.55v-6.8Z"/>
       </svg>
       <span id="reply-count-{{ item.obj.id }}" class="vote-count">{{ item.obj.reply_count|default:0 }}</span>
     </button>
 
     {% if item.can_manage %}
-    <form method="post" class="row manage-status-form community-status-form" style="gap: 8px; align-items: center;">
+    <form method="post" class="row manage-status-form community-status-form manage-status-row">
       {% csrf_token %}
       <input type="hidden" name="action" value="set_status" />
       <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
-      <select name="status" style="width: 170px; margin: 0;">
+      <select name="status" class="manage-status-select">
         {% for code, label in status_choices %}
         <option value="{{ code }}" {% if item.obj.status == code %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
@@ -130,7 +130,7 @@
           <div>{{ reply.text }}</div>
         </div>
         {% empty %}
-        <p class="muted comments-empty-state" style="margin: 0;">No comments yet. Start the discussion.</p>
+        <p class="muted comments-empty-state">No comments yet. Start the discussion.</p>
         {% endfor %}
       </div>
     </div>
@@ -140,12 +140,12 @@
         {% csrf_token %}
         <input type="hidden" name="action" value="comment" />
         <input type="hidden" name="complaint_id" value="{{ item.obj.id }}" />
-        <div class="form-row" style="align-items: end;">
-          <div class="form-group" style="margin: 0;">
+        <div class="form-row comment-form-row">
+          <div class="form-group form-group-tight">
             <label for="comment_{{ item.obj.id }}">Add Comment</label>
             <input id="comment_{{ item.obj.id }}" name="comment_text" required placeholder="Write a response or status update" />
           </div>
-          <div class="form-group" style="margin: 0;">
+          <div class="form-group form-group-tight">
             <button type="submit"><i class="ms-Icon ms-Icon--Send"></i> Comment</button>
           </div>
         </div>

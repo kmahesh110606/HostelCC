@@ -1,12 +1,73 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="tabs" style="grid-template-columns: 1fr; max-width: 840px; margin-inline: auto;">
+<style>
+  .profile-detail-shell {
+    grid-template-columns: 1fr;
+    max-width: 840px;
+    margin-inline: auto;
+  }
+
+  .profile-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .profile-detail-mess-block {
+    margin-top: 14px;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+
+  .profile-detail-mess-title {
+    margin-bottom: 6px;
+  }
+
+  .profile-detail-mess-form {
+    display: grid;
+    gap: 10px;
+    max-width: 360px;
+    margin-top: 10px;
+  }
+
+  .profile-detail-actions {
+    margin-top: 16px;
+  }
+
+  .profile-detail-section {
+    margin-top: 14px;
+  }
+
+  .profile-detail-admin-form {
+    display: grid;
+    gap: 10px;
+    max-width: 520px;
+    margin-top: 8px;
+  }
+
+  .profile-detail-admin-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .profile-detail-export-form {
+    display: grid;
+    gap: 10px;
+    max-width: 520px;
+    margin-top: 14px;
+  }
+</style>
+
+<div class="tabs profile-detail-shell">
   <section class="tab">
     <span class="label"><svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M17 13.5c0-.83-.67-1.5-1.5-1.5h-7c-.83 0-1.5.67-1.5 1.5v.5c0 1.97 1.86 4 5 4 3.14 0 5-2.03 5-4v-.5Zm-2.25-5.25a2.75 2.75 0 1 0-5.5 0 2.75 2.75 0 0 0 5.5 0ZM22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Zm-1.5 0a8.5 8.5 0 1 0-17 0 8.5 8.5 0 0 0 17 0Z"/></svg> Profile</span>
     <h2><svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M17 13.5c0-.83-.67-1.5-1.5-1.5h-7c-.83 0-1.5.67-1.5 1.5v.5c0 1.97 1.86 4 5 4 3.14 0 5-2.03 5-4v-.5Zm-2.25-5.25a2.75 2.75 0 1 0-5.5 0 2.75 2.75 0 0 0 5.5 0ZM22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Zm-1.5 0a8.5 8.5 0 1 0-17 0 8.5 8.5 0 0 0 17 0Z"/></svg> User Profile</h2>
     <p class="muted">Account and hostel details for your login.</p>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 14px;">
+    <div class="profile-detail-grid">
       <div>
         <label>Name</label>
         <input value="{{ user.get_full_name|default:user.username }}" disabled />
@@ -42,11 +103,11 @@
     </div>
 
     {% if student %}
-    <div style="margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px;">
-      <h3 style="margin-bottom: 6px;"><i class="ms-Icon ms-Icon--CalendarDay"></i> Monthly Mess Change</h3>
+    <div class="profile-detail-mess-block">
+      <h3 class="profile-detail-mess-title"><i class="ms-Icon ms-Icon--CalendarDay"></i> Monthly Mess Change</h3>
       {% if student.mess_change_unlocked %}
       <p class="muted">Admin has unlocked your profile this month. Pick a caterer from your block and current mess type, then submit once.</p>
-      <form method="post" style="display: grid; gap: 10px; max-width: 360px; margin-top: 10px;">
+      <form method="post" class="profile-detail-mess-form">
         {% csrf_token %}
         <input type="hidden" name="action" value="update_mess_choice" />
         <div>
@@ -66,17 +127,17 @@
     </div>
     {% endif %}
 
-    <div class="row" style="margin-top: 16px;">
+    <div class="row profile-detail-actions">
       <a class="button" href="/accounts/forgot-password/"><i class="ms-Icon ms-Icon--Shield"></i> Forgot Password</a>
       <a class="button secondary" href="/community/"><svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M5.25 18A3.25 3.25 0 0 1 2 14.75v-8.5C2 4.45 3.46 3 5.25 3h13.5C20.55 3 22 4.46 22 6.25v8.5c0 1.8-1.46 3.25-3.25 3.25h-5.74L8 21.75a1.25 1.25 0 0 1-2-1V18h-.75Zm7.26-1.5h6.24c.97 0 1.75-.78 1.75-1.75v-8.5c0-.97-.78-1.75-1.75-1.75H5.25c-.97 0-1.75.78-1.75 1.75v8.5c0 .97.78 1.75 1.75 1.75H7.5v3.75l5.01-3.75Z"/></svg> Open Community</a>
     </div>
   </section>
 
   {% if user.role == 'ADMIN' %}
-  <section class="tab" style="margin-top: 14px;">
+  <section class="tab profile-detail-section">
     <h2><i class="ms-Icon ms-Icon--Settings"></i> Admin: Unlock Student Mess Changes</h2>
     <p class="muted">Enable this once per month so a student can update mess allotment from their profile.</p>
-    <form method="post" style="display: grid; gap: 10px; max-width: 520px; margin-top: 8px;">
+    <form method="post" class="profile-detail-admin-form">
       {% csrf_token %}
       <input type="hidden" name="action" value="set_mess_unlock" />
       <div>
@@ -95,7 +156,7 @@
       <button type="submit"><i class="ms-Icon ms-Icon--Accept"></i> Update Access</button>
     </form>
 
-    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px;">
+    <div class="profile-detail-admin-row">
       <form method="post">
         {% csrf_token %}
         <input type="hidden" name="action" value="unlock_all_mess_changes" />
@@ -111,11 +172,11 @@
   {% endif %}
 
   {% if user.role == 'ADMIN' or user.role == 'SUPERVISOR' %}
-  <section class="tab" style="margin-top: 14px;">
+  <section class="tab profile-detail-section">
     <h2><i class="ms-Icon ms-Icon--Repair"></i> Mess Menu Management</h2>
     <p class="muted">Archive the active weekly menu before editing the next month and export the menu as CSV by mess type.</p>
 
-    <form method="post" style="display: grid; gap: 10px; max-width: 520px; margin-top: 8px;">
+    <form method="post" class="profile-detail-admin-form">
       {% csrf_token %}
       <input type="hidden" name="action" value="archive_mess_menu_snapshot" />
       <div>
@@ -130,7 +191,7 @@
       <button type="submit"><i class="ms-Icon ms-Icon--Archive"></i> Archive Current Menu Snapshot</button>
     </form>
 
-    <form method="get" action="{% url 'mess-export-menu' %}" style="display: grid; gap: 10px; max-width: 520px; margin-top: 14px;">
+    <form method="get" action="{% url 'mess-export-menu' %}" class="profile-detail-export-form">
       <div>
         <label for="menu_export_mess_type">Download CSV for Type</label>
         <select id="menu_export_mess_type" name="mess_type">

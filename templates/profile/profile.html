@@ -1,36 +1,145 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="tabs" style="grid-template-columns: 300px 1fr; align-items: start;">
-  <section class="tab" style="position: sticky; top: 100px;">
-    <div style="text-align: center;">
-      <div style="font-size: 48px; margin-bottom: 12px;">
-        <i class="fas fa-user-circle" style="color: var(--primary);"></i>
+<style>
+  .profile-layout {
+    grid-template-columns: 300px 1fr;
+    align-items: start;
+  }
+
+  .profile-sidebar {
+    position: sticky;
+    top: 100px;
+  }
+
+  .profile-sidebar-inner {
+    text-align: center;
+  }
+
+  .profile-avatar-wrap {
+    font-size: 48px;
+    margin-bottom: 12px;
+  }
+
+  .profile-avatar-icon,
+  .profile-section-icon {
+    color: var(--primary);
+  }
+
+  .profile-heading {
+    margin: 0 0 4px;
+  }
+
+  .profile-email {
+    font-size: 14px;
+    color: var(--primary);
+    margin: 8px 0;
+  }
+
+  .profile-meta-block {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .profile-meta-row {
+    margin-top: 12px;
+  }
+
+  .profile-meta-label {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .profile-meta-value {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .profile-sidebar-action-primary {
+    width: 100%;
+    margin-top: 16px;
+  }
+
+  .profile-sidebar-action-secondary {
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .profile-content {
+    margin-top: 20px;
+  }
+
+  .profile-section-title {
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  .profile-section-title.with-top-space {
+    margin-top: 24px;
+  }
+
+  .profile-info-card {
+    border-radius: var(--radius-md);
+    padding: 16px;
+    border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--line));
+    background: color-mix(in srgb, var(--primary) 5%, var(--panel));
+    margin-bottom: 20px;
+  }
+
+  .profile-student-card {
+    border-radius: var(--radius-md);
+    padding: 16px;
+    border: 1px solid color-mix(in srgb, var(--success) 24%, var(--line));
+    background: color-mix(in srgb, var(--success) 5%, var(--panel));
+  }
+
+  .profile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+
+  .profile-grid-value {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .profile-label-inline {
+    display: inline-block;
+  }
+</style>
+
+<div class="tabs profile-layout">
+  <section class="tab profile-sidebar">
+    <div class="profile-sidebar-inner">
+      <div class="profile-avatar-wrap">
+        <i class="fas fa-user-circle profile-avatar-icon"></i>
       </div>
-      <h2 style="margin: 0 0 4px;">{{ user.get_full_name|default:user.username }}</h2>
+      <h2 class="profile-heading">{{ user.get_full_name|default:user.username }}</h2>
       <p class="muted">{{ user.role }}</p>
-      <p style="font-size: 14px; color: var(--primary); margin: 8px 0;">{{ user.email }}</p>
+      <p class="profile-email">{{ user.email }}</p>
       
       {% if student %}
-      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line);">
-        <p class="muted" style="font-size: 12px; margin-bottom: 4px;">REGISTRATION</p>
-        <p style="font-weight: 600; color: var(--text);">{{ student.roll_no }}</p>
+      <div class="profile-meta-block">
+        <p class="muted profile-meta-label">REGISTRATION</p>
+        <p class="profile-meta-value">{{ student.roll_no }}</p>
       </div>
       
-      <div style="margin-top: 12px;">
-        <p class="muted" style="font-size: 12px; margin-bottom: 4px;">BLOCK</p>
-        <p style="font-weight: 600; color: var(--text);">{{ student.block.block_name }}</p>
+      <div class="profile-meta-row">
+        <p class="muted profile-meta-label">BLOCK</p>
+        <p class="profile-meta-value">{{ student.block.block_name }}</p>
       </div>
       
-      <div style="margin-top: 12px;">
-        <p class="muted" style="font-size: 12px; margin-bottom: 4px;">ROOM</p>
-        <p style="font-weight: 600; color: var(--text);">{{ student.room_no }}</p>
+      <div class="profile-meta-row">
+        <p class="muted profile-meta-label">ROOM</p>
+        <p class="profile-meta-value">{{ student.room_no }}</p>
       </div>
       {% endif %}
       
-      <a href="/accounts/change-password/" class="button" style="width: 100%; margin-top: 16px;">
+      <a href="/accounts/change-password/" class="button profile-sidebar-action-primary">
         <i class="fas fa-key"></i> Change Password
       </a>
-      <a href="/accounts/logout/" class="button secondary" style="width: 100%; margin-top: 8px;">
+      <a href="/accounts/logout/" class="button secondary profile-sidebar-action-secondary">
         <i class="fas fa-sign-out-alt"></i> Logout
       </a>
     </div>
@@ -41,39 +150,39 @@
     <h2>Your Information</h2>
     <p class="muted">View and manage your account details.</p>
 
-    <div style="margin-top: 20px;">
-      <h3 style="font-weight: 600; margin-bottom: 12px;">
-        <i class="fas fa-info-circle" style="color: var(--primary); margin-right: 6px;"></i>
+    <div class="profile-content">
+      <h3 class="profile-section-title">
+        <i class="fas fa-info-circle profile-section-icon"></i>
         Account Details
       </h3>
       
-      <div style="background: rgba(0, 120, 212, 0.05); border: 1px solid rgba(0, 120, 212, 0.1); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+      <div class="profile-info-card">
+        <div class="profile-grid">
           <div>
             <p class="muted">Email Address</p>
-            <p style="font-weight: 600; color: var(--text);">{{ user.email }}</p>
+            <p class="profile-grid-value">{{ user.email }}</p>
           </div>
           <div>
             <p class="muted">Username</p>
-            <p style="font-weight: 600; color: var(--text);">{{ user.username }}</p>
+            <p class="profile-grid-value">{{ user.username }}</p>
           </div>
           <div>
             <p class="muted">Full Name</p>
-            <p style="font-weight: 600; color: var(--text);">{{ user.get_full_name|default:"Not set" }}</p>
+            <p class="profile-grid-value">{{ user.get_full_name|default:"Not set" }}</p>
           </div>
           <div>
             <p class="muted">Phone</p>
-            <p style="font-weight: 600; color: var(--text);">{{ user.phone_country_code }}{{ user.phone_number|default:"Not set" }}</p>
+            <p class="profile-grid-value">{{ user.phone_country_code }}{{ user.phone_number|default:"Not set" }}</p>
           </div>
           <div>
             <p class="muted">Role</p>
-            <span class="label" style="display: inline-block;">
+            <span class="label profile-label-inline">
               <i class="fas fa-shield-alt"></i> {{ user.get_role_display }}
             </span>
           </div>
           <div>
             <p class="muted">Email Verified</p>
-            <p style="font-weight: 600;" class="{% if user.is_email_verified %}success-text{% else %}warning-text{% endif %}">
+            <p class="profile-grid-value {% if user.is_email_verified %}success-text{% else %}warning-text{% endif %}">
               <i class="fas fa-{% if user.is_email_verified %}check-circle{% else %}clock{% endif %}"></i>
               {% if user.is_email_verified %}Verified{% else %}Pending{% endif %}
             </p>
@@ -82,36 +191,36 @@
       </div>
 
       {% if student %}
-      <h3 style="font-weight: 600; margin-bottom: 12px; margin-top: 24px;">
-        <i class="fas fa-graduation-cap" style="color: var(--primary); margin-right: 6px;"></i>
+      <h3 class="profile-section-title with-top-space">
+        <i class="fas fa-graduation-cap profile-section-icon"></i>
         Student Information
       </h3>
       
-      <div style="background: rgba(16, 124, 16, 0.05); border: 1px solid rgba(16, 124, 16, 0.1); border-radius: 8px; padding: 16px;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+      <div class="profile-student-card">
+        <div class="profile-grid">
           <div>
             <p class="muted">Registration Number</p>
-            <p style="font-weight: 600; color: var(--text);">{{ student.roll_no }}</p>
+            <p class="profile-grid-value">{{ student.roll_no }}</p>
           </div>
           <div>
             <p class="muted">Full Name</p>
-            <p style="font-weight: 600; color: var(--text);">{{ student.name }}</p>
+            <p class="profile-grid-value">{{ student.name }}</p>
           </div>
           <div>
             <p class="muted">Block</p>
-            <p style="font-weight: 600; color: var(--text);">{{ student.block.block_name }}</p>
+            <p class="profile-grid-value">{{ student.block.block_name }}</p>
           </div>
           <div>
             <p class="muted">Room Number</p>
-            <p style="font-weight: 600; color: var(--text);">{{ student.room_no }}</p>
+            <p class="profile-grid-value">{{ student.room_no }}</p>
           </div>
           <div>
             <p class="muted">Mess Type</p>
-            <p style="font-weight: 600; color: var(--text);">{{ student.get_mess_allotment_display }}</p>
+            <p class="profile-grid-value">{{ student.get_mess_allotment_display }}</p>
           </div>
           <div>
             <p class="muted">Allotted Mess Caterer</p>
-            <p style="font-weight: 600; color: var(--text);">
+            <p class="profile-grid-value">
               {% if student.mess_caterer %}
               {{ student.mess_caterer.name }}
               {% else %}

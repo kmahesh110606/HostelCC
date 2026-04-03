@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="tabs" style="grid-template-columns: 2fr 3fr; align-items: start;">
-  <section class="tab" style="position: sticky; top: 92px;">
+<div class="tabs seamless-layout">
+  <section class="tab seamless-side-panel">
     <span class="label"><i class="fas fa-pencil-alt"></i> Create Complaint</span>
     <h2>Start A Thread</h2>
     <p class="muted">Tag the issue, add text, and optionally attach image/video evidence.</p>
 
-    <form id="complaintForm" enctype="multipart/form-data" style="margin-top: 10px;">
+    <form id="complaintForm" enctype="multipart/form-data" class="seamless-form-top">
       {% csrf_token %}
       <input type="hidden"name="action" value="create" />
       <div class="form-group">
@@ -27,14 +27,14 @@
         <input id="media" name="media" type="file" accept="image/*,video/*" />
       </div>
       <div class="form-actions">
-        <button type="submit" style="width: 100%;">
+        <button type="submit" class="seamless-full-btn">
           <i class="fas fa-send"></i> Post to Community
         </button>
       </div>
     </form>
 
-    <h3 style="margin-top: 20px; margin-bottom: 10px;">Find Threads</h3>
-    <form id="filterForm" style="margin-top: 8px;">
+    <h3 class="seamless-filter-title">Find Threads</h3>
+    <form id="filterForm" class="seamless-filter-form">
       <div class="form-group">
         <label for="q">Search Text</label>
         <input id="q" name="q" value="{{ query }}" placeholder="Search complaints" />
@@ -58,7 +58,7 @@
         </select>
       </div>
       <div class="form-actions">
-        <button type="submit" style="width: 100%;">
+        <button type="submit" class="seamless-full-btn">
           <i class="fas fa-filter"></i> Apply Filters
         </button>
       </div>
@@ -70,21 +70,97 @@
     <h2>Threads</h2>
     <p class="muted">Vote and discuss complaints to prioritize resolution.</p>
 
-    <div id="feedContainer" style="margin-top: 12px; display: grid; gap: 12px;">
+    <div id="feedContainer" class="seamless-feed-container">
       <!-- Feed items will be loaded here via AJAX -->
     </div>
     
-    <div id="loadingIndicator" style="text-align: center; padding: 20px; display: none;">
+    <div id="loadingIndicator" class="seamless-loading-indicator">
       <i class="fas fa-spinner fa-spin"></i> Loading more complaints...
     </div>
     
-    <button id="loadMoreBtn" style="width: 100%; margin-top: 12px; display: none;">
+    <button id="loadMoreBtn" class="seamless-load-more-btn">
       <i class="fas fa-chevron-down"></i> Load More
     </button>
   </section>
 </div>
 
 <style>
+  .seamless-layout {
+    grid-template-columns: 2fr 3fr;
+    align-items: start;
+  }
+
+  .seamless-side-panel {
+    position: sticky;
+    top: 92px;
+  }
+
+  .seamless-form-top {
+    margin-top: 10px;
+  }
+
+  .seamless-full-btn {
+    width: 100%;
+  }
+
+  .seamless-filter-title {
+    margin-top: 20px;
+    margin-bottom: 10px;
+  }
+
+  .seamless-filter-form {
+    margin-top: 8px;
+  }
+
+  .seamless-feed-container {
+    margin-top: 12px;
+    display: grid;
+    gap: 12px;
+  }
+
+  .seamless-loading-indicator {
+    text-align: center;
+    padding: 20px;
+    display: none;
+  }
+
+  .seamless-load-more-btn {
+    width: 100%;
+    margin-top: 12px;
+    display: none;
+  }
+
+  .seamless-empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+  }
+
+  .seamless-status-tag {
+    margin-bottom: 6px;
+  }
+
+  .seamless-status-icon {
+    color: var(--status-color, var(--primary));
+  }
+
+  .seamless-status-dot {
+    color: var(--status-color, var(--primary));
+    font-size: 8px;
+  }
+
+  .seamless-status-open {
+    --status-color: #ffb900;
+  }
+
+  .seamless-status-closed {
+    --status-color: #107c10;
+  }
+
+  .seamless-video-media {
+    max-height: 320px;
+  }
+
   .complaint-card {
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -190,6 +266,17 @@
     color: #e81123;
     background: rgba(232, 17, 35, 0.14);
   }
+
+  @media (max-width: 980px) {
+    .seamless-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .seamless-side-panel {
+      position: static;
+      top: auto;
+    }
+  }
 </style>
 
 <script>
@@ -230,7 +317,7 @@
         }
         
         if (data.items.length === 0 && page === 1) {
-          feedContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);"><i class="fas fa-inbox"></i> <p>No complaints found</p></div>';
+          feedContainer.innerHTML = '<div class="seamless-empty-state"><i class="fas fa-inbox"></i> <p>No complaints found</p></div>';
           loadMoreBtn.style.display = 'none';
           return;
         }
@@ -264,22 +351,22 @@
       if (isImage) {
         mediaHtml = `<img src="${item.media}" alt="Complaint media" class="complaint-media" />`;
       } else if (item.media_type === 'VIDEO') {
-        mediaHtml = `<video controls class="complaint-media" style="max-height: 320px;"><source src="${item.media}" /></video>`;
+        mediaHtml = `<video controls class="complaint-media seamless-video-media"><source src="${item.media}" /></video>`;
       }
     }
 
-    const statusColor = item.status === 'OPEN' ? '#FFB900' : '#107C10';
+    const statusClass = item.status === 'OPEN' ? 'seamless-status-open' : 'seamless-status-closed';
     const statusIcon = item.status === 'OPEN' ? 'exclamation-circle' : 'check-circle';
 
     card.innerHTML = `
       <div class="complaint-header">
         <div>
-          <span class="label" style="margin-bottom: 6px;">
-            <i class="fas fa-${statusIcon}" style="color: ${statusColor};"></i>
+          <span class="label seamless-status-tag ${statusClass}">
+            <i class="fas fa-${statusIcon} seamless-status-icon"></i>
             ${item.category}
           </span>
-          <span class="label" style="margin-bottom: 6px;">
-            <i class="fas fa-circle" style="color: ${statusColor}; font-size: 8px;"></i>
+          <span class="label seamless-status-tag ${statusClass}">
+            <i class="fas fa-circle seamless-status-dot"></i>
             ${item.status}
           </span>
         </div>

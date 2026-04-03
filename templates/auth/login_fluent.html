@@ -2,20 +2,20 @@
 {% block content %}
 <div class="auth-wrap">
   <section class="auth-panel">
-    <div style="text-align: center; margin-bottom: 24px;">
-      <div style="font-size: 48px; margin-bottom: 12px; color: var(--primary);">
+    <div class="fluent-auth-hero">
+      <div class="fluent-auth-hero-icon">
         <i class="fas fa-shield-alt"></i>
       </div>
-      <h1 style="font-size: 28px; margin: 0 0 8px;">Welcome to HostelCC</h1>
+      <h1 class="fluent-auth-title">Welcome to HostelCC</h1>
       <p class="muted">Campus living management platform for all roles</p>
     </div>
 
-    <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 16px;">
-      <a href="/accounts/login/?mode=signin" class="button {% if mode != 'signin' %}secondary{% endif %}" style="flex: 1; text-align: center;">
+    <div class="fluent-auth-mode-tabs">
+      <a href="/accounts/login/?mode=signin" class="button fluent-auth-mode-btn {% if mode != 'signin' %}secondary{% endif %}">
         <i class="fas fa-sign-in-alt"></i> Sign In
       </a>
       {% if mode != 'signup' %}
-      <a href="/accounts/login/?mode=signup" class="button {% if mode != 'signup' %}secondary{% endif %}" style="flex: 1; text-align: center;">
+      <a href="/accounts/login/?mode=signup" class="button fluent-auth-mode-btn {% if mode != 'signup' %}secondary{% endif %}">
         <i class="fas fa-user-plus"></i> Sign Up
       </a>
       {% endif %}
@@ -45,13 +45,13 @@
       </div>
       
       <div class="form-actions">
-        <button type="submit" style="width: 100%;">
+        <button type="submit" class="fluent-auth-full-btn">
           <i class="fas fa-arrow-right"></i> Continue
         </button>
-        <button type="submit" name="resend_otp" value="1" class="button secondary" style="width: 100%;">
+        <button type="submit" name="resend_otp" value="1" class="button secondary fluent-auth-full-btn">
           <i class="fas fa-redo"></i> Resend Code
         </button>
-        <a href="/accounts/forgot-password/" class="button secondary" style="width: 100%; text-align: center;">
+        <a href="/accounts/forgot-password/" class="button secondary fluent-auth-full-btn fluent-auth-text-center">
           <i class="fas fa-key"></i> Forgot Password?
       </a>
     </form>
@@ -63,7 +63,7 @@
       <input type="hidden" name="stage" value="otp-verify" />
       <input type="hidden" name="email" value="{{ email }}" />
       
-      <div class="success" style="margin-bottom: 16px;">
+      <div class="success fluent-auth-success-block">
         <i class="fas fa-info-circle"></i>
         Verification code sent to <strong>{{ email }}</strong>
       </div>
@@ -72,11 +72,11 @@
       <input type="text" id="otp_code" name="otp" required autofocus placeholder="000000" maxlength="6" />
       <p class="hint">Enter the 6-digit code from your email</p>
       
-      <button type="submit" style="width: 100%; margin-top: 16px;">
+      <button type="submit" class="fluent-auth-full-btn fluent-auth-mt-16">
         <i class="fas fa-check"></i> Verify Code
       </button>
       
-      <button type="submit" name="resend_otp" value="1" class="button secondary" style="width: 100%; margin-top: 8px;">
+      <button type="submit" name="resend_otp" value="1" class="button secondary fluent-auth-full-btn fluent-auth-mt-8">
         <i class="fas fa-redo"></i> Resend Code
       </button>
     </form>
@@ -88,13 +88,13 @@
       <input type="hidden" name="stage" value="signup-details" />
       <input type="hidden" name="email" value="{{ email }}" />
       
-      <div class="success" style="margin-bottom: 16px;">
+      <div class="success fluent-auth-success-block">
         <i class="fas fa-check-circle"></i>
         Email verified: <strong>{{ email }}</strong>
       </div>
 
-      <h3 style="font-weight: 600; margin: 20px 0 12px; display: flex; align-items: center; gap: 8px;">
-        <i class="fas fa-user" style="color: var(--primary);"></i>
+      <h3 class="fluent-auth-section-title">
+        <i class="fas fa-user icon-primary"></i>
         Personal Information
       </h3>
       
@@ -121,8 +121,8 @@
       </div>
 
       {% if email|lower|cut:' '|slice:'-17:' == '@vitstudent.ac.in' %}
-      <h3 style="font-weight: 600; margin: 20px 0 12px; display: flex; align-items: center; gap: 8px;">
-        <i class="fas fa-graduation-cap" style="color: var(--success);"></i>
+      <h3 class="fluent-auth-section-title">
+        <i class="fas fa-graduation-cap icon-success"></i>
         Student Details
       </h3>
       
@@ -159,8 +159,8 @@
         </div>
       </div>
       {% else %}
-      <h3 style="font-weight: 600; margin: 20px 0 12px; display: flex; align-items: center; gap: 8px;">
-        <i class="fas fa-briefcase" style="color: var(--primary);"></i>
+      <h3 class="fluent-auth-section-title">
+        <i class="fas fa-briefcase icon-primary"></i>
         Staff Details
       </h3>
       
@@ -206,7 +206,7 @@
       </div>
       {% endif %}
 
-      <button type="submit" style="width: 100%; margin-top: 20px;">
+      <button type="submit" class="fluent-auth-full-btn fluent-auth-mt-20">
         <i class="fas fa-user-check"></i> Create Account
       </button>
     </form>
@@ -218,13 +218,13 @@
       <input type="hidden" name="stage" value="set-password" />
       <input type="hidden" name="email" value="{{ email }}" />
 
-      <div class="success" style="margin-bottom: 16px;">
+      <div class="success fluent-auth-success-block">
         <i class="fas fa-check-circle"></i>
         Account created successfully!
       </div>
 
-      <h3 style="font-weight: 600; margin: 20px 0 12px; display: flex; align-items: center; gap: 8px;">
-        <i class="fas fa-lock" style="color: var(--primary);"></i>
+      <h3 class="fluent-auth-section-title">
+        <i class="fas fa-lock icon-primary"></i>
         Set Your Password
       </h3>
 
@@ -235,14 +235,14 @@
       <label for="password_confirm">Confirm Password</label>
       <input id="password_confirm" type="password" name="password_confirm" required />
 
-      <button type="submit" style="width: 100%; margin-top: 16px;">
+      <button type="submit" class="fluent-auth-full-btn fluent-auth-mt-16">
         <i class="fas fa-save"></i> Set Password
       </button>
     </form>
     {% endif %}
 
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); text-align: center;">
-      <p class="muted" style="font-size: 12px; margin: 0;">
+    <div class="fluent-auth-footer">
+      <p class="muted fluent-auth-footer-text">
         By signing in, you agree to our terms of service and privacy policy.
       </p>
     </div>
@@ -271,6 +271,87 @@
   input[type="tel"],
   select {
     margin-bottom: 12px;
+  }
+
+  .fluent-auth-hero {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .fluent-auth-hero-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    color: var(--primary);
+  }
+
+  .fluent-auth-title {
+    font-size: 28px;
+    margin: 0 0 8px;
+  }
+
+  .fluent-auth-mode-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 16px;
+  }
+
+  .fluent-auth-mode-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .fluent-auth-full-btn {
+    width: 100%;
+  }
+
+  .fluent-auth-text-center {
+    text-align: center;
+  }
+
+  .fluent-auth-success-block {
+    margin-bottom: 16px;
+  }
+
+  .fluent-auth-section-title {
+    font-weight: 600;
+    margin: 20px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .icon-primary {
+    color: var(--primary);
+  }
+
+  .icon-success {
+    color: var(--success);
+  }
+
+  .fluent-auth-mt-8 {
+    margin-top: 8px;
+  }
+
+  .fluent-auth-mt-16 {
+    margin-top: 16px;
+  }
+
+  .fluent-auth-mt-20 {
+    margin-top: 20px;
+  }
+
+  .fluent-auth-footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    text-align: center;
+  }
+
+  .fluent-auth-footer-text {
+    font-size: 12px;
+    margin: 0;
   }
 </style>
 {% endblock %}
