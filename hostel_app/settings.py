@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "complaints",
     "discipline",
     "checkout",
+    "cloakroom",
 ]
 
 MIDDLEWARE = [

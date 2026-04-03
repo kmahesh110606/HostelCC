@@ -203,6 +203,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "room_no": student.room_no,
             "mess_allotment": student.mess_allotment,
             "mess_caterer_name": student.mess_caterer.name if student.mess_caterer else "",
+            "mess_change_unlocked": student.mess_change_unlocked,
+            "cloakroom_unlocked": student.cloakroom_unlocked,
         }
 
     def get_discipline_alert(self, obj):

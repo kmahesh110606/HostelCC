@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .cloakroom-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+  }
+
+  .cloakroom-card {
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+  }
+
+  .cloakroom-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .cloakroom-row {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    background: color-mix(in srgb, var(--panel) 88%, white 12%);
+  }
+
+  .cloakroom-status {
+    font-weight: 700;
+  }
+
+  .cloakroom-status.submitted {
+    color: #8a5b00;
+  }
+
+  .cloakroom-status.returned {
+    color: #0f6a2c;
+  }
+</style>
+
+<div class="tabs">
+  <section class="tab">
+    <h2>Cloak Room</h2>
+    <p class="muted">Track submitted items with token numbers and storage room mapping.</p>
+
+    {% if student and not student.cloakroom_unlocked %}
+    <p class="muted">Cloak room access is currently locked by admin for your profile.</p>
+    {% endif %}
+
+    <div class="cloakroom-grid">
+      {% if can_manage_cloakroom %}
+      <article class="cloakroom-card">
+        <h3>Staff: Submit Item</h3>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="submit_item" />
+          <label for="qr_text">Student QR Text</label>
+          <textarea id="qr_text" name="qr_text" rows="3" required placeholder='{{ sample_qr }}'></textarea>
+
+          <label for="item_name">Item Name</label>
+          <input id="item_name" name="item_name" placeholder="Backpack / Laptop / Suitcase" required />
+
+          <label for="storage_room_no">Storage Room No</label>
+          <input id="storage_room_no" name="storage_room_no" placeholder="CR-1" required />
+
+          <label for="notes">Notes (optional)</label>
+          <textarea id="notes" name="notes" rows="2"></textarea>
+
+          <button type="submit">Submit and Generate Token</button>
+        </form>
+      </article>
+
+      <article class="cloakroom-card">
+        <h3>Staff: Return Item</h3>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="return_item" />
+          <label for="token_no">Token No</label>
+          <input id="token_no" name="token_no" type="number" min="1" required />
+
+          <label for="return_notes">Return Notes (optional)</label>
+          <textarea id="return_notes" name="return_notes" rows="2"></textarea>
+
+          <button type="submit" class="secondary">Mark Returned</button>
+        </form>
+      </article>
+      {% endif %}
+    </div>
+
+    <section class="cloakroom-card" style="margin-top: 14px;">
+      <h3>Recent Entries</h3>
+      {% if entries %}
+      <div class="cloakroom-list">
+        {% for entry in entries %}
+        <div class="cloakroom-row">
+          <div><strong>Token #{{ entry.token_no }}</strong> - {{ entry.item_name }}</div>
+          <div class="muted">Student: {{ entry.student.roll_no }} - {{ entry.student.name }}</div>
+          <div class="muted">Submitted from room {{ entry.student.room_no }} | Stored in {{ entry.storage_room_no }}</div>
+          <div class="muted">Submitted at {{ entry.submitted_at|date:'d M, h:i A' }}</div>
+          {% if entry.returned_at %}
+          <div class="muted">Returned at {{ entry.returned_at|date:'d M, h:i A' }}</div>
+          {% endif %}
+          <div class="cloakroom-status {% if entry.status == 'RETURNED' %}returned{% else %}submitted{% endif %}">{{ entry.get_status_display }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">No cloak room records available.</p>
+      {% endif %}
+    </section>
+  </section>
+</div>
+{% endblock %}

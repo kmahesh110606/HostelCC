@@ -22,6 +22,7 @@ class Student(models.Model):
     )
     mess_allotment = models.CharField(max_length=20, choices=MESS_TYPE_CHOICES, default=DEFAULT_MESS_TYPE, db_index=True)
     mess_change_unlocked = models.BooleanField(default=False)
+    cloakroom_unlocked = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["roll_no"]

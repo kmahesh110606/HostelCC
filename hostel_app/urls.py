@@ -30,6 +30,7 @@ urlpatterns = [
     path("mess/", include("mess.web_urls")),
     path("laundry/", include("laundry.web_urls")),
     path("checkout/", include("checkout.web_urls")),
+    path("cloakroom/", include("cloakroom.web_urls")),
     path("notifications/", notification_panel, name="notification-panel"),
     path("", home, name="home"),
     path("dashboard/", dashboard_router, name="dashboard-router"),
@@ -41,6 +42,7 @@ urlpatterns = [
     path("api/complaints/", include("complaints.urls")),
     path("api/discipline/", include("discipline.urls")),
     path("api/checkout/", include("checkout.urls")),
+    path("api/cloakroom/", include("cloakroom.urls")),
 ]
 
 if settings.DEBUG:

@@ -644,6 +644,7 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
             student_schedule = _get_or_create_schedule_for_student(student)
 
     is_laundry_manager = _is_laundry_manager_or_admin(request.user)
+    is_admin = _is_admin(request.user)
 
     if request.method == "POST":
         action = request.POST.get("action", "").strip()
@@ -831,6 +832,8 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
             holiday_dates=holiday_dates,
         )
 
+    token_assignment_rows = _get_token_assignment_rows(block_filter=block_filter) if is_laundry_manager else []
+
     student_qr_text = ""
     if student_schedule:
         student_email = (request.user.email or request.user.username or "").strip().lower()
@@ -914,8 +917,10 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
             "student_schedule": student_schedule,
             "student_qr_text": student_qr_text,
             "is_laundry_manager": is_laundry_manager,
+            "is_admin": is_admin,
             "manager_schedules": manager_schedules,
             "manager_block_ranges_today": manager_block_ranges_today,
+            "token_assignment_rows": token_assignment_rows,
             "block_filter": block_filter,
             "status_filter": status_filter,
             "sort_by": sort_by,
@@ -935,6 +940,39 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
             "admin_calendar_year": calendar_year,
         },
     )
+
+
+@login_required
+def download_laundry_token_tags(request: HttpRequest) -> HttpResponse:
+    if not _is_admin(request.user):
+        messages.error(request, "Only admin can download token tags.")
+        return redirect("laundry-portal")
+
+    block_name = _normalize_block_name(request.GET.get("block_name"))
+    token_start_raw = (request.GET.get("start") or "1000").strip()
+    token_end_raw = (request.GET.get("end") or "2000").strip()
+
+    if not block_name:
+        messages.error(request, "Please choose a block before downloading token tags.")
+        return redirect("laundry-portal")
+
+    try:
+        token_start = int(token_start_raw)
+        token_end = int(token_end_raw)
+    except ValueError:
+        messages.error(request, "Token range must be numeric.")
+        return redirect("laundry-portal")
+
+    if token_start < 1000 or token_end > 2000 or token_start > token_end:
+        messages.error(request, "Token range must stay within 1000-2000.")
+        return redirect("laundry-portal")
+
+    html = _build_token_tag_download_html(block_name, token_start, token_end)
+    response = HttpResponse(html, content_type="text/html; charset=utf-8")
+    response["Content-Disposition"] = (
+        f'attachment; filename="laundry-token-tags-{block_name}-{token_start:04d}-{token_end:04d}.html"'
+    )
+    return response
 
 
 @login_required

@@ -100,6 +100,10 @@
         <label>Allotted Mess Caterer</label>
         <input value="{% if student and student.mess_caterer %}{{ student.mess_caterer.name }}{% else %}N/A{% endif %}" disabled />
       </div>
+      <div>
+        <label>Cloak Room Access</label>
+        <input value="{% if student and student.cloakroom_unlocked %}Unlocked{% else %}Locked{% endif %}" disabled />
+      </div>
     </div>
 
     {% if student %}
@@ -166,6 +170,41 @@
         {% csrf_token %}
         <input type="hidden" name="action" value="lock_all_mess_changes" />
         <button type="submit" class="secondary"><i class="ms-Icon ms-Icon--Lock"></i> Lock All Students</button>
+      </form>
+    </div>
+
+    <hr style="margin: 18px 0; border: 0; border-top: 1px solid var(--line);" />
+    <h2><i class="ms-Icon ms-Icon--BoxMultiplySolid"></i> Admin: Cloak Room Access</h2>
+    <p class="muted">Enable or disable cloak room service access per student or in bulk.</p>
+    <form method="post" class="profile-detail-admin-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="set_cloakroom_unlock" />
+      <div>
+        <label for="student_id_cloakroom">Student</label>
+        <select id="student_id_cloakroom" name="student_id" required>
+          <option value="">Select student</option>
+          {% for s in students_for_admin %}
+          <option value="{{ s.id }}">{{ s.roll_no }} - {{ s.name }} ({{ s.block.block_name }}) {% if s.cloakroom_unlocked %}[UNLOCKED]{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="checkbox-item">
+        <input type="checkbox" id="cloakroom_unlocked" name="cloakroom_unlocked" checked />
+        <label for="cloakroom_unlocked">Unlock selected student</label>
+      </div>
+      <button type="submit"><i class="ms-Icon ms-Icon--Accept"></i> Update Cloak Room Access</button>
+    </form>
+
+    <div class="profile-detail-admin-row">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="unlock_all_cloakroom" />
+        <button type="submit"><i class="ms-Icon ms-Icon--Unlock"></i> Unlock Cloak Room for All</button>
+      </form>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="lock_all_cloakroom" />
+        <button type="submit" class="secondary"><i class="ms-Icon ms-Icon--Lock"></i> Lock Cloak Room for All</button>
       </form>
     </div>
   </section>

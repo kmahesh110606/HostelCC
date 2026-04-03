@@ -44,10 +44,16 @@ class StudentAdmin(admin.ModelAdmin):
         "mess_caterer",
         "mess_allotment",
         "mess_change_unlocked",
+        "cloakroom_unlocked",
     )
     search_fields = ("roll_no", "name", "mess_caterer__name")
-    list_filter = ("block", "mess_caterer", "mess_allotment", "mess_change_unlocked")
-    actions = ["unlock_mess_changes", "lock_mess_changes"]
+    list_filter = ("block", "mess_caterer", "mess_allotment", "mess_change_unlocked", "cloakroom_unlocked")
+    actions = [
+        "unlock_mess_changes",
+        "lock_mess_changes",
+        "unlock_cloakroom",
+        "lock_cloakroom",
+    ]
 
     def unlock_mess_changes(self, request, queryset):
         updated = queryset.update(mess_change_unlocked=True)
@@ -60,3 +66,15 @@ class StudentAdmin(admin.ModelAdmin):
         self.message_user(request, f"Locked mess change for {updated} student(s).")
 
     lock_mess_changes.short_description = "Lock mess change for selected students"
+
+    def unlock_cloakroom(self, request, queryset):
+        updated = queryset.update(cloakroom_unlocked=True)
+        self.message_user(request, f"Unlocked cloak room for {updated} student(s).")
+
+    unlock_cloakroom.short_description = "Unlock cloak room for selected students"
+
+    def lock_cloakroom(self, request, queryset):
+        updated = queryset.update(cloakroom_unlocked=False)
+        self.message_user(request, f"Locked cloak room for {updated} student(s).")
+
+    lock_cloakroom.short_description = "Lock cloak room for selected students"

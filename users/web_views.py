@@ -545,6 +545,24 @@ def profile_page(request: HttpRequest) -> HttpResponse:
             messages.success(request, f"Locked mess change for {updated} student(s).")
             return redirect("profile")
 
+        if action == "unlock_all_cloakroom":
+            if request.user.role != User.Role.ADMIN:
+                messages.error(request, "Only admin can unlock cloak room for all students.")
+                return redirect("profile")
+
+            updated = Student.objects.update(cloakroom_unlocked=True)
+            messages.success(request, f"Unlocked cloak room for {updated} student(s).")
+            return redirect("profile")
+
+        if action == "lock_all_cloakroom":
+            if request.user.role != User.Role.ADMIN:
+                messages.error(request, "Only admin can lock cloak room for all students.")
+                return redirect("profile")
+
+            updated = Student.objects.update(cloakroom_unlocked=False)
+            messages.success(request, f"Locked cloak room for {updated} student(s).")
+            return redirect("profile")
+
         if action == "archive_mess_menu_snapshot":
             if request.user.role not in {User.Role.ADMIN, User.Role.SUPERVISOR}:
                 messages.error(request, "Only admin or supervisor can archive the mess menu.")
@@ -602,6 +620,27 @@ def profile_page(request: HttpRequest) -> HttpResponse:
                 messages.success(request, f"Unlocked mess change for {target.roll_no}.")
             else:
                 messages.success(request, f"Locked mess change for {target.roll_no}.")
+            return redirect("profile")
+
+        if action == "set_cloakroom_unlock":
+            if request.user.role != User.Role.ADMIN:
+                messages.error(request, "Only admin can update cloak room access.")
+                return redirect("profile")
+
+            student_id = request.POST.get("student_id", "").strip()
+            can_use = request.POST.get("cloakroom_unlocked") == "on"
+            target = Student.objects.filter(id=student_id).first()
+
+            if not target:
+                messages.error(request, "Student not found.")
+                return redirect("profile")
+
+            target.cloakroom_unlocked = can_use
+            target.save(update_fields=["cloakroom_unlocked"])
+            if can_use:
+                messages.success(request, f"Unlocked cloak room for {target.roll_no}.")
+            else:
+                messages.success(request, f"Locked cloak room for {target.roll_no}.")
             return redirect("profile")
 
     available_mess_caterers = []
@@ -664,6 +703,7 @@ def dashboard_router(request: HttpRequest) -> HttpResponse:
 
     student = resolve_student_for_user(request.user)
     if student:
+        context["student"] = student
         active_case = (
             DisciplineCase.objects.filter(
                 student=student,
