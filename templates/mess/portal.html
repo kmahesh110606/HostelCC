@@ -268,8 +268,8 @@
 
 <div class="mess-shell">
   <section class="tab mess-tab">
-    <span class="label">Mess Menu</span>
-    <h2>Weekly Menu</h2>
+    <span class="label"><svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M3.2 3.73a1.9 1.9 0 0 1 3.09-1.31 2 2 0 0 1 2.43 0 1.9 1.9 0 0 1 3.09 1.3c.08.98.19 2.49.19 3.78a4.5 4.5 0 0 1-2.18 3.85c-.22.14-.28.3-.27.39.13 1.93.45 6.95.45 7.76a2.5 2.5 0 0 1-5 0c0-.8.32-5.83.45-7.76 0-.09-.05-.25-.27-.39A4.5 4.5 0 0 1 3 7.5c0-1.3.1-2.8.2-3.77Zm6.3 3.52a.75.75 0 0 1-1.5 0V4a.5.5 0 0 0-1 0v3.25a.75.75 0 0 1-1.5 0V3.92a.42.42 0 0 0-.42-.42.4.4 0 0 0-.4.36A46 46 0 0 0 4.5 7.5a3 3 0 0 0 1.45 2.57c.55.33 1.05.96 1 1.77-.13 1.98-.45 6.92-.45 7.66a1 1 0 1 0 2 0c0-.74-.32-5.68-.45-7.66-.05-.81.45-1.44 1-1.77A3 3 0 0 0 10.5 7.5a46 46 0 0 0-.19-3.64.4.4 0 0 0-.4-.36.42.42 0 0 0-.41.42v3.33Zm3.5.5A5.75 5.75 0 0 1 18.75 2c.41 0 .75.34.75.75v8.5c0 .32.1 1.9.22 3.64l.01.08c.13 1.91.27 3.99.27 4.53a2.5 2.5 0 0 1-5 0c0-.52.13-2.61.25-4.54l.17-2.6.03-.36h-.7c-.97 0-1.75-.78-1.75-1.75v-2.5Zm4 3.55-.02.32a797.81 797.81 0 0 0-.48 7.88 1 1 0 1 0 2 0c0-.48-.14-2.53-.27-4.5v-.11a119.4 119.4 0 0 1-.23-3.64V3.57a4.25 4.25 0 0 0-3.5 4.18v2.5c0 .14.11.25.25.25h1.5a.75.75 0 0 1 .75.8Z"/></svg> Mess Menu</span>
+    <h2><i class="ms-Icon ms-Icon--BookOpen"></i> Weekly Menu</h2>
     <p class="muted">Select a day to view breakfast, lunch, snacks, and dinner.</p>
 
     {% if student %}
@@ -281,7 +281,7 @@
         <option value="{{ mess_type }}" {% if mess_type == selected_mess_type %}selected{% endif %}>{{ mess_type }}</option>
         {% endfor %}
       </select>
-      <button type="submit" class="button secondary">Load Menu Type</button>
+      <button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Refresh"></i> Load Menu Type</button>
     </form>
     {% endif %}
 
@@ -325,13 +325,13 @@
   </section>
 
   <section class="tab mess-tab">
-    <span class="label">Feedback And Polls</span>
-    <h2>{{ month }} Student Actions</h2>
+    <span class="label"><i class="ms-Icon ms-Icon--People"></i> Feedback And Polls</span>
+    <h2><i class="ms-Icon ms-Icon--AllApps"></i> {{ month }} Student Actions</h2>
     <p class="muted">Rate food and vote on the meeting poll from one place.</p>
 
     <div class="action-grid" style="margin-top: 10px;">
       <article class="action-card">
-        <h3>Rate Food</h3>
+        <h3><i class="ms-Icon ms-Icon--Like"></i> Rate Food</h3>
         <p class="muted">Choose day, meal time, and menu item from dropdowns before rating.</p>
 
         <form method="post" style="margin-top: 8px;">
@@ -384,12 +384,12 @@
             <input id="rate-comment" name="comment" placeholder="Share what worked or what should improve" />
           </div>
 
-          <button type="submit" style="margin-top: 12px;">Submit Rating</button>
+          <button type="submit" style="margin-top: 12px;"><i class="ms-Icon ms-Icon--Send"></i> Submit Rating</button>
         </form>
       </article>
 
       <article class="action-card">
-        <h3>Poll For Mess Meeting</h3>
+        <h3><i class="ms-Icon ms-Icon--AllApps"></i> Poll For Mess Meeting</h3>
         <p class="muted">Open the poll modal to like additions and dislike removals.</p>
         <button
           type="button"
@@ -397,7 +397,7 @@
           class="poll-trigger"
           {% if not poll_is_active %}disabled{% endif %}
         >
-          {% if poll_is_active %}Open Active Poll{% else %}Poll Not Active Yet{% endif %}
+          <i class="ms-Icon ms-Icon--AllApps"></i> {% if poll_is_active %}Open Active Poll{% else %}Poll Not Active Yet{% endif %}
         </button>
         <p class="inline-note">
           {% if poll_is_active %}
@@ -478,7 +478,7 @@
           <input type="hidden" name="action" value="vote_poll" />
           <input type="hidden" name="option_id" value="{{ option.id }}" />
           <span>{{ option.item_name }} ({{ option.total_votes }})</span>
-          {% if student %}<button type="submit" class="button secondary">Like</button>{% endif %}
+          {% if student %}<button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Like"></i> Like</button>{% endif %}
         </form>
         {% empty %}
         <p class="muted">No add-item options yet.</p>
@@ -493,7 +493,7 @@
           <input type="hidden" name="action" value="vote_poll" />
           <input type="hidden" name="option_id" value="{{ option.id }}" />
           <span>{{ option.item_name }} ({{ option.total_votes }})</span>
-          {% if student %}<button type="submit" class="button secondary">Dislike</button>{% endif %}
+          {% if student %}<button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Dislike"></i> Dislike</button>{% endif %}
         </form>
         {% empty %}
         <p class="muted">No remove-item options yet.</p>

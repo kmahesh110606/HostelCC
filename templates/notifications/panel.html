@@ -107,8 +107,8 @@
 </style>
 <div class="tabs notifications-layout{% if not is_admin %} notifications-layout--single{% endif %}">
   <section class="tab notifications-panel">
-    <span class="label"><i class="fas fa-bell"></i> Notification Panel</span>
-    <h2>Campus Alerts</h2>
+    <span class="label"><svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M11.75 7.5a.75.75 0 0 0 0 1.5 4.4 4.4 0 0 1 3.4 1.76.75.75 0 1 0 1.24-.86 5.9 5.9 0 0 0-4.64-2.4Zm-2.25-3a2.5 2.5 0 0 1 5 0v.88a8.25 8.25 0 0 1 5.75 7.87c0 .41-.34.75-.75.75h-15a.75.75 0 0 1-.75-.75c0-3.68 2.42-6.8 5.75-7.86V4.5Zm3.5 0a1 1 0 1 0-2 0v.56a8.33 8.33 0 0 1 2 0V4.5Zm-7.7 8h13.4a6.73 6.73 0 0 0-6.68-6 6.77 6.77 0 0 0-6.73 6ZM4 15a2 2 0 1 0 0 4h16a2 2 0 1 0 0-4H4Zm-.5 2c0-.28.22-.5.5-.5h16a.5.5 0 0 1 0 1H4a.5.5 0 0 1-.5-.5Z"/></svg> Notification Panel</span>
+    <h2><svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M11.75 7.5a.75.75 0 0 0 0 1.5 4.4 4.4 0 0 1 3.4 1.76.75.75 0 1 0 1.24-.86 5.9 5.9 0 0 0-4.64-2.4Zm-2.25-3a2.5 2.5 0 0 1 5 0v.88a8.25 8.25 0 0 1 5.75 7.87c0 .41-.34.75-.75.75h-15a.75.75 0 0 1-.75-.75c0-3.68 2.42-6.8 5.75-7.86V4.5Zm3.5 0a1 1 0 1 0-2 0v.56a8.33 8.33 0 0 1 2 0V4.5Zm-7.7 8h13.4a6.73 6.73 0 0 0-6.68-6 6.77 6.77 0 0 0-6.73 6ZM4 15a2 2 0 1 0 0 4h16a2 2 0 1 0 0-4H4Zm-.5 2c0-.28.22-.5.5-.5h16a.5.5 0 0 1 0 1H4a.5.5 0 0 1-.5-.5Z"/></svg> Campus Alerts</h2>
     <p class="muted">Reply alerts, mess meeting reminders, and hostel meeting updates are listed here.</p>
 
     <div class="notifications-list">
@@ -121,7 +121,7 @@
         <p class="notification-message">{{ n.message }}</p>
         {% if n.poster %}
           {% if '.pdf' in n.poster.name|lower %}
-          <p style="margin: 0 0 8px;"><a class="button secondary" href="{{ n.poster.url }}" target="_blank" rel="noopener">Open Poster PDF</a></p>
+          <p style="margin: 0 0 8px;"><a class="button secondary" href="{{ n.poster.url }}" target="_blank" rel="noopener"><i class="ms-Icon ms-Icon--Document"></i> Open Poster PDF</a></p>
           {% else %}
           <img src="{{ n.poster.url }}" alt="Notification poster" class="notification-poster" />
           {% endif %}
@@ -133,7 +133,7 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="delete" />
             <input type="hidden" name="notification_id" value="{{ n.id }}" />
-            <button type="submit" class="button secondary">Delete</button>
+            <button type="submit" class="button secondary"><i class="ms-Icon ms-Icon--Delete"></i> Delete</button>
           </form>
         </div>
         {% endif %}
@@ -146,8 +146,8 @@
 
   {% if is_admin %}
   <section class="tab">
-    <span class="label"><i class="fas fa-pen"></i> Admin</span>
-    <h2>Create Notification</h2>
+    <span class="label"><i class="ms-Icon ms-Icon--Compose"></i> Admin</span>
+    <h2><i class="ms-Icon ms-Icon--Compose"></i> Create Notification</h2>
     <p class="muted">This publishes to both website and Flutter app dashboards.</p>
 
     <form method="post" enctype="multipart/form-data" style="display: grid; gap: 10px; margin-top: 12px;">
@@ -190,7 +190,7 @@
         </div>
       </div>
       <div class="form-actions">
-        <button type="submit"><i class="fas fa-paper-plane"></i> Publish</button>
+        <button type="submit"><i class="ms-Icon ms-Icon--Send"></i> Publish</button>
       </div>
     </form>
   </section>
