@@ -31,6 +31,8 @@
       --warning: #FFB900;
       --error: #E81123;
       --info: #0078D4;
+      --layout-max-width: 1680px;
+      --layout-gutter: 24px;
       
       /* Active mode (light by default) */
       --bg: var(--light-bg);
@@ -75,6 +77,18 @@
     }
 
     * { box-sizing: border-box; }
+    html,
+    body {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    img,
+    svg {
+      max-width: 100%;
+    }
+
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -84,6 +98,7 @@
     }
     
     .navbar {
+      width: 100%;
       background: var(--panel);
       border-bottom: 1px solid var(--line);
       padding: 12px 0;
@@ -94,13 +109,14 @@
     }
     
     .nav-inner {
-      max-width: 1680px;
+      width: min(100%, var(--layout-max-width));
       margin: 0 auto;
-      padding: 0 24px;
+      padding: 0 var(--layout-gutter);
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 20px;
+      min-width: 0;
     }
 
     .nav-brand-row {
@@ -207,6 +223,20 @@
       justify-content: center;
       box-shadow: none;
       cursor: pointer;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .nav-toggle:hover,
+    .nav-toggle:focus,
+    .nav-toggle:focus-visible,
+    .nav-toggle:active {
+      background: transparent !important;
+      border-color: transparent !important;
+      outline: none !important;
+      box-shadow: none !important;
     }
 
     .ms-Icon {
@@ -312,9 +342,15 @@
     }
 
     .shell {
-      max-width: 1680px;
+      width: min(100%, var(--layout-max-width));
       margin: 20px auto;
-      padding: 0 24px;
+      padding: 0 var(--layout-gutter);
+      min-width: 0;
+    }
+
+    .shell > * {
+      max-width: 100%;
+      min-width: 0;
     }
     
     .tabs {
@@ -396,7 +432,7 @@
 
     .auth-panel {
       width: 100%;
-      max-width: 500px;
+      max-width: min(500px, 100%);
       padding: 30px;
       background: var(--panel);
       border: 1px solid var(--line);
@@ -554,11 +590,14 @@
     }
 
     @media (max-width: 768px) {
+      :root {
+        --layout-gutter: 16px;
+      }
+
       .nav-inner {
         flex-wrap: wrap;
         align-items: flex-start;
         gap: 10px;
-        padding: 0 16px;
       }
 
       .nav-brand-row {
@@ -579,7 +618,6 @@
         width: 100%;
         display: none;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        grid-auto-rows: 86px;
         gap: 8px;
         align-items: stretch;
       }
@@ -590,8 +628,9 @@
 
       .nav-links > * {
         width: 100%;
-        min-height: 86px;
-        height: 86px;
+        min-height: 0;
+        height: auto;
+        aspect-ratio: 1 / 1;
         margin: 0;
       }
 
@@ -634,7 +673,7 @@
       
       .auth-panel {
         padding: 20px;
-        margin: 16px;
+        margin: 0;
       }
     }
   </style>
