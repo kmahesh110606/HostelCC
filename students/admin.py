@@ -47,3 +47,16 @@ class StudentAdmin(admin.ModelAdmin):
     )
     search_fields = ("roll_no", "name", "mess_caterer__name")
     list_filter = ("block", "mess_caterer", "mess_allotment", "mess_change_unlocked")
+    actions = ["unlock_mess_changes", "lock_mess_changes"]
+
+    def unlock_mess_changes(self, request, queryset):
+        updated = queryset.update(mess_change_unlocked=True)
+        self.message_user(request, f"Unlocked mess change for {updated} student(s).")
+
+    unlock_mess_changes.short_description = "Unlock mess change for selected students"
+
+    def lock_mess_changes(self, request, queryset):
+        updated = queryset.update(mess_change_unlocked=False)
+        self.message_user(request, f"Locked mess change for {updated} student(s).")
+
+    lock_mess_changes.short_description = "Lock mess change for selected students"

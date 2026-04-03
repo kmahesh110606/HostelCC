@@ -198,6 +198,13 @@
     line-height: 1;
   }
 
+  .action-pill svg.vote-icon {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+    transition: all 0.15s ease;
+  }
+
   .action-pill:hover {
     border-color: color-mix(in srgb, var(--line) 55%, #4a4a4a 45%);
   }
@@ -857,18 +864,40 @@
 
             if (upButton) {
               const countNode = upButton.querySelector('.vote-count');
+              const iconSvg = upButton.querySelector('svg.vote-icon');
               if (countNode) {
                 countNode.textContent = data.upvotes;
               }
               upButton.classList.toggle('active', data.user_vote === 'up');
+              if (iconSvg) {
+                const pathNode = iconSvg.querySelector('path');
+                if (data.user_vote === 'up') {
+                  iconSvg.classList.add('filled');
+                  pathNode.setAttribute('d', 'M15.06 9c.46-1.42.69-2.67.69-3.75 0-2.4-.94-4.25-2.5-4.25-.85 0-1.11.5-1.44 1.75a64.9 64.9 0 0 1-.77 2.72L8.17 9.95a5.88 5.88 0 0 1-2.85 2.33l-1.26.48c-.8.3-1.25 1.13-1.09 1.97l.69 3.54c.16.86.82 1.54 1.67 1.75l8.25 2.03a4.75 4.75 0 0 0 5.73-3.44l1.58-6.18A2.75 2.75 0 0 0 18.22 9h-3.16Z');
+                } else {
+                  iconSvg.classList.remove('filled');
+                  pathNode.setAttribute('d', 'M16.5 5.2c0-2.44-1.14-4.2-3-4.2-1.03 0-1.39.6-1.75 2l-.15.57a268.49 268.49 0 0 1-.56 1.9L8.17 9.95a5.88 5.88 0 0 1-2.85 2.33l-.47.18a2.75 2.75 0 0 0-1.72 3.1l.4 2.08a3.25 3.25 0 0 0 2.42 2.54l7.63 1.87a4.75 4.75 0 0 0 5.73-3.44l1.42-5.55A3.25 3.25 0 0 0 17.58 9h-1.83c.5-1.63.75-2.89.75-3.8ZM4.6 15.27c-.11-.6.21-1.2.78-1.4l.47-.19a7.38 7.38 0 0 0 3.59-2.92l2.86-4.48c.1-.15.16-.3.2-.46a261.43 261.43 0 0 0 .7-2.43c.19-.73.28-.89.3-.89.86 0 1.5.99 1.5 2.7 0 .89-.33 2.34-.98 4.32-.17.48.2.98.7.98h2.86a1.75 1.75 0 0 1 1.7 2.19l-1.42 5.55a3.25 3.25 0 0 1-3.93 2.35l-7.62-1.87A1.75 1.75 0 0 1 5 17.35l-.4-2.08Z');
+                }
+              }
             }
 
             if (downButton) {
               const countNode = downButton.querySelector('.vote-count');
+              const iconSvg = downButton.querySelector('svg.vote-icon');
               if (countNode) {
                 countNode.textContent = data.downvotes;
               }
               downButton.classList.toggle('active', data.user_vote === 'down');
+              if (iconSvg) {
+                const pathNode = iconSvg.querySelector('path');
+                if (data.user_vote === 'down') {
+                  iconSvg.classList.add('filled');
+                  pathNode.setAttribute('d', 'M15.06 14.18c.46 1.43.69 2.68.69 3.76 0 2.4-.94 4.24-2.5 4.24-.8 0-1.08-.45-1.38-1.54l-.27-1.02a264.6 264.6 0 0 0-.56-1.9l-2.87-4.49a5.88 5.88 0 0 0-2.85-2.32l-1.26-.48a1.75 1.75 0 0 1-1.09-1.97l.69-3.54c.16-.86.82-1.55 1.67-1.76l8.25-2.02a4.75 4.75 0 0 1 5.73 3.44l1.58 6.17a2.75 2.75 0 0 1-2.67 3.43h-3.16Z');
+                } else {
+                  iconSvg.classList.remove('filled');
+                  pathNode.setAttribute('d', 'M16.5 17.99c0 2.44-1.14 4.2-3 4.2-.98 0-1.35-.55-1.7-1.8l-.2-.77a267.17 267.17 0 0 0-.56-1.9l-2.87-4.49a5.88 5.88 0 0 0-2.85-2.32l-.47-.18a2.75 2.75 0 0 1-1.72-3.1l.4-2.08A3.25 3.25 0 0 1 5.95 3l7.63-1.87a4.75 4.75 0 0 1 5.73 3.44l1.42 5.55a3.25 3.25 0 0 1-3.15 4.05h-1.83c.5 1.64.75 2.9.75 3.8ZM4.6 7.92c-.11.6.21 1.19.78 1.4l.47.19a7.38 7.38 0 0 1 3.59 2.92l2.86 4.48c.1.14.16.3.2.46l.56 1.92.21.79a2 2 0 0 0 .22.6c.87 0 1.51-.98 1.51-2.7 0-.88-.33-2.33-.98-4.31a.75.75 0 0 1 .7-.99h2.86a1.75 1.75 0 0 0 1.7-2.18l-1.42-5.55a3.25 3.25 0 0 0-3.93-2.35L6.31 4.47c-.67.16-1.17.7-1.3 1.36l-.4 2.1Z');
+                }
+              }
             }
             return;
           }

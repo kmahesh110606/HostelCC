@@ -34,10 +34,16 @@ def _infer_media_type(uploaded_file) -> str:
     if not uploaded_file:
         return Complaint.MediaType.TEXT
 
-    lowered = uploaded_file.name.lower()
-    if lowered.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")):
+    content_type = (getattr(uploaded_file, "content_type", "") or "").lower()
+    if content_type.startswith("image/"):
         return Complaint.MediaType.IMAGE
-    if lowered.endswith((".mp4", ".mov", ".webm", ".mkv")):
+    if content_type.startswith("video/"):
+        return Complaint.MediaType.VIDEO
+
+    lowered = uploaded_file.name.lower()
+    if lowered.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic", ".heif", ".bmp")):
+        return Complaint.MediaType.IMAGE
+    if lowered.endswith((".mp4", ".mov", ".webm", ".mkv", ".m4v", ".3gp")):
         return Complaint.MediaType.VIDEO
     return Complaint.MediaType.TEXT
 
@@ -55,10 +61,14 @@ def _build_community_feed_scope(request: HttpRequest):
     sort_by = request.GET.get("sort", "newest").strip().lower()
 
     replies_qs = ComplaintReply.objects.select_related("author").order_by("created_at")
+    votes_qs = ComplaintVote.objects.filter(user_id=request.user.id).only("user_id", "complaint_id", "value")
     complaints = (
         Complaint.objects.select_related("student", "student__block", "author")
         .annotate(reply_count=Count("replies"))
-        .prefetch_related(Prefetch("replies", queryset=replies_qs))
+        .prefetch_related(
+            Prefetch("replies", queryset=replies_qs),
+            Prefetch("votes", queryset=votes_qs),
+        )
     )
 
     if query:
@@ -135,6 +145,12 @@ def _build_community_item(request: HttpRequest, complaint: Complaint) -> dict:
     elif complaint.student:
         author_name = complaint.student.name
 
+    user_vote = "none"
+    for vote in complaint.votes.all():
+        if vote.user_id == request.user.id:
+            user_vote = "up" if vote.value == ComplaintVote.Value.UPVOTE else "down"
+            break
+
     return {
         "obj": complaint,
         "author_name": author_name,
@@ -146,6 +162,7 @@ def _build_community_item(request: HttpRequest, complaint: Complaint) -> dict:
         or bool(complaint.student and complaint.student.user_id == request.user.id),
         "can_manage": _can_manage_complaint(request.user, complaint),
         "status_label": complaint.status_display_label,
+        "user_vote": user_vote,
     }
 
 

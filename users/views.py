@@ -2,6 +2,7 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
+from django.core.exceptions import ValidationError
 from django.core.cache import cache
 from users.otp_queue import OtpEmailJob, enqueue_otp_email
 from rest_framework import viewsets
@@ -343,18 +344,21 @@ class SignupCompleteView(APIView):
             user.department = ""
             user.assigned_mess_name = ""
 
-            Student.objects.update_or_create(
-                roll_no=reg_no,
-                defaults={
-                    "user": user,
-                    "name": name,
-                    "block": block,
-                    "room": room,
-                    "room_no": room_no,
-                    "mess_allotment": mess_type,
-                    "mess_caterer": mess_caterer,
-                },
-            )
+            try:
+                Student.objects.update_or_create(
+                    roll_no=reg_no,
+                    defaults={
+                        "user": user,
+                        "name": name,
+                        "block": block,
+                        "room": room,
+                        "room_no": room_no,
+                        "mess_allotment": mess_type,
+                        "mess_caterer": mess_caterer,
+                    },
+                )
+            except ValidationError as exc:
+                return Response({"detail": "; ".join(getattr(exc, "messages", [str(exc)]))}, status=400)
         else:
             role = (data.get("role") or "").strip()
             job_title = (data.get("job_title") or "").strip()

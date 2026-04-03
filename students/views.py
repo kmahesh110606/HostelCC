@@ -2,6 +2,7 @@ import csv
 import io
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -39,6 +40,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         decoded = csv_file.read().decode("utf-8")
         reader = csv.DictReader(io.StringIO(decoded))
         created_count = 0
+        error_response = None
 
         with transaction.atomic():
             for row in reader:
@@ -79,17 +81,28 @@ class StudentViewSet(viewsets.ModelViewSet):
                         "first_name": row.get("name", ""),
                     },
                 )
-                Student.objects.update_or_create(
-                    roll_no=row["roll_no"].strip(),
-                    defaults={
-                        "user": user,
-                        "name": row.get("name", ""),
-                        "block": block,
-                        "room_no": row.get("room_no", ""),
-                        "mess_caterer": selected_caterer,
-                        "mess_allotment": mess_type,
-                    },
-                )
+                try:
+                    Student.objects.update_or_create(
+                        roll_no=row["roll_no"].strip(),
+                        defaults={
+                            "user": user,
+                            "name": row.get("name", ""),
+                            "block": block,
+                            "room_no": row.get("room_no", ""),
+                            "mess_caterer": selected_caterer,
+                            "mess_allotment": mess_type,
+                        },
+                    )
+                except ValidationError as exc:
+                    error_response = Response(
+                        {"detail": "; ".join(getattr(exc, "messages", [str(exc)]))},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                    transaction.set_rollback(True)
+                    break
                 created_count += 1
+
+        if error_response:
+            return error_response
 
         return Response({"processed_records": created_count})

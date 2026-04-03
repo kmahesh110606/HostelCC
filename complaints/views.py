@@ -89,10 +89,20 @@ class ComplaintViewSet(viewsets.ModelViewSet):
         media = self.request.FILES.get("media")
         media_type = Complaint.MediaType.TEXT
         if media:
-            lowered = media.name.lower()
-            if lowered.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")):
+            content_type = (getattr(media, "content_type", "") or "").lower()
+            if content_type.startswith("image/"):
                 media_type = Complaint.MediaType.IMAGE
-            elif lowered.endswith((".mp4", ".mov", ".webm", ".mkv")):
+            elif content_type.startswith("video/"):
+                media_type = Complaint.MediaType.VIDEO
+
+            lowered = media.name.lower()
+            if media_type == Complaint.MediaType.TEXT and lowered.endswith(
+                (".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic", ".heif", ".bmp")
+            ):
+                media_type = Complaint.MediaType.IMAGE
+            elif media_type == Complaint.MediaType.TEXT and lowered.endswith(
+                (".mp4", ".mov", ".webm", ".mkv", ".m4v", ".3gp")
+            ):
                 media_type = Complaint.MediaType.VIDEO
 
         serializer.save(author=self.request.user, student=student, media_type=media_type)

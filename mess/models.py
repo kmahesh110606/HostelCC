@@ -30,10 +30,29 @@ class MessMenu(models.Model):
         return f"{self.get_mess_type_display()} - {self.get_week_day_display()}"
 
 
+class MessMenuArchive(models.Model):
+    archived_month = models.CharField(max_length=7, db_index=True)
+    mess_type = models.CharField(max_length=20, choices=MESS_TYPE_CHOICES, default=DEFAULT_MESS_TYPE, db_index=True)
+    week_day = models.CharField(max_length=3, choices=MessMenu.WeekDay.choices, db_index=True)
+    breakfast_items = models.TextField()
+    lunch_items = models.TextField()
+    snacks_items = models.TextField()
+    dinner_items = models.TextField()
+    archived_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-archived_month", "mess_type", "week_day"]
+        unique_together = ("archived_month", "mess_type", "week_day")
+
+    def __str__(self) -> str:
+        return f"{self.archived_month} - {self.get_mess_type_display()} - {self.get_week_day_display()}"
+
+
 class Caterer(models.Model):
     name = models.CharField(max_length=120)
     meal_types = models.CharField(max_length=20, choices=MESS_TYPE_CHOICES)
     block = models.ForeignKey(HostelBlock, on_delete=models.CASCADE, related_name="caterers")
+    student_capacity = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         unique_together = ("name", "block", "meal_types")

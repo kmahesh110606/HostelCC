@@ -5,10 +5,12 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.core.cache import cache
 from users.otp_queue import OtpEmailJob, enqueue_otp_email
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 
 from hostels.models import HostelBlock, Room
 from mess.options import (
@@ -19,7 +21,7 @@ from mess.options import (
     get_all_caterer_names,
     get_allowed_mess_types_for_block,
 )
-from mess.models import Caterer
+from mess.models import Caterer, MessMenu, MessMenuArchive
 from discipline.models import DisciplineCase
 from .models import AppNotification, OTPChallenge
 from students.models import Student
@@ -496,8 +498,68 @@ def profile_page(request: HttpRequest) -> HttpResponse:
             student.mess_caterer = selected_caterer
             student.mess_allotment = selected_caterer.meal_types
             student.mess_change_unlocked = False
-            student.save(update_fields=["mess_caterer", "mess_allotment", "mess_change_unlocked"])
+            try:
+                student.save(update_fields=["mess_caterer", "mess_allotment", "mess_change_unlocked"])
+            except ValidationError as exc:
+                messages.error(request, "; ".join(getattr(exc, "messages", [str(exc)])))
+                return redirect("profile")
             messages.success(request, "Mess caterer updated successfully.")
+            return redirect("profile")
+
+        if action == "unlock_all_mess_changes":
+            if request.user.role != User.Role.ADMIN:
+                messages.error(request, "Only admin can unlock mess changes for all students.")
+                return redirect("profile")
+
+            updated = Student.objects.update(mess_change_unlocked=True)
+            messages.success(request, f"Unlocked mess change for {updated} student(s).")
+            return redirect("profile")
+
+        if action == "lock_all_mess_changes":
+            if request.user.role != User.Role.ADMIN:
+                messages.error(request, "Only admin can lock mess changes for all students.")
+                return redirect("profile")
+
+            updated = Student.objects.update(mess_change_unlocked=False)
+            messages.success(request, f"Locked mess change for {updated} student(s).")
+            return redirect("profile")
+
+        if action == "archive_mess_menu_snapshot":
+            if request.user.role not in {User.Role.ADMIN, User.Role.SUPERVISOR}:
+                messages.error(request, "Only admin or supervisor can archive the mess menu.")
+                return redirect("profile")
+
+            raw_menu_type = (request.POST.get("archive_mess_type") or "").strip()
+            archive_mess_type = canonical_mess_type(raw_menu_type)
+            queryset = MessMenu.objects.all()
+            if archive_mess_type:
+                queryset = queryset.filter(mess_type=archive_mess_type)
+
+            if not queryset.exists():
+                messages.warning(request, "No mess menu rows were found to archive.")
+                return redirect("profile")
+
+            archived_month = timezone.localdate().strftime("%Y-%m")
+            archived_count = 0
+            for menu in queryset:
+                MessMenuArchive.objects.update_or_create(
+                    archived_month=archived_month,
+                    mess_type=menu.mess_type,
+                    week_day=menu.week_day,
+                    defaults={
+                        "breakfast_items": menu.breakfast_items,
+                        "lunch_items": menu.lunch_items,
+                        "snacks_items": menu.snacks_items,
+                        "dinner_items": menu.dinner_items,
+                    },
+                )
+                archived_count += 1
+
+            menu_label = archive_mess_type or "all types"
+            messages.success(
+                request,
+                f"Archived {archived_count} menu row(s) for {menu_label} into {archived_month}.",
+            )
             return redirect("profile")
 
         if action == "set_mess_unlock":
@@ -540,6 +602,7 @@ def profile_page(request: HttpRequest) -> HttpResponse:
             "student": student,
             "available_mess_caterers": available_mess_caterers,
             "students_for_admin": students_for_admin,
+            "admin_mess_types": list(MESS_TYPES.keys()),
         },
     )
 

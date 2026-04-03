@@ -1,5 +1,5 @@
-from datetime import datetime
 import csv
+from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from students.models import Student
 from mess.options import MESS_TYPES, canonical_mess_type
 
-from .models import Caterer, Feedback, MenuPollOption, MenuPollVote, MessMenu
+from .models import Caterer, Feedback, MenuPollOption, MenuPollVote, MessMenu, MessMenuArchive
 
 
 MEAL_SLOTS = ["breakfast", "lunch", "snacks", "dinner"]
@@ -306,6 +306,71 @@ def download_mess_students_csv(request: HttpRequest) -> HttpResponse:
                 user.email if user else "",
                 user.phone_country_code if user else "",
                 user.phone_number if user else "",
+            ]
+        )
+
+    return response
+
+
+@login_required
+def download_mess_menu_csv(request: HttpRequest) -> HttpResponse:
+    if request.user.role not in {"ADMIN", "SUPERVISOR"}:
+        messages.error(request, "Only admin and supervisor can download mess menu reports.")
+        return redirect("dashboard-router")
+
+    mess_type_filter = canonical_mess_type(request.GET.get("mess_type") or request.GET.get("type"))
+    archive_month = (request.GET.get("month") or request.GET.get("archive_month") or "").strip()
+
+    if archive_month:
+        menus = MessMenuArchive.objects.filter(archived_month=archive_month)
+    else:
+        menus = MessMenu.objects.all()
+
+    if mess_type_filter:
+        menus = menus.filter(mess_type=mess_type_filter)
+
+    menus = menus.order_by("mess_type", "week_day")
+
+    file_parts = ["mess_menu"]
+    if mess_type_filter:
+        file_parts.append(mess_type_filter.lower())
+    if archive_month:
+        file_parts.append(archive_month)
+    file_parts.append(datetime.now().strftime("%Y-%m-%d"))
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{"_".join(file_parts)}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "month",
+            "mess_type",
+            "mess_type_label",
+            "week_day",
+            "week_day_label",
+            "breakfast_items",
+            "lunch_items",
+            "snacks_items",
+            "dinner_items",
+            "source",
+        ]
+    )
+
+    for menu in menus:
+        month_value = getattr(menu, "archived_month", "") if archive_month else ""
+        writer.writerow(
+            [
+                month_value,
+                menu.mess_type,
+                menu.get_mess_type_display(),
+                menu.week_day,
+                menu.get_week_day_display(),
+                menu.breakfast_items,
+                menu.lunch_items,
+                menu.snacks_items,
+                menu.dinner_items,
+                "archive" if archive_month else "current",
             ]
         )
 

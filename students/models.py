@@ -36,16 +36,25 @@ class Student(models.Model):
         from mess.models import Caterer
 
         normalized_mess_type = canonical_mess_type(self.mess_allotment) or DEFAULT_MESS_TYPE
-        caterer = (
-            Caterer.objects.filter(block_id=self.block_id, meal_types=normalized_mess_type)
-            .order_by("name", "id")
-            .first()
-        )
+        for caterer in Caterer.objects.filter(block_id=self.block_id, meal_types=normalized_mess_type).order_by(
+            "name", "id"
+        ):
+            if not self._is_caterer_full(caterer):
+                return caterer
 
-        if caterer:
-            return caterer
+        return None
 
-        return Caterer.objects.filter(block_id=self.block_id).order_by("name", "id").first()
+    def _is_caterer_full(self, caterer) -> bool:
+        capacity = getattr(caterer, "student_capacity", None)
+        if not capacity:
+            return False
+
+        occupied = Student.objects.filter(mess_caterer_id=caterer.id).exclude(pk=self.pk).count()
+        return occupied >= capacity
+
+    def _validate_caterer_capacity(self):
+        if self.mess_caterer_id and self._is_caterer_full(self.mess_caterer):
+            raise ValidationError({"mess_caterer": "Selected caterer is full."})
 
     def clean(self):
         super().clean()
@@ -56,13 +65,18 @@ class Student(models.Model):
             if self.mess_caterer.block_id != self.block_id:
                 raise ValidationError({"mess_caterer": "Selected caterer must belong to the student's block."})
 
+        if self.mess_caterer_id:
+            self._validate_caterer_capacity()
+
     def save(self, *args, **kwargs):
         self.mess_allotment = canonical_mess_type(self.mess_allotment) or DEFAULT_MESS_TYPE
+        self.clean()
 
         if self.mess_caterer_id:
             if self.block_id and self.mess_caterer.block_id != self.block_id:
                 raise ValidationError({"mess_caterer": "Selected caterer must belong to the student's block."})
             self.mess_allotment = self.mess_caterer.meal_types
+            self._validate_caterer_capacity()
         else:
             self.mess_caterer = self._get_default_caterer()
             if self.mess_caterer:

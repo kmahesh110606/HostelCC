@@ -120,6 +120,12 @@ class MessChangeRequestSerializer(serializers.ModelSerializer):
                 }
             )
 
+        capacity = getattr(selected_caterer, "student_capacity", None)
+        if capacity:
+            occupied = Student.objects.filter(mess_caterer=selected_caterer).exclude(id=student.id).count()
+            if occupied >= capacity:
+                raise serializers.ValidationError({"requested_caterer_id": "Selected caterer is full."})
+
         attrs["student"] = student
         attrs["requested_mess"] = selected_caterer.name
         return attrs

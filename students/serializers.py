@@ -33,11 +33,18 @@ class StudentSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         block = attrs.get("block") or getattr(self.instance, "block", None)
         mess_caterer = attrs.get("mess_caterer", getattr(self.instance, "mess_caterer", None))
+        current_student_id = getattr(self.instance, "id", None)
 
         if mess_caterer and block and mess_caterer.block_id != block.id:
             raise serializers.ValidationError({"mess_caterer": "Selected caterer must belong to the student's block."})
 
         if mess_caterer:
             attrs["mess_allotment"] = mess_caterer.meal_types
+
+            capacity = getattr(mess_caterer, "student_capacity", None)
+            if capacity:
+                occupied = Student.objects.filter(mess_caterer=mess_caterer).exclude(id=current_student_id).count()
+                if occupied >= capacity:
+                    raise serializers.ValidationError({"mess_caterer": "Selected caterer is full."})
 
         return attrs

@@ -94,6 +94,58 @@
       </div>
       <button type="submit"><i class="ms-Icon ms-Icon--Accept"></i> Update Access</button>
     </form>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px;">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="unlock_all_mess_changes" />
+        <button type="submit"><i class="ms-Icon ms-Icon--Unlock"></i> Unlock All Students</button>
+      </form>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="lock_all_mess_changes" />
+        <button type="submit" class="secondary"><i class="ms-Icon ms-Icon--Lock"></i> Lock All Students</button>
+      </form>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if user.role == 'ADMIN' or user.role == 'SUPERVISOR' %}
+  <section class="tab" style="margin-top: 14px;">
+    <h2><i class="ms-Icon ms-Icon--Repair"></i> Mess Menu Management</h2>
+    <p class="muted">Archive the active weekly menu before editing the next month and export the menu as CSV by mess type.</p>
+
+    <form method="post" style="display: grid; gap: 10px; max-width: 520px; margin-top: 8px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="archive_mess_menu_snapshot" />
+      <div>
+        <label for="archive_mess_type">Mess Type</label>
+        <select id="archive_mess_type" name="archive_mess_type">
+          <option value="">All types</option>
+          {% for mess_type in admin_mess_types %}
+          <option value="{{ mess_type }}">{{ mess_type }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit"><i class="ms-Icon ms-Icon--Archive"></i> Archive Current Menu Snapshot</button>
+    </form>
+
+    <form method="get" action="{% url 'mess-export-menu' %}" style="display: grid; gap: 10px; max-width: 520px; margin-top: 14px;">
+      <div>
+        <label for="menu_export_mess_type">Download CSV for Type</label>
+        <select id="menu_export_mess_type" name="mess_type">
+          <option value="">All types</option>
+          {% for mess_type in admin_mess_types %}
+          <option value="{{ mess_type }}">{{ mess_type }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="archive_month">Archive Month (optional)</label>
+        <input id="archive_month" name="month" placeholder="YYYY-MM" />
+      </div>
+      <button type="submit"><i class="ms-Icon ms-Icon--Download"></i> Download Menu CSV</button>
+    </form>
   </section>
   {% endif %}
 </div>
