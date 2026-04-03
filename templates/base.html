@@ -193,15 +193,20 @@
 
     .nav-toggle {
       display: none;
-      background: var(--panel);
-      border: 1px solid var(--line);
+      background: transparent;
+      border: 0;
       color: var(--text);
-      border-radius: 8px;
-      min-width: 44px;
-      min-height: 44px;
+      border-radius: 0;
+      min-width: 32px;
+      min-height: 32px;
+      width: 32px;
+      height: 32px;
+      padding: 4px;
       font-size: 18px;
       align-items: center;
       justify-content: center;
+      box-shadow: none;
+      cursor: pointer;
     }
 
     .ms-Icon {
@@ -566,21 +571,58 @@
         display: inline-flex;
         margin-left: auto;
         flex-shrink: 0;
+        margin-top: 2px;
+        align-self: flex-start;
       }
 
       .nav-links {
         width: 100%;
         display: none;
         grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-auto-rows: 86px;
         gap: 8px;
+        align-items: stretch;
       }
 
       .nav-links.is-open {
         display: grid;
       }
 
-      .nav-item {
+      .nav-links > * {
         width: 100%;
+        min-height: 86px;
+        height: 86px;
+        margin: 0;
+      }
+
+      .nav-links > :not(.logout) {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 10px 8px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 11px;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .nav-links > :not(.logout) .inline-icon,
+      .nav-links > :not(.logout) svg {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+      }
+
+      .nav-links > .logout {
+        min-width: 0;
+        padding: 10px 8px;
+        font-size: 13px;
+        justify-content: center;
       }
       
       h1 { font-size: 24px; }
