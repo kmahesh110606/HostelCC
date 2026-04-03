@@ -163,6 +163,7 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
     today_status_code = serializers.SerializerMethodField()
     today_status_label = serializers.SerializerMethodField()
     next_submission_date = serializers.SerializerMethodField()
+    server_today_ist = serializers.SerializerMethodField()
 
     def _status_cache_key(self, obj: LaundrySchedule) -> str:
         return f"_cached_today_status_{obj.id}"
@@ -218,6 +219,9 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
         next_date = self._get_cached_next_submission_date(obj)
         return next_date.isoformat() if next_date else None
 
+    def get_server_today_ist(self, obj: LaundrySchedule) -> str:
+        return timezone.localdate().isoformat()
+
     class Meta:
         model = LaundrySchedule
         fields = [
@@ -236,6 +240,7 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
             "today_status_code",
             "today_status_label",
             "next_submission_date",
+            "server_today_ist",
         ]
 
 
