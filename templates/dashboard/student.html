@@ -21,14 +21,26 @@
     height: 30px;
     color: var(--primary);
   }
+
+  .dashboard-alert {
+    border: 1px solid color-mix(in srgb, var(--error) 35%, var(--line));
+    background: color-mix(in srgb, var(--error) 11%, var(--panel));
+    color: color-mix(in srgb, var(--error) 78%, #2f0f14);
+    align-content: center;
+  }
+
+  .dashboard-alert .muted {
+    color: color-mix(in srgb, var(--error) 78%, #2f0f14);
+    text-align: center;
+  }
 </style>
 
 <div class="dashboard-grid">
   {% if discipline_alert %}
-  <div class="tab dashboard-card" style="border: 1px solid #f2a7a7; background: #ffe8e8; color: #8a1010; align-content: center;">
+  <div class="tab dashboard-card dashboard-alert">
     <i class="ms-Icon ms-Icon--Warning"></i>
     <h2>ID Card Confiscated</h2>
-    <p class="muted" style="color:#8a1010; text-align:center;">
+    <p class="muted">
       {{ discipline_alert.get_violation_code_display }}<br />
       {{ discipline_alert.action_taken }}
     </p>

@@ -59,6 +59,45 @@
     margin-bottom: 12px;
   }
 
+  .feed-toolbar-note {
+    margin: 6px 0 0;
+  }
+
+  .community-filter-form {
+    margin-top: 8px;
+  }
+
+  .form-actions-stretch {
+    justify-content: stretch;
+  }
+
+  .button-full {
+    width: 100%;
+  }
+
+  .active-complaints-title {
+    margin-top: 18px;
+  }
+
+  .active-item-text {
+    margin: 0;
+  }
+
+  .community-feed-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .community-create-form {
+    display: grid;
+    gap: 10px;
+  }
+
+  .community-create-actions {
+    justify-content: stretch;
+    margin-top: 2px;
+  }
+
   .side-panel {
     position: sticky;
     top: 90px;
@@ -153,6 +192,58 @@
     align-items: flex-start;
     gap: 10px;
     margin-bottom: 10px;
+  }
+
+  .complaint-author {
+    margin: 2px 0 4px;
+  }
+
+  .complaint-submeta {
+    margin: 0;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-variant: all-small-caps;
+  }
+
+  .complaint-side-actions {
+    display: grid;
+    gap: 8px;
+  }
+
+  .complaint-text {
+    margin-top: 8px;
+    white-space: pre-wrap;
+  }
+
+  .comments-icon {
+    display: block;
+    color: #0078d4;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+  }
+
+  .manage-status-row {
+    gap: 8px;
+    align-items: center;
+  }
+
+  .manage-status-select {
+    width: 170px;
+    margin: 0;
+  }
+
+  .comments-empty-state {
+    margin: 0;
+  }
+
+  .comment-form-row {
+    align-items: end;
+  }
+
+  .form-group-tight {
+    margin: 0;
   }
 
   .feed-media {
@@ -484,7 +575,7 @@
 <div class="feed-toolbar">
   <div>
     <span class="label"><i class="ms-Icon ms-Icon--People"></i> Community Actions</span>
-    <p class="muted" style="margin: 6px 0 0;">Tap New Complaint to post. Feed stays focused and cleaner on mobile.</p>
+    <p class="muted feed-toolbar-note">Tap New Complaint to post. Feed stays focused and cleaner on mobile.</p>
   </div>
   <button type="button" class="new-complaint-btn" data-modal-target="new-complaint-modal" aria-label="Open new complaint form">
     <i class="ms-Icon ms-Icon--Add"></i>
@@ -500,7 +591,7 @@
     <h2>Find Complaints</h2>
     <p class="muted">Filter by block, status, category, and sorting.</p>
 
-    <form method="get" style="margin-top: 8px;">
+    <form method="get" class="community-filter-form">
       <div class="form-group">
         <label for="q">Search</label>
         <input id="q" name="q" value="{{ query }}" placeholder="Search text or author" />
@@ -544,13 +635,13 @@
           </select>
         </div>
       </div>
-      <div class="form-actions" style="justify-content: stretch;">
-        <button type="submit" style="width: 100%;" class="secondary"><i class="ms-Icon ms-Icon--Filter"></i> Apply Filters</button>
+      <div class="form-actions form-actions-stretch">
+        <button type="submit" class="secondary button-full"><i class="ms-Icon ms-Icon--Filter"></i> Apply Filters</button>
       </div>
     </form>
 
     {% if show_management_panel %}
-    <h3 style="margin-top: 18px;">Active Complaints</h3>
+    <h3 class="active-complaints-title">Active Complaints</h3>
     <div class="active-list" id="active-complaints-list">
       {% for active in active_complaints %}
       <div class="active-item">
@@ -559,7 +650,7 @@
           <strong>#{{ active.id }}</strong>
           <span class="tag-chip">{{ active.get_category_display }}</span>
         </div>
-        <p class="muted" style="margin: 0;">{{ active.text|truncatechars:90 }}</p>
+        <p class="muted active-item-text">{{ active.text|truncatechars:90 }}</p>
       </div>
       {% empty %}
       <p class="muted">No active complaints currently.</p>
@@ -575,7 +666,7 @@
       <p class="muted">Supervisors manage their department, wardens manage all departments, and status updates stay inside comments.</p>
     </div>
 
-    <div id="community-feed-list" style="display: grid; gap: 12px;">
+    <div id="community-feed-list" class="community-feed-list">
       {% for item in complaint_items %}
       {% include 'community/_complaint_card.html' with item=item status_choices=status_choices %}
       {% empty %}
@@ -600,7 +691,7 @@
       </button>
     </div>
     <div class="comment-modal-content">
-      <form id="community-create-form" class="community-create-form" method="post" enctype="multipart/form-data" style="display: grid; gap: 10px;">
+      <form id="community-create-form" class="community-create-form" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="action" value="create" />
         <div class="form-group required">
@@ -620,8 +711,8 @@
           <label for="modal_media">Image or Video</label>
           <input id="modal_media" name="media" type="file" accept="image/*,video/*" />
         </div>
-        <div class="form-actions" style="justify-content: stretch; margin-top: 2px;">
-          <button type="submit" style="width: 100%;"><i class="ms-Icon ms-Icon--Send"></i> Post to Community</button>
+        <div class="form-actions community-create-actions">
+          <button type="submit" class="button-full"><i class="ms-Icon ms-Icon--Send"></i> Post to Community</button>
         </div>
       </form>
     </div>
@@ -816,7 +907,7 @@
           '<strong>#' + escapeHtml(String(item.id)) + '</strong>' +
           '<span class="tag-chip">' + escapeHtml(item.category_label || 'Complaint') + '</span>' +
           '</div>' +
-          '<p class="muted" style="margin: 0;">' + escapeHtml(truncateText(item.text || '', 90)) + '</p>' +
+          '<p class="muted active-item-text">' + escapeHtml(truncateText(item.text || '', 90)) + '</p>' +
           '</div>';
       }).join('');
     }

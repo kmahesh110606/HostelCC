@@ -38,6 +38,39 @@
     color: var(--text);
   }
 
+  .discipline-search-tab,
+  .discipline-matches-tab {
+    margin-bottom: 14px;
+  }
+
+  .discipline-export-tab {
+    margin-top: 14px;
+    margin-bottom: 14px;
+  }
+
+  .discipline-search-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: end;
+  }
+
+  .discipline-action-btn {
+    margin-top: 10px;
+  }
+
+  .discipline-status-confiscated {
+    color: #b31212;
+    font-weight: 700;
+  }
+
+  .discipline-checkbox-inline {
+    margin-top: 8px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
   .violation-select,
   .violation-search {
     width: 100%;
@@ -81,10 +114,10 @@
   }
 </style>
 
-<form method="get" class="tab" style="margin-bottom: 14px;">
+<form method="get" class="tab discipline-search-tab">
   <h2>Discipline Search</h2>
   <p class="muted">Search by registration number or student name to manage violations and ID confiscation.</p>
-  <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+  <div class="discipline-search-row">
     <div>
       <label for="reg_no">Registration Number</label>
       <input id="reg_no" name="reg_no" value="{{ reg_no }}" placeholder="22BCE1234" />
@@ -98,7 +131,7 @@
 </form>
 
 {% if matched_students and not student %}
-  <div class="tab" style="margin-bottom: 14px;">
+  <div class="tab discipline-matches-tab">
     <h3>Matching Students</h3>
     <p class="muted">Select a student to open violation and history details.</p>
     <div class="discipline-history">
@@ -155,7 +188,7 @@
         <label for="notes">Notes</label>
         <textarea id="notes" name="notes" rows="3" placeholder="Optional notes"></textarea>
 
-        <button type="submit" style="margin-top:10px;">Confiscate & Record</button>
+        <button type="submit" class="discipline-action-btn">Confiscate & Record</button>
       </form>
     </div>
 
@@ -169,7 +202,7 @@
         <input type="hidden" name="case_id" value="{{ active_confiscation.id }}" />
         <label for="return_notes">Return notes</label>
         <textarea id="return_notes" name="return_notes" rows="3" placeholder="Optional notes"></textarea>
-        <button type="submit" style="margin-top:10px;">Mark ID Returned</button>
+        <button type="submit" class="discipline-action-btn">Mark ID Returned</button>
       </form>
       {% else %}
       <p class="muted">No active ID confiscation for this student.</p>
@@ -185,7 +218,7 @@
           <div><strong>{{ entry.get_violation_code_display }}</strong></div>
           <div class="muted">Occurrence #{{ entry.occurrence_number }} | {{ entry.created_at|date:'d M Y, h:i A' }}</div>
           <div>Action: {{ entry.action_taken|default:'-' }}</div>
-          <div>ID status: {% if entry.id_card_returned_at %}Returned{% else %}<span style="color:#b31212; font-weight:700;">Confiscated</span>{% endif %}</div>
+          <div>ID status: {% if entry.id_card_returned_at %}Returned{% else %}<span class="discipline-status-confiscated">Confiscated</span>{% endif %}</div>
           {% if entry.notes %}<div>Notes: {{ entry.notes }}</div>{% endif %}
           {% if entry.return_notes %}<div>Return notes: {{ entry.return_notes }}</div>{% endif %}
         </div>
@@ -200,7 +233,7 @@
   </div>
 {% endif %}
 
-<div class="tab" style="margin-top: 14px; margin-bottom: 14px;">
+<div class="tab discipline-export-tab">
   <h2>CSV Exports</h2>
   <p class="muted">Export all students (Block + Room order) and complete discipline history.</p>
   <div class="discipline-grid">
@@ -210,12 +243,12 @@
         <label for="export_block_students">Block (optional)</label>
         <input id="export_block_students" name="block" placeholder="A" />
 
-        <label style="margin-top:8px; display:flex; gap:6px; align-items:center;">
+        <label class="discipline-checkbox-inline">
           <input type="checkbox" name="only_active" value="true" />
           Only students with active ID confiscation
         </label>
 
-        <button type="submit" style="margin-top:10px;">Download Student Master CSV</button>
+        <button type="submit" class="discipline-action-btn">Download Student Master CSV</button>
       </form>
     </div>
 
@@ -228,7 +261,7 @@
         <label for="export_reg_no_cases">Registration Number (optional)</label>
         <input id="export_reg_no_cases" name="reg_no" placeholder="22BCE1234" value="{{ reg_no }}" />
 
-        <button type="submit" style="margin-top:10px;">Download Discipline Cases CSV</button>
+        <button type="submit" class="discipline-action-btn">Download Discipline Cases CSV</button>
       </form>
     </div>
   </div>
