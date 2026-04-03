@@ -13,11 +13,11 @@
   }
 
   .laundry-card {
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 16px;
-    background: var(--panel);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .laundry-notice {
@@ -118,6 +118,11 @@
   .dot-red {
     background: #e81123;
     box-shadow: 0 0 0 4px rgba(232, 17, 35, 0.2);
+  }
+
+  .dot-blue {
+    background: #0078d4;
+    box-shadow: 0 0 0 4px rgba(0, 120, 212, 0.2);
   }
 
   .student-qr-wrap {
@@ -354,19 +359,14 @@
         <p class="muted" style="margin: 0;"><i class="ms-Icon ms-Icon--Calendar"></i> Pickup Day: <strong>{{ student_schedule.get_day_of_week_display }}</strong></p>
         <div>
           <span class="status-pill">
-            {% if student_schedule.submission_status %}
-              <span class="dot dot-green"></span> Submitted for this Week!
-            {% elif student_schedule.collection_status and ready_for_next_submission %}
-              <span class="dot dot-yellow"></span> Ready for New Submission
-            {% elif student_schedule.collection_status %}
-              <span class="dot dot-green"></span> Submitted for this Week!
-            {% else %}
-              <span class="dot dot-red"></span> Not Submitted Yet
-            {% endif %}
+            <span class="dot {{ student_today_status.dot }}"></span> {{ student_today_status.label }}
           </span>
         </div>
-        <p class="muted" style="margin: 0;"><i class="ms-Icon ms-Icon--Recent"></i> Last Submission: {{ student_schedule.last_submission_at|default:'N/A' }}</p>
-        <p class="muted" style="margin: 0;"><i class="ms-Icon ms-Icon--Clock"></i> Due Collection By: {{ student_schedule.due_collection_by|default:'N/A' }}</p>
+        <p class="muted" style="margin: 0;"><i class="ms-Icon ms-Icon--Recent"></i> Last Submission (IST): {% if last_submission_local %}{{ last_submission_local|date:'Y-m-d h:i A' }}{% else %}N/A{% endif %}</p>
+        {% if due_collection_local %}
+        <p class="muted" style="margin: 0;"><i class="ms-Icon ms-Icon--Clock"></i> Due Collection By (IST): {{ due_collection_local|date:'Y-m-d h:i A' }}</p>
+        {% endif %}
+        <p class="muted" style="margin: 0;"><i class="ms-Icon ms-Icon--CalendarDay"></i> Next Submission Date: {% if next_submission_date %}{{ next_submission_date|date:'Y-m-d (l)' }}{% else %}N/A{% endif %}</p>
 
         <div class="student-qr-wrap">
           <div id="student-qr-code" class="student-qr-canvas"></div>
@@ -690,51 +690,55 @@
       </div>
     </form>
 
-    <div class="table-wrap">
-      <table class="laundry-table">
-        <thead>
-          <tr>
-            <th>Reg No</th>
-            <th>Name</th>
-            <th>Block</th>
-            <th>Room</th>
-            <th>Day</th>
-            <th>Submission</th>
-            <th>Collection</th>
-            <th>Last Submission</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for schedule in manager_schedules %}
-          <tr>
-            <td>{{ schedule.student.roll_no }}</td>
-            <td>{{ schedule.student.name }}</td>
-            <td>{{ schedule.student.block.block_name }}</td>
-            <td>{{ schedule.student.room_no }}</td>
-            <td>{{ schedule.get_day_of_week_display }}</td>
-            <td>
-              {% if schedule.submission_status %}
-              <span class="status-pill"><span class="dot dot-green"></span> Submitted</span>
-              {% else %}
-              <span class="status-pill"><span class="dot dot-red"></span> Pending</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if schedule.collection_status %}
-              <span class="status-pill"><span class="dot dot-green"></span> Collected</span>
-              {% else %}
-              <span class="status-pill"><span class="dot dot-yellow"></span> Awaiting</span>
-              {% endif %}
-            </td>
-            <td>{{ schedule.last_submission_at|default:'N/A' }}</td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="8" class="muted">No schedules found for selected filters.</td>
-          </tr>
+    <div style="display: grid; gap: 12px;">
+      {% for block_item in manager_block_ranges_today %}
+      <div style="border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 12px;">
+        <h3 style="margin: 0 0 6px;"><i class="ms-Icon ms-Icon--CityNext2"></i> Block {{ block_item.block }}</h3>
+        <p class="muted" style="margin: 0 0 10px;">Today: {{ block_item.date|date:'Y-m-d (l)' }} | Room ranges: {{ block_item.range_count }}</p>
+
+        <div style="display: grid; gap: 8px;">
+          {% for range_item in block_item.ranges %}
+          <details style="border: 1px solid var(--line); border-radius: 10px; background: var(--bg); padding: 8px 10px;">
+            <summary style="cursor: pointer; font-weight: 700; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+              <span><i class="ms-Icon ms-Icon--FabricFolder"></i> Room Range {{ range_item.range_label }}</span>
+              <span class="status-pill"><span class="dot dot-blue"></span> {{ range_item.student_count }} students</span>
+            </summary>
+
+            <div class="table-wrap" style="margin-top: 10px;">
+              <table class="laundry-table" style="min-width: 520px;">
+                <thead>
+                  <tr>
+                    <th>Reg No</th>
+                    <th>Name</th>
+                    <th>Room</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for student in range_item.students %}
+                  <tr>
+                    <td>{{ student.roll_no }}</td>
+                    <td>{{ student.name }}</td>
+                    <td>{{ student.room_no }}</td>
+                    <td>
+                      <span class="status-pill"><span class="dot {{ student.status.dot }}"></span> {{ student.status.label }}</span>
+                    </td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="4" class="muted">No students matched this range for the current filters.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </details>
           {% endfor %}
-        </tbody>
-      </table>
+        </div>
+      </div>
+      {% empty %}
+      <div class="muted">No room ranges configured for today for the selected filters.</div>
+      {% endfor %}
     </div>
   </section>
   {% endif %}

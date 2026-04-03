@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .discipline-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+  }
+
+  .discipline-card {
+    padding: 14px;
+    border: 1px solid var(--border, #d8dee8);
+    border-radius: 12px;
+    background: var(--surface, #fff);
+  }
+
+  .discipline-alert {
+    border: 1px solid #f2a7a7;
+    background: #ffe8e8;
+    color: #8a1010;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 12px;
+  }
+
+  .discipline-history {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .discipline-row {
+    border: 1px solid var(--border, #d8dee8);
+    border-radius: 10px;
+    padding: 10px;
+  }
+</style>
+
+<form method="get" class="tab" style="margin-bottom: 14px;">
+  <h2>Discipline Search</h2>
+  <p class="muted">Search by registration number to view history and manage ID confiscation.</p>
+  <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+    <div>
+      <label for="reg_no">Registration Number</label>
+      <input id="reg_no" name="reg_no" value="{{ reg_no }}" placeholder="22BCE1234" required />
+    </div>
+    <button type="submit">Search</button>
+  </div>
+</form>
+
+<div class="tab" style="margin-bottom: 14px;">
+  <h2>CSV Exports</h2>
+  <p class="muted">Export all students (Block + Room order) and complete discipline history.</p>
+  <div class="discipline-grid">
+    <div class="discipline-card">
+      <h3>Student Master CSV</h3>
+      <form method="get" action="{% url 'discipline-export-students-master' %}">
+        <label for="export_block_students">Block (optional)</label>
+        <input id="export_block_students" name="block" placeholder="A" />
+
+        <label style="margin-top:8px; display:flex; gap:6px; align-items:center;">
+          <input type="checkbox" name="only_active" value="true" />
+          Only students with active ID confiscation
+        </label>
+
+        <button type="submit" style="margin-top:10px;">Download Student Master CSV</button>
+      </form>
+    </div>
+
+    <div class="discipline-card">
+      <h3>Discipline Cases CSV</h3>
+      <form method="get" action="{% url 'discipline-export-cases' %}">
+        <label for="export_block_cases">Block (optional)</label>
+        <input id="export_block_cases" name="block" placeholder="A" />
+
+        <label for="export_reg_no_cases">Registration Number (optional)</label>
+        <input id="export_reg_no_cases" name="reg_no" placeholder="22BCE1234" value="{{ reg_no }}" />
+
+        <button type="submit" style="margin-top:10px;">Download Discipline Cases CSV</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% if student %}
+  {% if active_confiscation %}
+    <div class="discipline-alert">
+      <strong>ID card currently confiscated</strong><br />
+      Reason: {{ active_confiscation.get_violation_code_display }}<br />
+      Action: {{ active_confiscation.action_taken }}
+    </div>
+  {% endif %}
+
+  <div class="discipline-grid">
+    <div class="discipline-card">
+      <h3>Student</h3>
+      <p><strong>{{ student.name }}</strong></p>
+      <p class="muted">REG NO {{ student.roll_no }} | BLOCK {{ student.block.block_name }} | ROOM {{ student.room_no }}</p>
+    </div>
+
+    <div class="discipline-card">
+      <h3>Confiscate ID Card</h3>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="confiscate" />
+        <input type="hidden" name="reg_no" value="{{ student.roll_no }}" />
+
+        <label for="violation_code">Violation</label>
+        <select id="violation_code" name="violation_code" required>
+          <option value="">Select violation</option>
+          {% for policy in violation_policies %}
+            <option value="{{ policy.code }}">{{ policy.title }}</option>
+          {% endfor %}
+        </select>
+
+        <label for="notes">Notes</label>
+        <textarea id="notes" name="notes" rows="3" placeholder="Optional notes"></textarea>
+
+        <button type="submit" style="margin-top:10px;">Confiscate & Record</button>
+      </form>
+    </div>
+
+    <div class="discipline-card">
+      <h3>Return ID Card</h3>
+      {% if active_confiscation %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="return_id" />
+        <input type="hidden" name="reg_no" value="{{ student.roll_no }}" />
+        <input type="hidden" name="case_id" value="{{ active_confiscation.id }}" />
+        <label for="return_notes">Return notes</label>
+        <textarea id="return_notes" name="return_notes" rows="3" placeholder="Optional notes"></textarea>
+        <button type="submit" style="margin-top:10px;">Mark ID Returned</button>
+      </form>
+      {% else %}
+      <p class="muted">No active ID confiscation for this student.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="discipline-history">
+    <h3>Violation History</h3>
+    {% if history %}
+      {% for entry in history %}
+        <div class="discipline-row">
+          <div><strong>{{ entry.get_violation_code_display }}</strong></div>
+          <div class="muted">Occurrence #{{ entry.occurrence_number }} | {{ entry.created_at|date:'d M Y, h:i A' }}</div>
+          <div>Action: {{ entry.action_taken|default:'-' }}</div>
+          <div>ID status: {% if entry.id_card_returned_at %}Returned{% else %}<span style="color:#b31212; font-weight:700;">Confiscated</span>{% endif %}</div>
+          {% if entry.notes %}<div>Notes: {{ entry.notes }}</div>{% endif %}
+          {% if entry.return_notes %}<div>Return notes: {{ entry.return_notes }}</div>{% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted">No discipline history yet.</p>
+    {% endif %}
+  </div>
+{% elif reg_no %}
+  <div class="tab">
+    <p>No student found for registration number <strong>{{ reg_no }}</strong>.</p>
+  </div>
+{% endif %}
+{% endblock %}

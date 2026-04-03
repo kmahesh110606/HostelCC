@@ -20,6 +20,7 @@ from mess.options import (
     get_allowed_mess_types_for_block,
 )
 from mess.models import Caterer
+from discipline.models import DisciplineCase
 from .models import AppNotification, OTPChallenge
 from students.models import Student
 from students.utils import resolve_student_for_user
@@ -559,6 +560,8 @@ def dashboard_router(request: HttpRequest) -> HttpResponse:
     role_to_template = {
         "STUDENT": "dashboard/student.html",
         "WARDEN": "dashboard/warden.html",
+        "SUPERVISOR": "dashboard/staff.html",
+        "DIRECTOR": "dashboard/staff.html",
         "MESS_MANAGER": "dashboard/mess_manager.html",
         "LAUNDRY_PERSON": "dashboard/laundry_person.html",
         "ADMIN": "dashboard/admin.html",
@@ -574,6 +577,20 @@ def dashboard_router(request: HttpRequest) -> HttpResponse:
         )
         cache.set(cache_key, notifications, timeout=60)
     context = {"notifications": notifications}
+
+    student = resolve_student_for_user(request.user)
+    if student:
+        active_case = (
+            DisciplineCase.objects.filter(
+                student=student,
+                id_card_confiscated=True,
+                id_card_returned_at__isnull=True,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        context["discipline_alert"] = active_case
+
     if request.user.role == User.Role.ADMIN:
         context["mess_names"] = get_all_caterer_names()
         context["mess_types"] = list(MESS_TYPES.keys())

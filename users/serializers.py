@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from discipline.models import DisciplineCase
 from .models import AppNotification, OTPChallenge
 from students.utils import resolve_student_for_user
 
@@ -160,6 +161,7 @@ class AuthenticatedChangePasswordSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     student = serializers.SerializerMethodField()
+    discipline_alert = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -180,6 +182,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "is_email_verified",
             "is_active",
             "student",
+            "discipline_alert",
         ]
 
     def get_full_name(self, obj):
@@ -197,6 +200,45 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "room_no": student.room_no,
             "mess_allotment": student.mess_allotment,
             "mess_caterer_name": student.mess_caterer.name if student.mess_caterer else "",
+        }
+
+    def get_discipline_alert(self, obj):
+        student = resolve_student_for_user(obj)
+        if not student:
+            return {
+                "active": False,
+                "violation_code": "",
+                "violation_title": "",
+                "action_taken": "",
+                "confiscated_at": None,
+            }
+
+        active_case = (
+            DisciplineCase.objects.select_related("student")
+            .filter(
+                student=student,
+                id_card_confiscated=True,
+                id_card_returned_at__isnull=True,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not active_case:
+            return {
+                "active": False,
+                "violation_code": "",
+                "violation_title": "",
+                "action_taken": "",
+                "confiscated_at": None,
+            }
+
+        return {
+            "active": True,
+            "violation_code": active_case.violation_code,
+            "violation_title": active_case.get_violation_code_display(),
+            "action_taken": active_case.action_taken,
+            "confiscated_at": active_case.id_card_confiscated_at,
         }
 
 

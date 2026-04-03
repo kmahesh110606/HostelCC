@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "laundry",
     "mess",
     "complaints",
+    "discipline",
 ]
 
 MIDDLEWARE = [

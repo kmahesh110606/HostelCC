@@ -35,34 +35,28 @@
     {% endwith %}
   </a>
 
-  <a class="tab dashboard-card" href="/community/">
-    <i class="ms-Icon ms-Icon--Comment"></i>
-    <h2>Community</h2>
-    <p class="muted">Review and moderate complaint threads.</p>
-  </a>
-
   <a class="tab dashboard-card" href="/discipline/">
     <i class="ms-Icon ms-Icon--ShieldSolid"></i>
     <h2>Discipline</h2>
-    <p class="muted">Track violations, confiscate ID cards, and mark returns.</p>
+    <p class="muted">Search by registration number, mark confiscation, and return ID cards.</p>
   </a>
 
   <a class="tab dashboard-card" href="{% url 'discipline-export-students-master' %}">
     <i class="ms-Icon ms-Icon--People"></i>
     <h2>Student Master CSV</h2>
-    <p class="muted">Export all student details by Block and Room order with discipline summary.</p>
+    <p class="muted">Export all student details by Block + Room order with discipline summary.</p>
   </a>
 
-  <a class="tab dashboard-card" href="/mess/">
-    <i class="ms-Icon ms-Icon--EatDrink"></i>
-    <h2>Mess Oversight</h2>
-    <p class="muted">Monitor menu quality and feedback trends.</p>
+  <a class="tab dashboard-card" href="{% url 'discipline-export-cases' %}">
+    <i class="ms-Icon ms-Icon--Shield"></i>
+    <h2>Discipline History CSV</h2>
+    <p class="muted">Download all violation records with confiscation/return timelines.</p>
   </a>
 
-  <a class="tab dashboard-card" href="/laundry/">
-    <i class="ms-Icon ms-Icon--Product"></i>
-    <h2>Laundry Oversight</h2>
-    <p class="muted">Track schedule quality and service gaps.</p>
+  <a class="tab dashboard-card" href="/community/">
+    <i class="ms-Icon ms-Icon--Comment"></i>
+    <h2>Community</h2>
+    <p class="muted">Review and moderate complaint threads.</p>
   </a>
 </div>
 {% endblock %}

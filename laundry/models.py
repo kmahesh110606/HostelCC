@@ -30,7 +30,8 @@ class LaundrySchedule(models.Model):
 
     def mark_submission(self):
         now = timezone.now()
-        if self.last_submission_at and self.last_submission_at.date() == now.date():
+        today = timezone.localdate(now)
+        if self.last_submission_at and timezone.localdate(self.last_submission_at) == today:
             raise ValueError("Student already submitted laundry today.")
         self.submission_status = True
         self.collection_status = False
@@ -46,7 +47,8 @@ class LaundrySchedule(models.Model):
             raise ValueError("Collection window exceeded 1 week.")
         self.collection_status = True
         self.submission_status = False
-        self.save(update_fields=["collection_status", "submission_status"])
+        self.due_collection_by = None
+        self.save(update_fields=["collection_status", "submission_status", "due_collection_by"])
 
 
 class LaundryEvent(models.Model):

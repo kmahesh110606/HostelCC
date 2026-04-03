@@ -1,5 +1,4 @@
 import csv
-import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -471,81 +470,40 @@ def download_active_complaints_csv(request: HttpRequest) -> HttpResponse:
         messages.error(request, "Only admin can download complaints reports.")
         return redirect("dashboard-router")
 
-    complaints = (
-        Complaint.objects.select_related("student", "student__block", "author")
-        .prefetch_related("replies", "replies__author")
-        .filter(status__in=[Complaint.Status.OPEN, Complaint.Status.IN_PROGRESS])
-        .order_by("-created_at")
+    group_by = (request.GET.get("group_by") or "block").strip().lower()
+    if group_by not in {"block", "department"}:
+        group_by = "block"
+
+    complaints = Complaint.objects.select_related("student", "student__block").filter(
+        status__in=[Complaint.Status.OPEN, Complaint.Status.IN_PROGRESS]
     )
+
+    if group_by == "department":
+        complaints = complaints.order_by("category", "student__block__block_name", "student__room_no", "student__roll_no")
+        file_name = "complaints_grouped_by_department.csv"
+    else:
+        complaints = complaints.order_by("student__block__block_name", "student__room_no", "category", "student__roll_no")
+        file_name = "complaints_grouped_by_block.csv"
 
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="complaints_open_in_progress.csv"'
+    response["Content-Disposition"] = f'attachment; filename="{file_name}"'
 
     writer = csv.writer(response)
-    writer.writerow(
-        [
-            "complaint_id",
-            "category",
-            "category_label",
-            "status",
-            "status_label",
-            "text",
-            "media_type",
-            "media_url",
-            "warden_tag",
-            "upvotes",
-            "downvotes",
-            "created_at",
-            "author_id",
-            "author_username",
-            "author_full_name",
-            "author_email",
-            "student_id",
-            "student_roll_no",
-            "student_name",
-            "student_block",
-            "student_room_no",
-            "reply_count",
-            "replies",
-        ]
-    )
+    writer.writerow(["Block", "Room No", "Reg No", "Name", "Complaint", "Department", "Status", "Signature"])
 
     for item in complaints:
-        author = item.author
         student = item.student
-        replies = []
-        for reply in item.replies.all().order_by("created_at"):
-            reply_author = reply.author.get_full_name().strip() or reply.author.username
-            cleaned_text = " ".join((reply.text or "").splitlines()).strip()
-            replies.append(f"{reply.created_at.isoformat()} | {reply_author} | {cleaned_text}")
-
-        media_url = request.build_absolute_uri(item.media.url) if item.media else ""
 
         writer.writerow(
             [
-                item.id,
-                item.category,
-                item.get_category_display(),
-                item.status,
-                item.get_status_display(),
-                item.text,
-                item.media_type,
-                media_url,
-                item.warden_tag,
-                item.upvotes,
-                item.downvotes,
-                item.created_at.isoformat() if item.created_at else "",
-                author.id if author else "",
-                author.username if author else "",
-                author.get_full_name().strip() if author else "",
-                author.email if author else "",
-                student.id if student else "",
-                student.roll_no if student else "",
-                student.name if student else "",
                 student.block.block_name if student and student.block else "",
                 student.room_no if student else "",
-                len(replies),
-                json.dumps(replies),
+                student.roll_no if student else "",
+                student.name if student else "",
+                item.text,
+                item.get_category_display(),
+                item.get_status_display(),
+                "",
             ]
         )
 

@@ -53,6 +53,12 @@
     <p class="muted">Review complaints and moderation updates.</p>
   </a>
 
+  <a class="tab dashboard-card" href="/discipline/">
+    <i class="ms-Icon ms-Icon--ShieldSolid"></i>
+    <h2>Discipline</h2>
+    <p class="muted">Search by registration number, track violations, confiscate and return ID cards.</p>
+  </a>
+
   <a class="tab dashboard-card" href="{% url 'laundry-export-logs' %}">
     <i class="ms-Icon ms-Icon--Download"></i>
     <h2>Laundry Logs CSV</h2>
@@ -65,11 +71,31 @@
     <p class="muted">Download day-wise laundry schedule for all students.</p>
   </a>
 
-  <a class="tab dashboard-card" href="{% url 'complaints-export-active' %}">
+  <a class="tab dashboard-card" href="{% url 'discipline-export-students-master' %}">
+    <i class="ms-Icon ms-Icon--People"></i>
+    <h2>Student Master CSV</h2>
+    <p class="muted">All student details sorted by Block and Room with latest discipline status.</p>
+  </a>
+
+  <a class="tab dashboard-card" href="{% url 'discipline-export-cases' %}">
+    <i class="ms-Icon ms-Icon--Shield"></i>
+    <h2>Discipline History CSV</h2>
+    <p class="muted">Full discipline case history for all students, with return records.</p>
+  </a>
+
+  <div class="tab dashboard-card" style="padding: 16px; align-content: start;">
     <i class="ms-Icon ms-Icon--IncidentTriangle"></i>
     <h2>Active Complaints CSV</h2>
-    <p class="muted">Download unresolved and in-progress complaints with details.</p>
-  </a>
+    <p class="muted" style="text-align:center;">Download unresolved and in-progress complaints grouped by block or department.</p>
+    <form method="get" action="{% url 'complaints-export-active' %}" style="width:100%; display:grid; gap:8px;">
+      <label for="complaints_group_by"><small>Group By</small></label>
+      <select id="complaints_group_by" name="group_by">
+        <option value="block">Block</option>
+        <option value="department">Department</option>
+      </select>
+      <button type="submit">Download CSV</button>
+    </form>
+  </div>
 
   <div class="tab dashboard-card" style="padding: 16px; align-content: start;">
     <i class="ms-Icon ms-Icon--People"></i>

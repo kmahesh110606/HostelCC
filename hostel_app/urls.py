@@ -26,6 +26,7 @@ urlpatterns = [
     path("welcome/", welcome_page, name="welcome"),
     path("profile/", profile_page, name="profile"),
     path("community/", include("complaints.web_urls")),
+    path("discipline/", include("discipline.web_urls")),
     path("mess/", include("mess.web_urls")),
     path("laundry/", include("laundry.web_urls")),
     path("notifications/", notification_panel, name="notification-panel"),
@@ -37,6 +38,7 @@ urlpatterns = [
     path("api/laundry/", include("laundry.urls")),
     path("api/mess/", include("mess.urls")),
     path("api/complaints/", include("complaints.urls")),
+    path("api/discipline/", include("discipline.urls")),
 ]
 
 if settings.DEBUG:

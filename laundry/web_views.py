@@ -3,7 +3,7 @@ import csv
 import io
 import json
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -11,8 +11,10 @@ from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils.dateparse import parse_date
+from django.utils import timezone
 
 from .models import LaundryEvent, LaundryHoliday, LaundryRoomRange, LaundrySchedule
+from students.models import Student
 from students.utils import resolve_student_for_user
 
 
@@ -73,6 +75,23 @@ _DAY_SORT_ORDER = {
 }
 
 
+def _local_today() -> date:
+    return timezone.localdate()
+
+
+def _local_day_bounds(target_date: date):
+    tz = timezone.get_current_timezone()
+    start = timezone.make_aware(datetime.combine(target_date, time.min), tz)
+    end = start + timedelta(days=1)
+    return start, end
+
+
+def _local_date_from_dt(value):
+    if not value:
+        return None
+    return timezone.localtime(value).date()
+
+
 def _infer_student_day_from_room_ranges(student):
     if not student or not student.block:
         return None
@@ -95,7 +114,7 @@ def _infer_student_day_from_room_ranges(student):
 
     dated_rules = sorted(
         [rule for rule in matching_rules if rule.scheduled_date],
-        key=lambda rule: (rule.scheduled_date < date.today(), rule.scheduled_date),
+        key=lambda rule: (rule.scheduled_date < _local_today(), rule.scheduled_date),
     )
     if not dated_rules:
         return None
@@ -204,7 +223,7 @@ def _build_admin_month_calendar(room_ranges, holidays, year: int, month: int, bl
             {
                 "day": day,
                 "date_iso": current.isoformat(),
-                "is_today": current == date.today(),
+                "is_today": current == _local_today(),
                 "is_holiday": current in holiday_set,
                 "slots": slots,
             }
@@ -260,7 +279,7 @@ def _build_student_month_days(student_schedule, room_rules, holiday_cache=None):
     if not student_schedule:
         return [], "", 0
 
-    today = date.today()
+    today = _local_today()
     year = today.year
     month = today.month
     month_name = today.strftime("%B")
@@ -296,13 +315,15 @@ def _build_student_month_days(student_schedule, room_rules, holiday_cache=None):
     month_end = date(year, month, last_day)
 
     events = list(
-        LaundryEvent.objects.filter(schedule=student_schedule, created_at__date__lte=month_end)
+        LaundryEvent.objects.filter(schedule=student_schedule)
         .order_by("created_at")
     )
     submitted_days = set()
     pending_submission_dates = []
     for event in events:
-        event_day = event.created_at.date()
+        event_day = _local_date_from_dt(event.created_at)
+        if not event_day or event_day > month_end:
+            continue
         if event.event_type == LaundryEvent.EventType.SUBMISSION:
             pending_submission_dates.append(event_day)
             if month_start <= event_day <= month_end:
@@ -348,6 +369,173 @@ def _build_student_month_days(student_schedule, room_rules, holiday_cache=None):
         days.append({"day": "", "highlighted": False, "today": False, "status": "blank"})
 
     return days, month_name, year
+
+
+def _is_student_submission_day(student_schedule, target_date: date, room_rules, holiday_cache=None) -> bool:
+    if not student_schedule:
+        return False
+
+    room_no = student_schedule.student.room_no
+    block_name = student_schedule.student.block.block_name if student_schedule.student.block else ""
+    if room_rules and block_name:
+        matching_rules = _matching_room_rules_for_date(
+            block_name,
+            target_date,
+            preloaded_rules=room_rules,
+            holiday_cache=holiday_cache,
+        )
+        return any(_room_in_rule(room_no, rule.room_from, rule.room_to) for rule in matching_rules)
+
+    weekday_code = {
+        0: LaundrySchedule.DayChoices.MON,
+        1: LaundrySchedule.DayChoices.TUE,
+        2: LaundrySchedule.DayChoices.WED,
+        3: LaundrySchedule.DayChoices.THU,
+        4: LaundrySchedule.DayChoices.FRI,
+        5: LaundrySchedule.DayChoices.SAT,
+        6: LaundrySchedule.DayChoices.SUN,
+    }[target_date.weekday()]
+    return student_schedule.day_of_week == weekday_code
+
+
+def _next_submission_date(student_schedule, room_rules, holiday_cache=None, start_date: date | None = None):
+    if not student_schedule:
+        return None
+
+    from_date = start_date or _local_today()
+    for offset in range(0, 45):
+        candidate = from_date + timedelta(days=offset)
+        if _is_student_submission_day(student_schedule, candidate, room_rules, holiday_cache=holiday_cache):
+            return candidate
+    return None
+
+
+def _student_today_status(student_schedule, room_rules, holiday_cache=None):
+    if not student_schedule:
+        return {"code": "none", "label": "No schedule", "dot": "dot-red"}
+
+    today = _local_today()
+    today_start, today_end = _local_day_bounds(today)
+    events_today = list(
+        LaundryEvent.objects.filter(
+            schedule=student_schedule,
+            created_at__gte=today_start,
+            created_at__lt=today_end,
+        ).order_by("created_at")
+    )
+
+    submitted_today = any(event.event_type == LaundryEvent.EventType.SUBMISSION for event in events_today)
+    collected_today = any(event.event_type == LaundryEvent.EventType.COLLECTION for event in events_today)
+    is_submission_day = _is_student_submission_day(student_schedule, today, room_rules, holiday_cache=holiday_cache)
+
+    if collected_today:
+        return {"code": "collected", "label": "Collected", "dot": "dot-green"}
+    if student_schedule.submission_status and not student_schedule.collection_status:
+        return {"code": "in_progress", "label": "In Progress", "dot": "dot-yellow"}
+    if is_submission_day and not submitted_today:
+        return {"code": "ready", "label": "Ready to Submit", "dot": "dot-blue"}
+    if submitted_today and not collected_today:
+        return {"code": "in_progress", "label": "In Progress", "dot": "dot-yellow"}
+    return {"code": "not_today", "label": "No Laundry Action Today", "dot": "dot-red"}
+
+
+def _build_manager_block_ranges_for_today(
+    *,
+    block_filter: str,
+    status_filter: str,
+    room_rules_by_block: dict,
+    holiday_dates: list,
+):
+    today = _local_today()
+
+    if block_filter:
+        candidate_blocks = [block_filter]
+    else:
+        candidate_blocks = sorted(room_rules_by_block.keys())
+
+    if not candidate_blocks:
+        return []
+
+    students = list(
+        Student.objects.select_related("block")
+        .filter(block__block_name__in=candidate_blocks)
+        .order_by("block__block_name", "room_no", "roll_no")
+    )
+    students_by_block = {}
+    for student in students:
+        block_name = (student.block.block_name if student.block else "").strip().upper()
+        if not block_name:
+            continue
+        students_by_block.setdefault(block_name, []).append(student)
+
+    schedules = list(
+        LaundrySchedule.objects.select_related("student", "student__block")
+        .filter(student__block__block_name__in=candidate_blocks)
+    )
+    schedule_by_student_id = {schedule.student_id: schedule for schedule in schedules}
+
+    manager_blocks = []
+    for block_name in candidate_blocks:
+        block_rules = room_rules_by_block.get(block_name, [])
+        today_rules = _matching_room_rules_for_date(
+            block_name,
+            today,
+            preloaded_rules=block_rules,
+            holiday_cache=holiday_dates,
+        )
+        if not today_rules:
+            continue
+
+        range_rows = []
+        block_students = students_by_block.get(block_name, [])
+        for rule in sorted(today_rules, key=lambda item: (_room_number_as_int(item.room_from) or 0, item.room_from)):
+            students_in_range = []
+            for student in block_students:
+                if not _room_in_rule(student.room_no, rule.room_from, rule.room_to):
+                    continue
+
+                schedule = schedule_by_student_id.get(student.id)
+                if schedule:
+                    status = _student_today_status(schedule, block_rules, holiday_cache=holiday_dates)
+                    if status["code"] in {"ready", "not_today", "none"}:
+                        status = {"code": status["code"], "label": status["label"], "dot": "dot-red"}
+                else:
+                    status = {"code": "none", "label": "No Schedule", "dot": "dot-red"}
+
+                if status_filter == "submitted" and status["code"] not in {"in_progress", "collected"}:
+                    continue
+                if status_filter == "not_submitted" and status["code"] in {"in_progress", "collected"}:
+                    continue
+
+                students_in_range.append(
+                    {
+                        "roll_no": student.roll_no,
+                        "name": student.name,
+                        "room_no": student.room_no,
+                        "status": status,
+                    }
+                )
+
+            range_rows.append(
+                {
+                    "range_label": f"{rule.room_from} - {rule.room_to}",
+                    "room_from": rule.room_from,
+                    "room_to": rule.room_to,
+                    "student_count": len(students_in_range),
+                    "students": students_in_range,
+                }
+            )
+
+        manager_blocks.append(
+            {
+                "block": block_name,
+                "date": today,
+                "ranges": range_rows,
+                "range_count": len(range_rows),
+            }
+        )
+
+    return manager_blocks
 
 
 @login_required
@@ -519,20 +707,7 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
     selected_month = request.GET.get("month", "").strip()
     selected_year = request.GET.get("year", "").strip()
 
-    manager_schedules = LaundrySchedule.objects.select_related("student", "student__block").all()
-    if block_filter:
-        manager_schedules = manager_schedules.filter(student__block__block_name=block_filter)
-    if status_filter == "submitted":
-        manager_schedules = manager_schedules.filter(submission_status=True)
-    elif status_filter == "not_submitted":
-        manager_schedules = manager_schedules.filter(submission_status=False)
-
-    if sort_by == "student":
-        manager_schedules = manager_schedules.order_by("student__roll_no")
-    elif sort_by == "recent":
-        manager_schedules = manager_schedules.order_by("-last_submission_at", "student__roll_no")
-    else:
-        manager_schedules = manager_schedules.order_by("day_of_week", "student__roll_no")
+    manager_schedules = []
 
     all_room_ranges = LaundryRoomRange.objects.filter(is_active=True)
     room_ranges = all_room_ranges
@@ -541,6 +716,23 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
     room_ranges = room_ranges.order_by("block_name", "scheduled_date", "day_of_week", "room_from")
     holidays = LaundryHoliday.objects.filter(is_active=True).order_by("holiday_date")
     holiday_dates = list(holidays.values_list("holiday_date", flat=True))
+    all_room_ranges_list = list(all_room_ranges)
+
+    room_rules_by_block = {}
+    for rule in all_room_ranges_list:
+        block_key = (rule.block_name or "").strip().upper()
+        if not block_key:
+            continue
+        room_rules_by_block.setdefault(block_key, []).append(rule)
+
+    manager_block_ranges_today = []
+    if is_laundry_manager:
+        manager_block_ranges_today = _build_manager_block_ranges_for_today(
+            block_filter=block_filter,
+            status_filter=status_filter,
+            room_rules_by_block=room_rules_by_block,
+            holiday_dates=holiday_dates,
+        )
 
     student_qr_text = ""
     if student_schedule:
@@ -566,15 +758,16 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
 
     calendar_days, schedule_month_name, schedule_year = _build_student_month_days(student_schedule, student_room_rules, holiday_cache=holiday_dates)
 
-    ready_for_next_submission = False
-    if student_schedule and student_schedule.collection_status:
-        if student_schedule.last_submission_at:
-            ready_after = student_schedule.last_submission_at.date() + timedelta(days=7)
-            ready_for_next_submission = date.today() >= ready_after
-        else:
-            ready_for_next_submission = True
+    student_today_status = _student_today_status(student_schedule, student_room_rules, holiday_cache=holiday_dates)
+    next_submission_date = _next_submission_date(student_schedule, student_room_rules, holiday_cache=holiday_dates)
+    last_submission_local = timezone.localtime(student_schedule.last_submission_at) if student_schedule and student_schedule.last_submission_at else None
+    due_collection_local = (
+        timezone.localtime(student_schedule.due_collection_by)
+        if student_schedule and student_schedule.due_collection_by and student_schedule.submission_status and not student_schedule.collection_status
+        else None
+    )
 
-    today = date.today()
+    today = _local_today()
     try:
         calendar_month = int(selected_month) if selected_month else today.month
     except ValueError:
@@ -593,7 +786,7 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
         admin_calendar_cells = cache.get(calendar_cache_key)
         if admin_calendar_cells is None:
             admin_calendar_cells = _build_admin_month_calendar(
-                room_ranges=list(all_room_ranges),
+                room_ranges=all_room_ranges_list,
                 holidays=holiday_dates,
                 year=calendar_year,
                 month=calendar_month,
@@ -624,7 +817,8 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
             "student_schedule": student_schedule,
             "student_qr_text": student_qr_text,
             "is_laundry_manager": is_laundry_manager,
-            "manager_schedules": manager_schedules[:200] if is_laundry_manager else [],
+            "manager_schedules": manager_schedules,
+            "manager_block_ranges_today": manager_block_ranges_today,
             "block_filter": block_filter,
             "status_filter": status_filter,
             "sort_by": sort_by,
@@ -634,7 +828,10 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
             "calendar_days": calendar_days,
             "schedule_month_name": schedule_month_name,
             "schedule_year": schedule_year,
-            "ready_for_next_submission": ready_for_next_submission,
+            "student_today_status": student_today_status,
+            "next_submission_date": next_submission_date,
+            "last_submission_local": last_submission_local,
+            "due_collection_local": due_collection_local,
             "holidays": holidays,
             "admin_calendar_cells": admin_calendar_cells if is_laundry_manager else [],
             "admin_calendar_month": calendar_month,
@@ -661,7 +858,7 @@ def download_laundry_logs_csv(request: HttpRequest) -> HttpResponse:
     )
 
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = f'attachment; filename="laundry_logs_{date.today().isoformat()}.csv"'
+    response["Content-Disposition"] = f'attachment; filename="laundry_logs_{_local_today().isoformat()}.csv"'
 
     writer = csv.writer(response)
     writer.writerow(
@@ -694,7 +891,7 @@ def download_laundry_logs_csv(request: HttpRequest) -> HttpResponse:
             [
                 item.id,
                 item.event_type,
-                item.created_at.isoformat() if item.created_at else "",
+                timezone.localtime(item.created_at).isoformat() if item.created_at else "",
                 student.id if student else "",
                 student.roll_no if student else "",
                 student.name if student else "",
@@ -703,8 +900,8 @@ def download_laundry_logs_csv(request: HttpRequest) -> HttpResponse:
                 schedule.get_day_of_week_display() if schedule else "",
                 schedule.submission_status if schedule else "",
                 schedule.collection_status if schedule else "",
-                schedule.last_submission_at.isoformat() if schedule and schedule.last_submission_at else "",
-                schedule.due_collection_by.isoformat() if schedule and schedule.due_collection_by else "",
+                timezone.localtime(schedule.last_submission_at).isoformat() if schedule and schedule.last_submission_at else "",
+                timezone.localtime(schedule.due_collection_by).isoformat() if schedule and schedule.due_collection_by else "",
                 schedule.qr_token if schedule else "",
                 scanned_by.username if scanned_by else "",
                 scanned_by.email if scanned_by else "",
@@ -728,7 +925,7 @@ def download_laundry_schedule_csv(request: HttpRequest) -> HttpResponse:
     )
 
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = f'attachment; filename="laundry_day_wise_schedule_{date.today().isoformat()}.csv"'
+    response["Content-Disposition"] = f'attachment; filename="laundry_day_wise_schedule_{_local_today().isoformat()}.csv"'
 
     writer = csv.writer(response)
     writer.writerow(
@@ -767,8 +964,8 @@ def download_laundry_schedule_csv(request: HttpRequest) -> HttpResponse:
                 student_user.email if student_user else "",
                 item.submission_status,
                 item.collection_status,
-                item.last_submission_at.isoformat() if item.last_submission_at else "",
-                item.due_collection_by.isoformat() if item.due_collection_by else "",
+                timezone.localtime(item.last_submission_at).isoformat() if item.last_submission_at else "",
+                timezone.localtime(item.due_collection_by).isoformat() if item.due_collection_by else "",
                 json.dumps(item.holidays or []),
                 item.qr_token,
             ]
