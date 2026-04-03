@@ -4,7 +4,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
-from users.otp_queue import OtpEmailJob, enqueue_otp_email
+from users.otp_queue import OtpEmailJob, send_otp_email
 from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -58,7 +58,7 @@ def _issue_otp_for_user(user) -> tuple[bool, str]:
     if not from_email:
         return False, "Email service is not configured. Please contact admin."
     try:
-        enqueue_otp_email(
+        send_otp_email(
             OtpEmailJob(
                 email=user.email,
                 otp_code=challenge.otp_code,
@@ -160,7 +160,7 @@ class RequestOTPView(APIView):
             return Response({"detail": "Email service is not configured. Please contact admin."}, status=503)
 
         try:
-            enqueue_otp_email(
+            send_otp_email(
                 OtpEmailJob(
                     email=user.email,
                     otp_code=challenge.otp_code,

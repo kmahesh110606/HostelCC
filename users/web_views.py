@@ -7,10 +7,10 @@ from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
-from users.otp_queue import OtpEmailJob, enqueue_otp_email
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from users.otp_queue import OtpEmailJob, send_otp_email
 
 from hostel_app.upload_limits import upload_size_error
 from hostels.models import HostelBlock, Room
@@ -65,7 +65,7 @@ def _issue_otp(user) -> tuple[bool, str]:
         return False, "Email service is not configured. Please contact admin."
 
     try:
-        enqueue_otp_email(
+        send_otp_email(
             OtpEmailJob(
                 email=user.email,
                 otp_code=challenge.otp_code,
