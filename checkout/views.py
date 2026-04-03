@@ -32,6 +32,11 @@ def _resolve_student_from_qr_token(qr_token: str):
     token = (qr_token or "").strip()
     if not token:
         return None
+
+    chair_submission = ChairSubmission.objects.select_related("student").filter(qr_token__iexact=token).first()
+    if chair_submission and chair_submission.student:
+        return chair_submission.student
+
     return Student.objects.filter(Q(user__username__iexact=token) | Q(roll_no__iexact=token)).first()
 
 
