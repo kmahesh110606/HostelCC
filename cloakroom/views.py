@@ -74,6 +74,16 @@ def _next_token_no() -> int:
     return current + 1
 
 
+def _append_note(existing: str, extra: str) -> str:
+    left = (existing or "").strip()
+    right = (extra or "").strip()
+    if not right:
+        return left
+    if not left:
+        return right
+    return f"{left}\n{right}"
+
+
 class CloakroomEntryViewSet(viewsets.GenericViewSet):
     serializer_class = CloakroomEntrySerializer
     permission_classes = [IsAuthenticated]
@@ -148,18 +158,55 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
             raise PermissionDenied("Only hostel staff can mark cloakroom return.")
 
         raw_token = (request.data.get("token_no") or "").strip()
+        qr_text = (request.data.get("qr_text") or "").strip()
         notes = (request.data.get("notes") or "").strip()
 
-        try:
-            token_no = int(raw_token)
-        except (TypeError, ValueError):
-            raise ValidationError({"token_no": "Token number must be a valid integer."})
+        token_no = None
+        if raw_token:
+            try:
+                token_no = int(raw_token)
+            except (TypeError, ValueError):
+                raise ValidationError({"token_no": "Token number must be a valid integer."})
 
-        entry = CloakroomEntry.objects.select_related("student", "student__block", "submitted_by", "returned_by").filter(
-            token_no=token_no
-        ).first()
-        if not entry:
-            raise ValidationError({"token_no": "Token not found."})
+        if token_no is None and not qr_text:
+            raise ValidationError({"detail": "Provide token_no or student qr_text to mark collection."})
+
+        entry_queryset = CloakroomEntry.objects.select_related(
+            "student", "student__block", "submitted_by", "returned_by"
+        )
+        entry = None
+
+        if qr_text:
+            parsed = _parse_student_qr(qr_text)
+            if not parsed:
+                raise ValidationError({"qr_text": "Invalid student QR format."})
+
+            student = _resolve_student_from_payload(parsed)
+            if not student:
+                raise ValidationError({"qr_text": "Student could not be resolved from this QR."})
+
+            pending = entry_queryset.filter(student=student, status=CloakroomEntry.Status.SUBMITTED)
+            if token_no is not None:
+                entry = pending.filter(token_no=token_no).first()
+                if not entry:
+                    raise ValidationError({"token_no": "No pending token found for this student."})
+            else:
+                pending_count = pending.count()
+                if pending_count == 0:
+                    raise ValidationError({"detail": "No pending cloak room item found for this student."})
+                if pending_count > 1:
+                    tokens = list(pending.values_list("token_no", flat=True)[:10])
+                    raise ValidationError(
+                        {
+                            "token_no": "Multiple pending tokens exist for this student. Provide token_no with QR.",
+                            "pending_tokens": tokens,
+                        }
+                    )
+                entry = pending.first()
+        else:
+            entry = entry_queryset.filter(token_no=token_no).first()
+            if not entry:
+                raise ValidationError({"token_no": "Token not found."})
 
         if entry.status == CloakroomEntry.Status.RETURNED:
             payload = self.get_serializer(entry).data
@@ -170,9 +217,84 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
         entry.returned_at = timezone.now()
         entry.returned_by = request.user
         if notes:
-            entry.notes = f"{entry.notes}\nReturn note: {notes}".strip()
+            entry.notes = _append_note(entry.notes, f"Return note: {notes}")
         entry.save(update_fields=["status", "returned_at", "returned_by", "notes"])
 
         payload = self.get_serializer(entry).data
-        payload["message"] = "Cloak room item marked as returned."
+        payload["message"] = "Cloak room item marked as collected."
         return Response(payload)
+
+    @action(detail=False, methods=["post"], url_path="move")
+    def move_items(self, request):
+        if not _can_manage_cloakroom(request.user):
+            raise PermissionDenied("Only hostel staff can move cloakroom items.")
+
+        target_storage_room = (request.data.get("storage_room_no") or "").strip().upper()
+        block_name = (request.data.get("block_name") or "").strip()
+        room_no = (request.data.get("room_no") or "").strip()
+        raw_start = (request.data.get("token_start") or "").strip()
+        raw_end = (request.data.get("token_end") or "").strip()
+        notes = (request.data.get("notes") or "").strip()
+
+        if not target_storage_room:
+            raise ValidationError({"storage_room_no": "Target storage room is required."})
+
+        has_token_start = bool(raw_start)
+        has_token_end = bool(raw_end)
+        if has_token_start != has_token_end:
+            raise ValidationError({"token_start": "Provide both token_start and token_end for range moves."})
+
+        token_start = None
+        token_end = None
+        if has_token_start and has_token_end:
+            try:
+                token_start = int(raw_start)
+                token_end = int(raw_end)
+            except (TypeError, ValueError):
+                raise ValidationError({"token_start": "Token range must be valid integers."})
+            if token_start > token_end:
+                raise ValidationError({"token_start": "token_start must be <= token_end."})
+
+        if token_start is None and not block_name and not room_no:
+            raise ValidationError(
+                {
+                    "detail": "Choose at least one selector: token range, block name, or room no.",
+                }
+            )
+
+        queryset = CloakroomEntry.objects.select_related("student", "student__block").filter(
+            status=CloakroomEntry.Status.SUBMITTED
+        )
+        if token_start is not None and token_end is not None:
+            queryset = queryset.filter(token_no__gte=token_start, token_no__lte=token_end)
+        if block_name:
+            queryset = queryset.filter(student__block__block_name__iexact=block_name)
+        if room_no:
+            queryset = queryset.filter(student__room_no__iexact=room_no)
+
+        entries = list(queryset[:500])
+        if not entries:
+            raise ValidationError({"detail": "No submitted entries matched this move filter."})
+
+        updated = 0
+        timestamp = timezone.localtime().strftime("%d %b %Y %I:%M %p")
+        move_note = f"Moved to {target_storage_room} by {request.user.username} on {timestamp}"
+        if notes:
+            move_note = f"{move_note}. Note: {notes}"
+
+        for entry in entries:
+            if entry.storage_room_no == target_storage_room and not notes:
+                continue
+            entry.storage_room_no = target_storage_room
+            entry.notes = _append_note(entry.notes, move_note)
+            entry.save(update_fields=["storage_room_no", "notes"])
+            updated += 1
+
+        return Response(
+            {
+                "message": f"Moved {updated} cloak room item(s) to {target_storage_room}.",
+                "updated_count": updated,
+                "matched_count": len(entries),
+                "updated_tokens": [entry.token_no for entry in entries[:40]],
+            }
+        )

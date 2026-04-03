@@ -705,10 +705,23 @@
     {% if room_ranges %}
     <div id="room-ranges-bulk-actions" class="room-ranges-bulk-actions">
       <p class="muted laundry-meta">Use the action below to remove the room ranges currently shown in this view.</p>
-      <form method="post" class="room-ranges-delete-all-form" data-confirm-message="Delete {{ room_ranges|length }} room ranges currently shown? This cannot be undone.">
+      <form method="post" class="room-ranges-delete-all-form" data-confirm-message="Delete the selected room range? This cannot be undone.">
         {% csrf_token %}
-        <input type="hidden" name="action" value="delete_all_room_ranges" />
-        <button type="submit" class="button danger"><i class="ms-Icon ms-Icon--Delete"></i> Delete All Room Ranges</button>
+        <input type="hidden" name="action" value="delete_room_range" />
+        <div class="form-row">
+          <div class="form-group">
+            <label for="room_range_id_bulk">Room Range</label>
+            <select id="room_range_id_bulk" name="room_range_id" required>
+              <option value="">Select room range</option>
+              {% for rule in room_ranges %}
+              <option value="{{ rule.id }}">
+                {{ rule.block_name }} | {% if rule.scheduled_date %}{{ rule.scheduled_date }}{% elif rule.day_of_week %}{{ rule.get_day_of_week_display }}{% else %}-{% endif %} | {{ rule.room_from }}-{{ rule.room_to }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="button danger"><i class="ms-Icon ms-Icon--Delete"></i> Delete Selected Room Range</button>
       </form>
     </div>
     {% endif %}
