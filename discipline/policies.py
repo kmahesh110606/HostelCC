@@ -4,6 +4,13 @@ from typing import Dict, List
 
 VIOLATION_POLICIES: List[dict] = [
     {
+        "code": "LATE_ENTRY_AT_NIGHT",
+        "title": "Late entry to hostel at night (9:00 PM boys, 8:00 PM girls)",
+        "actions": [
+            "Record only (no fine)",
+        ],
+    },
+    {
         "code": "AVOID_ATTENDANCE_OR_NIGHT_ABSENCE",
         "title": "Avoiding hostel attendance or not being present at night",
         "actions": [

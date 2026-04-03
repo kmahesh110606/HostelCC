@@ -9,15 +9,16 @@
 
   .discipline-card {
     padding: 14px;
-    border: 1px solid var(--border, #d8dee8);
+    border: 1px solid var(--line);
     border-radius: 12px;
-    background: var(--surface, #fff);
+    background: var(--panel);
+    color: var(--text);
   }
 
   .discipline-alert {
-    border: 1px solid #f2a7a7;
-    background: #ffe8e8;
-    color: #8a1010;
+    border: 1px solid #d06a6a;
+    background: #ffe3e3;
+    color: #7a0c0c;
     border-radius: 10px;
     padding: 10px;
     margin-bottom: 12px;
@@ -30,57 +31,87 @@
   }
 
   .discipline-row {
-    border: 1px solid var(--border, #d8dee8);
+    border: 1px solid var(--line);
     border-radius: 10px;
     padding: 10px;
+    background: var(--panel);
+    color: var(--text);
+  }
+
+  .violation-select,
+  .violation-search {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .discipline-card input,
+  .discipline-card select,
+  .discipline-card textarea,
+  .tab input,
+  .tab select,
+  .tab textarea {
+    background: var(--panel);
+    color: var(--text);
+    border-color: var(--line);
+  }
+
+  .discipline-row a {
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  html[data-theme="dark"] .discipline-alert {
+    border-color: #8f4a4a;
+    background: rgba(143, 74, 74, 0.25);
+    color: #ffd8d8;
+  }
+
+  html[data-theme="dark"] .discipline-row,
+  html[data-theme="dark"] .discipline-card {
+    box-shadow: none;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) .discipline-alert {
+      border-color: #8f4a4a;
+      background: rgba(143, 74, 74, 0.25);
+      color: #ffd8d8;
+    }
   }
 </style>
 
 <form method="get" class="tab" style="margin-bottom: 14px;">
   <h2>Discipline Search</h2>
-  <p class="muted">Search by registration number to view history and manage ID confiscation.</p>
+  <p class="muted">Search by registration number or student name to manage violations and ID confiscation.</p>
   <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
     <div>
       <label for="reg_no">Registration Number</label>
-      <input id="reg_no" name="reg_no" value="{{ reg_no }}" placeholder="22BCE1234" required />
+      <input id="reg_no" name="reg_no" value="{{ reg_no }}" placeholder="22BCE1234" />
+    </div>
+    <div>
+      <label for="student_name">Student Name</label>
+      <input id="student_name" name="student_name" value="{{ student_name }}" placeholder="Search by name" />
     </div>
     <button type="submit">Search</button>
   </div>
 </form>
 
-<div class="tab" style="margin-bottom: 14px;">
-  <h2>CSV Exports</h2>
-  <p class="muted">Export all students (Block + Room order) and complete discipline history.</p>
-  <div class="discipline-grid">
-    <div class="discipline-card">
-      <h3>Student Master CSV</h3>
-      <form method="get" action="{% url 'discipline-export-students-master' %}">
-        <label for="export_block_students">Block (optional)</label>
-        <input id="export_block_students" name="block" placeholder="A" />
-
-        <label style="margin-top:8px; display:flex; gap:6px; align-items:center;">
-          <input type="checkbox" name="only_active" value="true" />
-          Only students with active ID confiscation
-        </label>
-
-        <button type="submit" style="margin-top:10px;">Download Student Master CSV</button>
-      </form>
-    </div>
-
-    <div class="discipline-card">
-      <h3>Discipline Cases CSV</h3>
-      <form method="get" action="{% url 'discipline-export-cases' %}">
-        <label for="export_block_cases">Block (optional)</label>
-        <input id="export_block_cases" name="block" placeholder="A" />
-
-        <label for="export_reg_no_cases">Registration Number (optional)</label>
-        <input id="export_reg_no_cases" name="reg_no" placeholder="22BCE1234" value="{{ reg_no }}" />
-
-        <button type="submit" style="margin-top:10px;">Download Discipline Cases CSV</button>
-      </form>
+{% if matched_students and not student %}
+  <div class="tab" style="margin-bottom: 14px;">
+    <h3>Matching Students</h3>
+    <p class="muted">Select a student to open violation and history details.</p>
+    <div class="discipline-history">
+      {% for item in matched_students %}
+        <div class="discipline-row">
+          <strong>{{ item.name }}</strong>
+          <div class="muted">REG NO {{ item.roll_no }} | BLOCK {{ item.block.block_name }} | ROOM {{ item.room_no }}</div>
+          <a href="?reg_no={{ item.roll_no }}&student_name={{ student_name|urlencode }}">Open Record</a>
+        </div>
+      {% endfor %}
     </div>
   </div>
-</div>
+{% endif %}
 
 {% if student %}
   {% if active_confiscation %}
@@ -105,8 +136,16 @@
         <input type="hidden" name="action" value="confiscate" />
         <input type="hidden" name="reg_no" value="{{ student.roll_no }}" />
 
+        <label for="violation_filter">Search violation</label>
+        <input
+          id="violation_filter"
+          class="violation-search"
+          type="text"
+          placeholder="Type to search violation"
+        />
+
         <label for="violation_code">Violation</label>
-        <select id="violation_code" name="violation_code" required>
+        <select id="violation_code" class="violation-select" name="violation_code" required>
           <option value="">Select violation</option>
           {% for policy in violation_policies %}
             <option value="{{ policy.code }}">{{ policy.title }}</option>
@@ -160,4 +199,84 @@
     <p>No student found for registration number <strong>{{ reg_no }}</strong>.</p>
   </div>
 {% endif %}
+
+<div class="tab" style="margin-top: 14px; margin-bottom: 14px;">
+  <h2>CSV Exports</h2>
+  <p class="muted">Export all students (Block + Room order) and complete discipline history.</p>
+  <div class="discipline-grid">
+    <div class="discipline-card">
+      <h3>Student Master CSV</h3>
+      <form method="get" action="{% url 'discipline-export-students-master' %}">
+        <label for="export_block_students">Block (optional)</label>
+        <input id="export_block_students" name="block" placeholder="A" />
+
+        <label style="margin-top:8px; display:flex; gap:6px; align-items:center;">
+          <input type="checkbox" name="only_active" value="true" />
+          Only students with active ID confiscation
+        </label>
+
+        <button type="submit" style="margin-top:10px;">Download Student Master CSV</button>
+      </form>
+    </div>
+
+    <div class="discipline-card">
+      <h3>Discipline Cases CSV</h3>
+      <form method="get" action="{% url 'discipline-export-cases' %}">
+        <label for="export_block_cases">Block (optional)</label>
+        <input id="export_block_cases" name="block" placeholder="A" />
+
+        <label for="export_reg_no_cases">Registration Number (optional)</label>
+        <input id="export_reg_no_cases" name="reg_no" placeholder="22BCE1234" value="{{ reg_no }}" />
+
+        <button type="submit" style="margin-top:10px;">Download Discipline Cases CSV</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const filterInput = document.getElementById("violation_filter");
+    const violationSelect = document.getElementById("violation_code");
+    if (!filterInput || !violationSelect) {
+      return;
+    }
+
+    const allOptions = Array.from(violationSelect.options);
+    function applyFilter() {
+      const query = (filterInput.value || "").trim().toLowerCase();
+      let firstVisibleValue = "";
+      for (const option of allOptions) {
+        if (!option.value) {
+          option.hidden = false;
+          continue;
+        }
+        option.hidden = query.length > 0 && !option.text.toLowerCase().includes(query);
+        if (!option.hidden && !firstVisibleValue) {
+          firstVisibleValue = option.value;
+        }
+      }
+
+      if (violationSelect.selectedOptions.length > 0 && violationSelect.selectedOptions[0].hidden) {
+        violationSelect.value = firstVisibleValue || "";
+      }
+    }
+
+    filterInput.addEventListener("input", applyFilter);
+    filterInput.addEventListener("keydown", function (event) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        violationSelect.focus();
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const visibleOption = allOptions.find((option) => option.value && !option.hidden);
+        if (visibleOption) {
+          violationSelect.value = visibleOption.value;
+          violationSelect.focus();
+        }
+      }
+    });
+  })();
+</script>
 {% endblock %}

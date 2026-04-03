@@ -210,19 +210,30 @@ def discipline_portal(request):
         return redirect("dashboard-router")
 
     reg_no = (request.GET.get("reg_no") or request.POST.get("reg_no") or "").strip().upper()
+    student_name = (request.GET.get("student_name") or request.POST.get("student_name") or "").strip()
     student = None
+    matched_students = []
     history = []
     active_confiscation = None
 
     if reg_no:
         student = Student.objects.select_related("block").filter(roll_no__iexact=reg_no).first()
-        if student:
-            history = list(
-                DisciplineCase.objects.select_related("created_by", "returned_by")
-                .filter(student=student)
-                .order_by("-created_at")
-            )
-            active_confiscation = next((item for item in history if item.is_id_card_active_confiscation), None)
+    elif student_name:
+        matched_students = list(
+            Student.objects.select_related("block")
+            .filter(name__icontains=student_name)
+            .order_by("name", "roll_no")[:50]
+        )
+        if len(matched_students) == 1:
+            student = matched_students[0]
+
+    if student:
+        history = list(
+            DisciplineCase.objects.select_related("created_by", "returned_by")
+            .filter(student=student)
+            .order_by("-created_at")
+        )
+        active_confiscation = next((item for item in history if item.is_id_card_active_confiscation), None)
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -233,12 +244,12 @@ def discipline_portal(request):
 
             if not student:
                 messages.error(request, "Student not found for this registration number.")
-                return redirect(f"{request.path}?reg_no={reg_no}")
+                return redirect(f"{request.path}?reg_no={reg_no}&student_name={student_name}")
 
             policy_codes = {item["code"] for item in VIOLATION_POLICIES}
             if violation_code not in policy_codes:
                 messages.error(request, "Please select a valid violation.")
-                return redirect(f"{request.path}?reg_no={reg_no}")
+                return redirect(f"{request.path}?reg_no={reg_no}&student_name={student_name}")
 
             occurrence_number = (
                 DisciplineCase.objects.filter(student=student, violation_code=violation_code).count() + 1
@@ -255,7 +266,7 @@ def discipline_portal(request):
                 id_card_confiscated=True,
             )
             messages.success(request, "ID card confiscation record created.")
-            return redirect(f"{request.path}?reg_no={reg_no}")
+            return redirect(f"{request.path}?reg_no={reg_no}&student_name={student_name}")
 
         if action == "return_id":
             case_id = (request.POST.get("case_id") or "").strip()
@@ -264,10 +275,10 @@ def discipline_portal(request):
             case = DisciplineCase.objects.filter(id=case_id).first()
             if not case:
                 messages.error(request, "Discipline record not found.")
-                return redirect(f"{request.path}?reg_no={reg_no}")
+                return redirect(f"{request.path}?reg_no={reg_no}&student_name={student_name}")
             if case.id_card_returned_at is not None:
                 messages.error(request, "ID card already marked as returned.")
-                return redirect(f"{request.path}?reg_no={reg_no}")
+                return redirect(f"{request.path}?reg_no={reg_no}&student_name={student_name}")
 
             from django.utils import timezone
 
@@ -276,14 +287,16 @@ def discipline_portal(request):
             case.returned_by = request.user
             case.save(update_fields=["id_card_returned_at", "return_notes", "returned_by", "updated_at"])
             messages.success(request, "ID card marked as returned.")
-            return redirect(f"{request.path}?reg_no={reg_no}")
+            return redirect(f"{request.path}?reg_no={reg_no}&student_name={student_name}")
 
     return render(
         request,
         "discipline/portal.html",
         {
             "reg_no": reg_no,
+            "student_name": student_name,
             "student": student,
+            "matched_students": matched_students,
             "history": history,
             "active_confiscation": active_confiscation,
             "violation_policies": VIOLATION_POLICIES,
