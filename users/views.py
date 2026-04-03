@@ -1,11 +1,14 @@
 import logging
+import mimetypes
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
+from django.http import FileResponse
 from users.otp_queue import OtpEmailJob, send_otp_email
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -466,3 +469,27 @@ class AppNotificationViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=["get"], url_path="poster")
+    def poster(self, request, pk=None):
+        notification = self.get_object()
+        if not notification.poster:
+            return Response({"detail": "No poster attached for this notification."}, status=404)
+
+        file_name = notification.poster.name.rsplit("/", 1)[-1] or "notification-poster"
+        guessed_type, _ = mimetypes.guess_type(file_name)
+        lower_name = file_name.lower()
+        if lower_name.endswith(".pdf"):
+            content_type = guessed_type or "application/pdf"
+        elif lower_name.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")):
+            content_type = guessed_type or "image/jpeg"
+        else:
+            content_type = guessed_type or "application/octet-stream"
+
+        response = FileResponse(
+            notification.poster.open("rb"),
+            content_type=content_type,
+            as_attachment=False,
+        )
+        response["Cache-Control"] = "public, max-age=3600"
+        return response

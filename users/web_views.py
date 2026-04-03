@@ -1,6 +1,5 @@
 import json
 import logging
-from urllib.parse import urljoin
 
 from django.conf import settings
 from django.contrib import messages
@@ -10,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from users.otp_queue import OtpEmailJob, send_otp_email
 
@@ -45,23 +45,11 @@ def _bump_notifications_cache_version() -> None:
     cache.set("dashboard:notifications:version", _notifications_cache_version() + 1, timeout=None)
 
 
-def _normalized_file_url(file_field) -> str:
-    """Return a browser-safe URL for a stored file across storage backends."""
-    if not file_field:
+def _notification_poster_url(request: HttpRequest, notification: AppNotification) -> str:
+    if not notification.poster or not notification.pk:
         return ""
-    try:
-        raw_url = str(file_field.url or "").strip()
-    except Exception:
-        return ""
-
-    if not raw_url:
-        return ""
-
-    # Keep absolute URLs and root-relative URLs as-is.
-    if raw_url.startswith(("http://", "https://", "/")):
-        return raw_url
-
-    return urljoin(settings.MEDIA_URL, raw_url)
+    poster_path = reverse("app-notifications-poster", args=[notification.pk])
+    return request.build_absolute_uri(poster_path)
 
 
 def _get_fixed_otp_code() -> str:
@@ -758,7 +746,7 @@ def notification_panel(request: HttpRequest) -> HttpResponse:
         )[:20]
 
     for notification in notifications:
-        notification.poster_web_url = _normalized_file_url(notification.poster)
+        notification.poster_web_url = _notification_poster_url(request, notification)
 
     return render(
         request,
