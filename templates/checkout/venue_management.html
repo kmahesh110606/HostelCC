@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Venue Management - QR Checkout{% endblock %}
+
+{% block content %}
+<div class="shell">
+  <h1>Venue Management</h1>
+  <p class="muted">Manage storage locations and item distribution</p>
+  
+  <div style="margin-top: 24px;">
+    {% if venues %}
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+        {% for venue in venues %}
+          <div style="background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px; transition: all 200ms ease;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+              <div>
+                <h3 style="margin-top: 0;">{{ venue.name }}</h3>
+                {% if venue.description %}
+                  <p class="muted" style="font-size: 13px; margin-bottom: 12px;">{{ venue.description }}</p>
+                {% endif %}
+              </div>
+              {% if not venue.is_active %}
+                <div style="padding: 4px 8px; border-radius: var(--radius-md); background: var(--error); color: white; font-size: 11px; font-weight: 600;">
+                  INACTIVE
+                </div>
+              {% endif %}
+            </div>
+            
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div class="muted" style="font-size: 13px;">Current Items</div>
+                <div style="font-weight: 700; font-size: 18px; color: var(--primary);">{{ venue.item_count }}</div>
+              </div>
+              
+              {% if venue.max_capacity %}
+                <div style="width: 100%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden;">
+                  <div style="height: 100%; width: {{ venue.item_count|default:0 }}%; max-width: 100%; background: color-mix(in srgb, var(--primary) 60%, var(--warning) 40%); transition: width 200ms ease;"></div>
+                </div>
+                <div class="muted" style="font-size: 12px; margin-top: 8px;">
+                  Capacity: {{ venue.item_count }}/{{ venue.max_capacity }}
+                </div>
+              {% endif %}
+            </div>
+            
+            {% if venue.location %}
+              <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);">
+                <div class="muted" style="font-size: 12px;">📍 {{ venue.location }}</div>
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="messages">
+        <li>No venues configured yet</li>
+      </div>
+    {% endif %}
+  </div>
+  
+  <!-- Summary -->
+  {% if item_stats %}
+    <div style="margin-top: 40px;">
+      <h2>Item Distribution</h2>
+      <div style="margin-top: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;">
+        {% for stat in item_stats %}
+          <div style="padding: 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 600;">{{ stat.current_venue__name }}</div>
+            <div style="font-size: 18px; font-weight: 700; color: var(--primary);">{{ stat.count }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+  
+  <!-- Quick Stats -->
+  <div style="margin-top: 40px; margin-bottom: 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+    <div style="background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px;">
+      <div style="font-size: 24px; font-weight: 700; color: var(--primary);">{{ venues.count }}</div>
+      <div class="muted">Active Venues</div>
+    </div>
+    
+    <div style="background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px;">
+      <div style="font-size: 24px; font-weight: 700;">
+        {% with total_items=venues|dictsort:"item_count"|join:"," %}
+          {% for v in venues %}
+            {% if forloop.last %}
+              <!-- Calculate total manually if needed -->
+            {% endif %}
+          {% endfor %}
+        {% endwith %}
+        <!-- Fallback: show count of all submissions -->
+      </div>
+      <div class="muted">Total Items Stored</div>
+    </div>
+  </div>
+</div>
+
+<style>
+  @media (max-width: 768px) {
+    div {
+      grid-template-columns: 1fr !important;
+    }
+  }
+</style>
+{% endblock %}

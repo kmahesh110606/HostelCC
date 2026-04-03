@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Submissions - QR Checkout{% endblock %}
+
+{% block content %}
+<div class="shell">
+  <h1>Item Submissions</h1>
+  <p class="muted">View and manage all submitted items</p>
+  
+  <div style="margin-top: 24px;">
+    <!-- Filters -->
+    <form method="get" style="background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px;">
+      <div class="form-grid">
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 13px;">Student (Roll/Name)</label>
+          <input 
+            type="text" 
+            name="student" 
+            value="{{ student_search }}"
+            placeholder="Search..."
+            style="width: 100%;"
+          />
+        </div>
+        
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 13px;">Item Type</label>
+          <select name="item" style="width: 100%;">
+            <option value="">All Items</option>
+            {% for item in item_types %}
+              <option value="{{ item.code }}" {% if item.code == current_item_filter %}selected{% endif %}>
+                {{ item.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 13px;">Venue</label>
+          <select name="venue" style="width: 100%;">
+            <option value="">All Venues</option>
+            {% for venue in venues %}
+              <option value="{{ venue.id }}" {% if venue.id|slugify == current_venue_filter|slugify %}selected{% endif %}>
+                {{ venue.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 12px; margin-top: 12px;">
+        <button type="submit" style="flex: 1; padding: 11px 18px; border-radius: var(--radius-md); border: 1px solid var(--primary); background: var(--primary); color: white; font-weight: 600; font-size: 14px; cursor: pointer;">
+          Filter
+        </button>
+        <a href="{% url 'submissions-list' %}" style="flex: 1; padding: 11px 18px; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--panel); color: var(--text); font-weight: 600; font-size: 14px; cursor: pointer; text-align: center; text-decoration: none;">
+          Clear
+        </a>
+      </div>
+    </form>
+  </div>
+  
+  <!-- Submissions List -->
+  <div style="margin-top: 24px;">
+    {% if submissions %}
+      <div style="border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;">
+        {% for submission in submissions %}
+          <div style="padding: 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="flex: 1;">
+              <div style="font-weight: 600; margin-bottom: 4px;">
+                {{ submission.student.roll_no }} - {{ submission.student.name }}
+              </div>
+              <div class="muted" style="font-size: 13px; margin-bottom: 8px;">
+                <strong>Item:</strong> {{ submission.item_type.name }}
+              </div>
+              <div class="muted" style="font-size: 13px;">
+                <strong>Venue:</strong> {{ submission.current_venue.name }}
+              </div>
+            </div>
+            
+            <div style="text-align: right; margin-left: 16px;">
+              <div style="font-weight: 600; color: var(--primary);">
+                {{ submission.token_number }}
+              </div>
+              <div class="muted" style="font-size: 12px; margin-top: 4px;">
+                {{ submission.submitted_at|date:"d M, H:i" }}
+              </div>
+              {% if submission.relocated_at %}
+                <div style="font-size: 12px; color: var(--warning); margin-top: 4px;">
+                  Relocated {{ submission.relocated_at|date:"d M, H:i" }}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="messages">
+        <li>No submissions found</li>
+      </div>
+    {% endif %}
+  </div>
+  
+  <!-- Submission Stats -->
+  <div style="margin-top: 40px; margin-bottom: 40px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 24px;">
+    <h3 style="margin-top: 0;">Statistics</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px;">
+      <div>
+        <div style="font-size: 24px; font-weight: 700; color: var(--primary);">{{ submissions.count }}</div>
+        <div class="muted" style="margin-top: 4px;">Total Submissions</div>
+      </div>
+      <div>
+        <div style="font-size: 24px; font-weight: 700;">
+          {% with relocated_count=submissions|dictsort:"relocated_at"|length %}
+            {{ relocated_count }}
+          {% endwith %}
+        </div>
+        <div class="muted" style="margin-top: 4px;">Relocated Items</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    align-items: end;
+  }
+</style>
+{% endblock %}

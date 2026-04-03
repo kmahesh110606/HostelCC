@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "mess",
     "complaints",
     "discipline",
+    "checkout",
 ]
 
 MIDDLEWARE = [

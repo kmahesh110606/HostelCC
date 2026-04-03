@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}My Checkout Status{% endblock %}
+
+{% block content %}
+<div class="shell" style="max-width: 800px;">
+  <h1>My Checkout Status</h1>
+  <p class="muted">Track your chair and item submissions</p>
+
+  <div style="margin-top: 24px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel); display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
+    <div style="width: 120px; height: 120px; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 8px; background: #fff; display:flex; align-items:center; justify-content:center;">
+      {% if student_qr_svg %}
+        {{ student_qr_svg|safe }}
+      {% else %}
+        <span class="muted" style="font-size: 12px; text-align: center;">QR unavailable</span>
+      {% endif %}
+    </div>
+    <div>
+      <div class="muted" style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;">Student QR</div>
+      <div style="font-weight: 700; margin-top: 6px;">{{ student_qr_payload }}</div>
+      <div class="muted" style="font-size: 13px; margin-top: 8px;">Show this QR for chair submission and all item scans.</div>
+    </div>
+  </div>
+  
+  <!-- Warning Messages -->
+  {% if not can_submit_items %}
+    <div id="gateMessage" style="margin-top: 24px; padding: 16px; border-radius: var(--radius-lg); background: rgba(232, 17, 35, 0.1); border: 1px solid rgba(232, 17, 35, 0.2); color: #E81123;">
+      <strong style="display: block; margin-bottom: 4px;">⚠ Action Required</strong>
+      <span>You must submit your chair before submitting items to clock rooms. Please visit the admin desk to scan your chair.</span>
+    </div>
+  {% else %}
+    <div id="gateMessage" style="display:none;"></div>
+  {% endif %}
+  
+  <!-- Chair Submission Status -->
+  <div style="margin-top: 32px;">
+    <h2>Chair Submission</h2>
+    
+    {% if chair_submission %}
+      {% if chair_submission.status == 'damaged' %}
+      <div id="chairCard" class="chair-card is-damaged">
+      {% else %}
+      <div id="chairCard" class="chair-card is-perfect">
+      {% endif %}
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 28px;">{% if chair_submission.status == 'damaged' %}⚠{% else %}✓{% endif %}</div>
+          <div>
+            {% if chair_submission.status == 'damaged' %}
+            <div class="chair-status-text is-damaged">
+            {% else %}
+            <div class="chair-status-text is-perfect">
+            {% endif %}
+              Chair Status: {{ chair_submission.get_status_display }}
+            </div>
+            <div class="muted" style="font-size: 13px; margin-top: 4px;">
+              Submitted on {{ chair_submission.submitted_at|date:"d M Y, H:i" }}
+            </div>
+            {% if chair_submission.notes %}
+              {% if chair_submission.status == 'damaged' %}
+              <div class="chair-notes is-damaged">
+              {% else %}
+              <div class="chair-notes is-perfect">
+              {% endif %}
+                <strong>Notes:</strong> {{ chair_submission.notes }}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        
+        <!-- QR Code Display -->
+        {% if chair_submission.status == 'damaged' %}
+        <div class="chair-qr-sep is-damaged">
+        {% else %}
+        <div class="chair-qr-sep is-perfect">
+        {% endif %}
+          <div class="muted" style="font-size: 12px; margin-bottom: 12px;">Your QR Token (for item submissions):</div>
+          <div style="font-family: monospace; font-weight: 600; padding: 12px; background: rgba(0,0,0,0.05); border-radius: var(--radius-md); word-break: break-all;">
+            {{ chair_submission.qr_token }}
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div id="chairCard" style="margin-top: 16px; padding: 20px; border-radius: var(--radius-lg); background: rgba(23, 120, 109, 0.1); border: 1px solid rgba(23, 120, 109, 0.2);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 28px;">🔒</div>
+          <div>
+            <div style="font-weight: 600;">Chair Not Yet Submitted</div>
+            <div class="muted" style="font-size: 13px; margin-top: 4px;">
+              Please contact the admin desk to submit your chair before proceeding with item submissions.
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+  
+  <!-- Item Submissions -->
+  <div style="margin-top: 40px; margin-bottom: 40px;">
+    <h2>Submitted Items</h2>
+    
+    <div style="margin-top: 16px;">
+      <div id="itemsList" class="messages" style="list-style: none; margin: 0; padding: 0; display: grid; gap: 12px;">
+        {% for submission in submissions %}
+          <li style="border: 1px solid var(--line); background: var(--panel); padding: 16px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <div style="font-weight: 600;">{{ submission.item_type.name }}</div>
+              <div class="muted" style="font-size: 13px; margin-top: 6px;">
+                Stored in: <strong>{{ submission.current_venue.name }}</strong>
+              </div>
+              <div class="muted" style="font-size: 13px; margin-top: 4px;">
+                Submitted: {{ submission.submitted_at|date:"d M Y, H:i" }}
+              </div>
+              {% if submission.relocated_at %}
+                <div style="font-size: 12px; color: var(--warning); margin-top: 4px;">
+                  ↻ Last moved: {{ submission.relocated_at|date:"d M Y, H:i" }}
+                </div>
+              {% endif %}
+            </div>
+            <div style="text-align: right;">
+              <div style="padding: 8px 12px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--primary) 15%, var(--panel) 85%); border: 1px solid var(--primary);">
+                <div style="font-weight: 700; color: var(--primary); font-size: 14px;">{{ submission.token_number }}</div>
+                <div class="muted" style="font-size: 11px; margin-top: 2px;">Token</div>
+              </div>
+            </div>
+          </li>
+        {% endfor %}
+      </div>
+      <div id="emptyItemsWrap" class="messages{% if submissions %} is-hidden{% endif %}" style="margin-top: 16px;">
+        <li id="emptyItemsMsg">
+          {% if can_submit_items %}
+            No items submitted yet. Visit the admin desk to submit items.
+          {% else %}
+            Submit your chair first to be able to submit items.
+          {% endif %}
+        </li>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function renderItems(items) {
+  const list = document.getElementById('itemsList');
+  const empty = document.getElementById('emptyItemsWrap');
+  if (!list) {
+    return;
+  }
+  if (!items.length) {
+    list.innerHTML = '';
+    if (empty) {
+      empty.style.display = 'grid';
+    }
+    return;
+  }
+  if (empty) {
+    empty.style.display = 'none';
+  }
+  list.innerHTML = items.map((item) => {
+    const statusText = item.status === 'relocated' ? '<div style="font-size: 12px; color: var(--warning); margin-top: 4px;">↻ Relocated</div>' : '';
+    return `
+      <li style="border: 1px solid var(--line); background: var(--panel); padding: 16px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <div style="font-weight: 600;">${item.item_type}</div>
+          <div class="muted" style="font-size: 13px; margin-top: 6px;">Stored in: <strong>${item.venue}</strong></div>
+          <div class="muted" style="font-size: 13px; margin-top: 4px;">Submitted: ${new Date(item.submitted_at).toLocaleString()}</div>
+          ${statusText}
+        </div>
+        <div style="text-align: right;">
+          <div style="padding: 8px 12px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--primary) 15%, var(--panel) 85%); border: 1px solid var(--primary);">
+            <div style="font-weight: 700; color: var(--primary); font-size: 14px;">${item.token}</div>
+            <div class="muted" style="font-size: 11px; margin-top: 2px;">Token</div>
+          </div>
+        </div>
+      </li>
+    `;
+  }).join('');
+}
+
+async function pollStatus() {
+  try {
+    const res = await fetch('/api/checkout/student/status/?silent=1', { credentials: 'same-origin' });
+    if (!res.ok) {
+      return;
+    }
+    const data = await res.json();
+    renderItems(data.items_submitted || []);
+    const gateMessage = document.getElementById('gateMessage');
+    if (gateMessage) {
+      gateMessage.style.display = data.chair_submitted ? 'none' : 'block';
+    }
+  } catch (e) {
+    console.error('status poll failed', e);
+  }
+}
+
+window.setInterval(pollStatus, 5000);
+</script>
+
+<style>
+  .chair-card {
+    margin-top: 16px;
+    padding: 20px;
+    border-radius: var(--radius-lg);
+  }
+
+  .chair-card.is-perfect {
+    background: rgba(16, 124, 16, 0.1);
+    border: 1px solid rgba(16, 124, 16, 0.2);
+  }
+
+  .chair-card.is-damaged {
+    background: rgba(255, 51, 51, 0.1);
+    border: 1px solid rgba(255, 51, 51, 0.2);
+  }
+
+  .chair-status-text {
+    font-weight: 600;
+  }
+
+  .chair-status-text.is-perfect {
+    color: #107C10;
+  }
+
+  .chair-status-text.is-damaged {
+    color: #FF3333;
+  }
+
+  .chair-notes {
+    font-size: 13px;
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .chair-notes.is-perfect {
+    border-top: 1px solid rgba(16, 124, 16, 0.3);
+  }
+
+  .chair-notes.is-damaged {
+    border-top: 1px solid rgba(255, 51, 51, 0.3);
+  }
+
+  .chair-qr-sep {
+    margin-top: 16px;
+    padding-top: 16px;
+  }
+
+  .chair-qr-sep.is-perfect {
+    border-top: 1px solid rgba(16, 124, 16, 0.2);
+  }
+
+  .chair-qr-sep.is-damaged {
+    border-top: 1px solid rgba(255, 51, 51, 0.2);
+  }
+
+  .is-hidden {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    .messages li {
+      flex-direction: column;
+      align-items: flex-start !important;
+    }
+    
+    .messages li > div:last-child {
+      align-self: flex-end;
+      margin-top: 12px;
+    }
+  }
+</style>
+{% endblock %}

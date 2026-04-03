@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}QR Checkout - Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="shell">
+  <h1>QR Checkout Administration</h1>
+  <p class="muted">Manage chair submissions, item storage, and checkout process</p>
+  
+  <!-- Statistics Grid -->
+  <div class="tabs" style="margin-top: 24px;">
+    <div class="tab">
+      <div style="font-size: 32px; font-weight: 700; color: var(--primary);">{{ total_chairs_submitted }}</div>
+      <div class="muted" style="margin-top: 8px;">Chairs Submitted</div>
+    </div>
+    <div class="tab">
+      <div style="font-size: 32px; font-weight: 700; color: var(--warning);">{{ damaged_chairs }}</div>
+      <div class="muted" style="margin-top: 8px;">Damaged Chairs</div>
+    </div>
+    <div class="tab">
+      <div style="font-size: 32px; font-weight: 700; color: var(--success);">{{ total_items_submitted }}</div>
+      <div class="muted" style="margin-top: 8px;">Items Submitted</div>
+    </div>
+    <div class="tab">
+      <div style="font-size: 32px; font-weight: 700; color: var(--info);">{{ total_venues }}</div>
+      <div class="muted" style="margin-top: 8px;">Active Venues</div>
+    </div>
+    <div class="tab">
+      <div style="font-size: 32px; font-weight: 700;">{{ chair_submission_rate }}</div>
+      <div class="muted" style="margin-top: 8px;">Submission Rate</div>
+    </div>
+  </div>
+  
+  <!-- Actions -->
+  <div style="margin-top: 32px;">
+    <h2>Scanning Operations</h2>
+    <div class="tabs" style="margin-top: 16px;">
+      <a href="{% url 'chair-scanner' %}" class="tab" style="text-decoration: none; opacity: 1; transform: none;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18"></rect>
+          <line x1="7" y1="7" x2="7" y2="7"></line>
+          <line x1="17" y1="7" x2="17" y2="7"></line>
+          <line x1="7" y1="17" x2="7" y2="17"></line>
+          <line x1="17" y1="17" x2="17" y2="17"></line>
+        </svg>
+        <div style="margin-top: 12px; font-weight: 600;">Chair Scanning</div>
+        <p class="muted" style="margin-top: 6px; font-size: 13px;">Submit chairs</p>
+      </a>
+      
+      {% if item_types %}
+        {% for item in item_types %}
+          <a href="{% url 'item-scanner' item.code %}" class="tab" style="text-decoration: none; opacity: 1; transform: none;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 6h6m-6 4h6m-13-4h4v12h4v-12h4v12h4v-12"></path>
+            </svg>
+            <div style="margin-top: 12px; font-weight: 600; font-size: 14px;">{{ item.name }}</div>
+            <p class="muted" style="margin-top: 6px; font-size: 12px;">{{ item.code }}</p>
+          </a>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+  
+  <!-- Management Options -->
+  <div style="margin-top: 32px;">
+    <h2>Management</h2>
+    <div class="tabs" style="margin-top: 16px;">
+      <a href="{% url 'submissions-list' %}" class="tab" style="text-decoration: none; opacity: 1; transform: none;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path>
+        </svg>
+        <div style="margin-top: 12px; font-weight: 600;">View Submissions</div>
+        <p class="muted" style="margin-top: 6px; font-size: 13px;">All submitted items</p>
+      </a>
+      
+      <a href="{% url 'venue-management' %}" class="tab" style="text-decoration: none; opacity: 1; transform: none;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
+        </svg>
+        <div style="margin-top: 12px; font-weight: 600;">Venues</div>
+        <p class="muted" style="margin-top: 6px; font-size: 13px;">Manage storage locations</p>
+      </a>
+    </div>
+  </div>
+  
+  <!-- Recent Activity -->
+  <div style="margin-top: 40px;">
+    <h2>Recent Chair Submissions</h2>
+    {% if recent_chairs %}
+      <div style="margin-top: 16px; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;">
+        {% for chair in recent_chairs %}
+          <div style="padding: 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 600;">{{ chair.student.roll_no }}</div>
+              <div class="muted" style="font-size: 13px; margin-top: 4px;">{{ chair.student.name }}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-weight: 600; color: {% if chair.status == 'damaged' %}var(--warning){% else %}var(--success){% endif %};">
+                {{ chair.get_status_display }}
+              </div>
+              <div class="muted" style="font-size: 13px; margin-top: 4px;">{{ chair.submitted_at|date:"d M, H:i" }}</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="messages">
+        <li>No chair submissions yet</li>
+      </div>
+    {% endif %}
+  </div>
+  
+  <!-- Venue Status -->
+  <div style="margin-top: 40px; margin-bottom: 40px;">
+    <h2>Venue Status</h2>
+    {% if venues %}
+      <div style="margin-top: 16px; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;">
+        {% for venue in venues %}
+          <div style="padding: 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;">
+            <div style="flex: 1;">
+              <div style="font-weight: 600;">{{ venue.name }}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-weight: 600;">{{ venue.item_count }} items</div>
+              {% if venue.max_capacity %}
+                <div class="muted" style="font-size: 13px; margin-top: 4px;">Capacity: {{ venue.item_count }}/{{ venue.max_capacity }}</div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="messages">
+        <li>No venues configured</li>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+  .tab {
+    cursor: pointer;
+    transition: all 200ms ease;
+  }
+  
+  .tab:hover {
+    transform: translateY(-2px);
+  }
+  
+  .tab svg {
+    color: var(--primary);
+  }
+</style>
+{% endblock %}

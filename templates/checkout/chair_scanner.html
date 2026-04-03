@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}Chair Submission - QR Scanner{% endblock %}
+
+{% block content %}
+<div class="shell" style="max-width: 600px;">
+  <h1>Chair Submission</h1>
+  <p class="muted">Scan student QR code and record chair condition</p>
+  
+  <div style="margin-top: 32px;">
+    <!-- QR Input Section -->
+    <div style="background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 24px;">
+      <label style="display: block; margin-bottom: 8px; font-weight: 600;">Student QR Code</label>
+      <input 
+        type="text" 
+        id="qrInput" 
+        placeholder="Scan QR code or enter student ID"
+        autocomplete="off"
+        style="font-size: 16px;"
+      />
+      <p class="hint">Scanning will start automatically after you place focus on the field</p>
+    </div>
+    
+    <!-- Student Info (Hidden until scan) -->
+    <div id="studentInfo" style="display: none; margin-top: 24px; padding: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg);">
+      <div style="margin-bottom: 16px;">
+        <div class="muted" style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;">Student Details</div>
+        <div id="studentName" style="font-size: 18px; font-weight: 600; margin-top: 8px;"></div>
+        <div id="studentRoll" class="muted" style="margin-top: 4px;"></div>
+      </div>
+    </div>
+    
+    <!-- Chair Status Selection (Hidden until scan) -->
+    <div id="statusSection" style="display: none; margin-top: 24px;">
+      <label style="display: block; margin-bottom: 16px; font-weight: 600;">Chair Condition</label>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <button 
+          class="status-btn" 
+          data-status="perfect"
+          style="padding: 16px; border: 2px solid var(--line); border-radius: var(--radius-md); background: var(--panel); cursor: pointer; transition: all 200ms ease; font-weight: 600;"
+        >
+          <div style="font-size: 20px; margin-bottom: 8px;">✓</div>
+          <div>Perfect</div>
+          <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">No damage</div>
+        </button>
+        
+        <button 
+          class="status-btn" 
+          data-status="damaged"
+          style="padding: 16px; border: 2px solid var(--line); border-radius: var(--radius-md); background: var(--panel); cursor: pointer; transition: all 200ms ease; font-weight: 600;"
+        >
+          <div style="font-size: 20px; margin-bottom: 8px;">⚠</div>
+          <div>Damaged</div>
+          <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">Has issues</div>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Notes (Visible when damaged selected) -->
+    <div id="notesSection" style="display: none; margin-top: 20px;">
+      <label style="display: block; margin-bottom: 8px; font-weight: 600;">Damage Notes</label>
+      <textarea 
+        id="damageNotes" 
+        placeholder="Describe the damage (optional)"
+        style="min-height: 100px;"
+      ></textarea>
+    </div>
+    
+    <!-- Submit Button (Hidden until status selected) -->
+    <div id="submitSection" style="display: none; margin-top: 24px;">
+      <button 
+        id="submitBtn"
+        style="width: 100%; padding: 14px; font-weight: 600; font-size: 16px; border-radius: var(--radius-md); border: 1px solid var(--primary); background: var(--primary); color: white; cursor: pointer; transition: all 200ms ease;"
+      >
+        Submit Chair Information
+      </button>
+    </div>
+    
+    <!-- Status Messages -->
+    <div id="messageArea" style="display: none; margin-top: 20px;"></div>
+  </div>
+</div>
+
+<script>
+const qrInput = document.getElementById('qrInput');
+const studentInfo = document.getElementById('studentInfo');
+const statusSection = document.getElementById('statusSection');
+const notesSection = document.getElementById('notesSection');
+const submitSection = document.getElementById('submitSection');
+const messageArea = document.getElementById('messageArea');
+const damageNotes = document.getElementById('damageNotes');
+const submitBtn = document.getElementById('submitBtn');
+
+let currentStudent = null;
+let selectedStatus = null;
+let isVerifying = false;
+
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+// Focus input on load
+window.addEventListener('load', () => {
+  qrInput.focus();
+});
+
+// Handle QR code scanning
+qrInput.addEventListener('change', async (e) => {
+  if (isVerifying) {
+    return;
+  }
+  const qr = e.target.value.trim();
+  if (!qr) return;
+  
+  // Clear previous state
+  studentInfo.style.display = 'none';
+  statusSection.style.display = 'none';
+  submitSection.style.display = 'none';
+  selectedStatus = null;
+  
+  try {
+    isVerifying = true;
+    showMessage('Verifying student...', 'info');
+    
+    const response = await fetch('/api/checkout/verify-qr/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      body: JSON.stringify({ qr_token: qr })
+    });
+    
+    if (!response.ok) {
+      showMessage('Student not found', 'error');
+      qrInput.value = '';
+      qrInput.focus();
+      return;
+    }
+    
+    const data = await response.json();
+    currentStudent = data;
+    
+    document.getElementById('studentName').textContent = data.student_name;
+    document.getElementById('studentRoll').textContent = data.student_roll;
+    
+    studentInfo.style.display = 'block';
+    statusSection.style.display = 'block';
+    messageArea.style.display = 'none';
+    
+  } catch (error) {
+    showMessage('Error verifying QR code', 'error');
+    qrInput.value = '';
+    qrInput.focus();
+  } finally {
+    isVerifying = false;
+  }
+});
+
+// Status button selection
+document.querySelectorAll('.status-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    // Remove previous selection
+    document.querySelectorAll('.status-btn').forEach(b => {
+      b.style.borderColor = 'var(--line)';
+      b.style.background = 'var(--panel)';
+    });
+    
+    // Mark current selection
+    selectedStatus = btn.dataset.status;
+    btn.style.borderColor = 'var(--primary)';
+    btn.style.background = 'color-mix(in srgb, var(--primary) 15%, var(--panel) 85%)';
+    
+    // Show notes if damaged
+    if (selectedStatus === 'damaged') {
+      notesSection.style.display = 'block';
+    } else {
+      notesSection.style.display = 'none';
+      damageNotes.value = '';
+    }
+    
+    submitSection.style.display = 'block';
+  });
+});
+
+// Submit
+submitBtn.addEventListener('click', async () => {
+  if (!currentStudent || !selectedStatus) {
+    showMessage('Please complete all fields', 'error');
+    return;
+  }
+  
+  submitBtn.disabled = true;
+  submitBtn.style.opacity = '0.6';
+  
+  try {
+    const response = await fetch('/api/checkout/chair-submissions/process_chair_scan/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      body: JSON.stringify({
+        qr_token: currentStudent.qr_token,
+        status: selectedStatus,
+        notes: damageNotes.value
+      })
+    });
+    
+    if (!response.ok) {
+      const err = await response.json();
+      showMessage(err.error || 'Submission failed', 'error');
+      return;
+    }
+    
+    const data = await response.json();
+    showMessage(`✓ Chair submitted as ${selectedStatus}`, 'success');
+    
+    // Reset form
+    setTimeout(() => {
+      qrInput.value = '';
+      studentInfo.style.display = 'none';
+      statusSection.style.display = 'none';
+      submitSection.style.display = 'none';
+      damageNotes.value = '';
+      currentStudent = null;
+      selectedStatus = null;
+      messageArea.style.display = 'none';
+      qrInput.focus();
+    }, 1500);
+    
+  } catch (error) {
+    console.error(error);
+    showMessage('Error submitting chair information', 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.style.opacity = '1';
+  }
+});
+
+function showMessage(msg, type) {
+  messageArea.innerHTML = `
+    <div style="padding: 12px 16px; border-radius: var(--radius-md); background: ${
+      type === 'error' ? 'rgba(232, 17, 35, 0.1)' :
+      type === 'success' ? 'rgba(16, 124, 16, 0.1)' :
+      'rgba(23, 120, 109, 0.1)'
+    }; color: ${
+      type === 'error' ? '#E81123' :
+      type === 'success' ? '#107C10' :
+      '#17786d'
+    }; font-weight: 500; border: 1px solid ${
+      type === 'error' ? 'rgba(232, 17, 35, 0.2)' :
+      type === 'success' ? 'rgba(16, 124, 16, 0.2)' :
+      'rgba(23, 120, 109, 0.2)'
+    };">
+      ${msg}
+    </div>
+  `;
+  messageArea.style.display = 'block';
+}
+</script>
+
+<style>
+  .status-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+  
+  .status-btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
+</style>
+{% endblock %}

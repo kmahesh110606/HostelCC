@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} - QR Scanner{% endblock %}
+
+{% block content %}
+<div class="shell" style="max-width: 600px;">
+  <h1>{{ page_title }}</h1>
+  <p class="muted">Scan student QR code to submit item</p>
+  
+  <div style="margin-top: 32px;">
+    <!-- Quick Navigation -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-bottom: 24px;">
+      {% for item in all_item_types %}
+        <a 
+          href="{% url 'item-scanner' item.code %}"
+          class="item-type-chip {% if item.code == selected_item.code %}is-active{% endif %}"
+          title="{{ item.name }}"
+        >
+          {{ item.name|truncatewords:2 }}
+        </a>
+      {% endfor %}
+    </div>
+    
+    <!-- Venue Selection -->
+    <div style="background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 24px;">
+      <label style="display: block; margin-bottom: 8px; font-weight: 600;">Select Venue</label>
+      <select id="venueSelect" style="margin-bottom: 16px;">
+        <option value="">-- Choose storage location --</option>
+        {% for venue in venues %}
+          <option value="{{ venue.id }}">{{ venue.name }} ({{ venue.item_count }} items)</option>
+        {% endfor %}
+      </select>
+
+      <label style="display: block; margin-bottom: 8px; font-weight: 600;">Hostel Block</label>
+      <select id="blockSelect" style="margin-bottom: 16px;">
+        <option value="">-- Choose hostel block --</option>
+        {% for block in blocks %}
+          <option value="{{ block.id }}">{{ block.name }}</option>
+        {% endfor %}
+      </select>
+      
+      <label style="display: block; margin-bottom: 8px; font-weight: 600;">QR Code</label>
+      <input 
+        type="text" 
+        id="qrInput" 
+        placeholder="Scan QR code or enter student ID"
+        autocomplete="off"
+        style="font-size: 16px;"
+      />
+      <p class="hint">Scanning will start automatically</p>
+    </div>
+    
+    <!-- Student Info -->
+    <div id="studentInfo" style="display: none; margin-top: 24px; padding: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg);">
+      <div style="margin-bottom: 12px;">
+        <div class="muted" style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;">Student Details</div>
+        <div id="studentName" style="font-size: 18px; font-weight: 600; margin-top: 8px;"></div>
+        <div id="studentRoll" class="muted" style="margin-top: 4px;"></div>
+      </div>
+      <div id="chairStatus" style="margin-top: 12px; padding: 12px; border-radius: var(--radius-md); background: var(--success); color: white; display: none;">
+        ✓ Chair submitted
+      </div>
+      <div id="chairWarning" style="margin-top: 12px; padding: 12px; border-radius: var(--radius-md); background: var(--error); color: white; display: none;">
+        Chair not yet submitted! Cannot proceed.
+      </div>
+    </div>
+    
+    <!-- Confirmation -->
+    <div id="confirmSection" style="display: none; margin-top: 24px; padding: 20px; background: color-mix(in srgb, var(--success) 15%, var(--panel) 85%); border: 2px solid var(--success); border-radius: var(--radius-lg);">
+      <div style="font-weight: 600; color: var(--success); margin-bottom: 12px;">Ready to submit?</div>
+      <div id="confirmText" style="font-size: 14px; margin-bottom: 16px;"></div>
+      <button 
+        id="confirmBtn"
+        style="width: 100%; padding: 12px; font-weight: 600; border-radius: var(--radius-md); border: 1px solid var(--success); background: var(--success); color: white; cursor: pointer; transition: all 200ms ease; margin-bottom: 8px;"
+      >
+        ✓ Confirm Submission
+      </button>
+      <button 
+        id="cancelBtn"
+        style="width: 100%; padding: 12px; font-weight: 600; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; transition: all 200ms ease;"
+      >
+        Cancel
+      </button>
+    </div>
+    
+    <!-- Status Messages -->
+    <div id="messageArea" style="display: none; margin-top: 20px;"></div>
+  </div>
+</div>
+
+<script>
+const qrInput = document.getElementById('qrInput');
+const venueSelect = document.getElementById('venueSelect');
+const blockSelect = document.getElementById('blockSelect');
+const studentInfo = document.getElementById('studentInfo');
+const confirmSection = document.getElementById('confirmSection');
+const messageArea = document.getElementById('messageArea');
+const confirmText = document.getElementById('confirmText');
+const confirmBtn = document.getElementById('confirmBtn');
+const cancelBtn = document.getElementById('cancelBtn');
+const selectedItemId = Number('{{ selected_item.id }}');
+
+let currentStudent = null;
+let isVerifying = false;
+
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+window.addEventListener('load', () => {
+  qrInput.focus();
+});
+
+qrInput.addEventListener('change', async (e) => {
+  if (isVerifying) {
+    return;
+  }
+  const qr = e.target.value.trim();
+  if (!qr) return;
+  
+  const venue_id = venueSelect.value;
+  if (!venue_id) {
+    showMessage('Please select a venue first', 'error');
+    qrInput.value = '';
+    return;
+  }
+  if (!blockSelect.value) {
+    showMessage('Please select a hostel block first', 'error');
+    qrInput.value = '';
+    return;
+  }
+  
+  confirmSection.style.display = 'none';
+  studentInfo.style.display = 'none';
+  
+  try {
+    isVerifying = true;
+    showMessage('Verifying student...', 'info');
+    
+    const response = await fetch('/api/checkout/verify-qr/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      body: JSON.stringify({ qr_token: qr })
+    });
+    
+    if (!response.ok) {
+      showMessage('Student not found', 'error');
+      qrInput.value = '';
+      qrInput.focus();
+      return;
+    }
+    
+    const data = await response.json();
+    currentStudent = data;
+    
+    document.getElementById('studentName').textContent = data.student_name;
+    document.getElementById('studentRoll').textContent = data.student_roll;
+    
+    if (data.chair_submitted) {
+      document.getElementById('chairStatus').style.display = 'block';
+      document.getElementById('chairWarning').style.display = 'none';
+      
+      // Show confirmation
+      const venue_name = venueSelect.options[venueSelect.selectedIndex].text;
+      confirmText.innerHTML = `Submit <strong>{{ selected_item.name }}</strong> to <strong>${venue_name.split('(')[0].trim()}</strong>?`;
+      confirmSection.style.display = 'block';
+      
+    } else {
+      document.getElementById('chairWarning').style.display = 'block';
+      document.getElementById('chairStatus').style.display = 'none';
+      confirmSection.style.display = 'none';
+    }
+    
+    studentInfo.style.display = 'block';
+    messageArea.style.display = 'none';
+    
+  } catch (error) {
+    console.error(error);
+    showMessage('Error verifying QR code', 'error');
+    qrInput.value = '';
+    qrInput.focus();
+  } finally {
+    isVerifying = false;
+  }
+});
+
+confirmBtn.addEventListener('click', async () => {
+  if (!currentStudent) return;
+  
+  const venue_id = venueSelect.value;
+  confirmBtn.disabled = true;
+  confirmBtn.style.opacity = '0.6';
+  
+  try {
+    const response = await fetch('/api/checkout/clock-room-submissions/process_item_scan/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      body: JSON.stringify({
+        qr_token: currentStudent.qr_token,
+        item_type_id: selectedItemId,
+        venue_id: parseInt(venue_id),
+        hostel_block_id: parseInt(blockSelect.value)
+      })
+    });
+    
+    if (!response.ok) {
+      const err = await response.json();
+      showMessage(err.error || 'Submission failed', 'error');
+      confirmBtn.disabled = false;
+      confirmBtn.style.opacity = '1';
+      return;
+    }
+    
+    const data = await response.json();
+    const token = data.data.token_number;
+    
+    showMessage(`✓ Item submitted! Token: ${token}`, 'success');
+    confirmSection.style.display = 'none';
+    
+    setTimeout(() => {
+      qrInput.value = '';
+      studentInfo.style.display = 'none';
+      messageArea.style.display = 'none';
+      currentStudent = null;
+      venueSelect.value = '';
+      qrInput.focus();
+    }, 2000);
+    
+  } catch (error) {
+    console.error(error);
+    showMessage('Error submitting item', 'error');
+    confirmBtn.disabled = false;
+    confirmBtn.style.opacity = '1';
+  }
+});
+
+cancelBtn.addEventListener('click', () => {
+  qrInput.value = '';
+  confirmSection.style.display = 'none';
+  studentInfo.style.display = 'none';
+  messageArea.style.display = 'none';
+  currentStudent = null;
+  qrInput.focus();
+});
+
+venueSelect.addEventListener('change', () => {
+  confirmSection.style.display = 'none';
+  studentInfo.style.display = 'none';
+  qrInput.value = '';
+  qrInput.focus();
+});
+
+blockSelect.addEventListener('change', () => {
+  confirmSection.style.display = 'none';
+  studentInfo.style.display = 'none';
+  qrInput.value = '';
+  qrInput.focus();
+});
+
+function showMessage(msg, type) {
+  messageArea.innerHTML = `
+    <div style="padding: 12px 16px; border-radius: var(--radius-md); background: ${
+      type === 'error' ? 'rgba(232, 17, 35, 0.1)' :
+      type === 'success' ? 'rgba(16, 124, 16, 0.1)' :
+      'rgba(23, 120, 109, 0.1)'
+    }; color: ${
+      type === 'error' ? '#E81123' :
+      type === 'success' ? '#107C10' :
+      '#17786d'
+    }; font-weight: 500; border: 1px solid ${
+      type === 'error' ? 'rgba(232, 17, 35, 0.2)' :
+      type === 'success' ? 'rgba(16, 124, 16, 0.2)' :
+      'rgba(23, 120, 109, 0.2)'
+    };">
+      ${msg}
+    </div>
+  `;
+  messageArea.style.display = 'block';
+}
+</script>
+
+<style>
+  .item-type-chip {
+    padding: 12px;
+    border-radius: var(--radius-md);
+    text-align: center;
+    text-decoration: none;
+    border: 2px solid var(--line);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 200ms ease;
+  }
+
+  .item-type-chip.is-active {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 15%, var(--panel) 85%);
+  }
+
+  #venueSelect, #blockSelect, #qrInput {
+    width: 100%;
+  }
+  
+  #confirmBtn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+  }
+</style>
+{% endblock %}
