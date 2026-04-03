@@ -103,6 +103,13 @@
       gap: 20px;
     }
 
+    .nav-brand-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
     .nav-links {
       display: flex;
       align-items: center;
@@ -544,13 +551,21 @@
     @media (max-width: 768px) {
       .nav-inner {
         flex-wrap: wrap;
-        align-items: center;
-        gap: 12px;
+        align-items: flex-start;
+        gap: 10px;
         padding: 0 16px;
+      }
+
+      .nav-brand-row {
+        width: 100%;
+        justify-content: space-between;
+        align-items: flex-start;
       }
 
       .nav-toggle {
         display: inline-flex;
+        margin-left: auto;
+        flex-shrink: 0;
       }
 
       .nav-links {
@@ -586,14 +601,18 @@
 <body>
   <div class="navbar">
     <div class="nav-inner">
-      <div>
-        <h1>HostelCC</h1>
-        <p class="muted">Campus Living Platform</p>
+      <div class="nav-brand-row">
+        <div>
+          <h1>HostelCC</h1>
+          <p class="muted">Campus Living Platform</p>
+        </div>
+        {% if user.is_authenticated %}
+        <button class="nav-toggle" id="navToggle" type="button" title="Toggle menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M3 4a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4zm0 7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2zm0 7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2z"/></svg>
+        </button>
+        {% endif %}
       </div>
       {% if user.is_authenticated %}
-      <button class="nav-toggle" id="navToggle" type="button" title="Toggle menu">
-        <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M3 4a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4zm0 7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2zm0 7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2z"/></svg>
-      </button>
       <div class="nav-links" id="navLinks">
         <a class="button secondary nav-item" href="/" title="Home">
           <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M10.55 2.53c.84-.7 2.06-.7 2.9 0l6.75 5.7c.5.42.8 1.05.8 1.71v9.31c0 .97-.78 1.75-1.75 1.75h-3.5c-.97 0-1.75-.78-1.75-1.75v-5a.25.25 0 0 0-.25-.25h-3.5a.25.25 0 0 0-.25.25v5c0 .97-.78 1.75-1.75 1.75h-3.5C3.78 21 3 20.22 3 19.25v-9.3c0-.67.3-1.3.8-1.73l6.75-5.69Zm1.93 1.15a.75.75 0 0 0-.96 0l-6.75 5.7a.75.75 0 0 0-.27.56v9.31c0 .14.11.25.25.25h3.5c.14 0 .25-.1.25-.25v-5c0-.97.78-1.75 1.75-1.75h3.5c.97 0 1.75.78 1.75 1.75v5c0 .14.11.25.25.25h3.5c.14 0 .25-.1.25-.25v-9.3c0-.23-.1-.44-.27-.58l-6.75-5.7Z"/></svg><span>Home</span>
@@ -617,16 +636,16 @@
           <svg class="inline-icon" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M17.75 14C19 14 20 15 20 16.25v.57c0 .9-.32 1.76-.9 2.44C17.53 21.1 15.15 22 12 22c-3.15 0-5.53-.9-7.1-2.74a3.75 3.75 0 0 1-.9-2.43v-.58C4 15 5.01 14 6.25 14h11.5Zm0 1.5H6.25a.75.75 0 0 0-.75.75v.58c0 .53.2 1.05.54 1.46C7.3 19.76 9.26 20.5 12 20.5c2.74 0 4.7-.74 5.96-2.21.35-.41.54-.93.54-1.47v-.57a.75.75 0 0 0-.75-.75ZM12 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 1.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/></svg>
           {{ user.role }}
         </span>
-        <button class="theme-toggle nav-utility-action" type="button" title="Refresh" onclick="window.location.reload();">
-          <svg class="inline-icon" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M12 4.5a7.5 7.5 0 1 0 7.42 6.4c-.07-.46.26-.9.72-.9.37 0 .7.26.76.62A9 9 0 1 1 18 5.3V4.25a.75.75 0 0 1 1.5 0v3c0 .41-.34.75-.75.75h-3a.75.75 0 0 1 0-1.5h1.35a7.47 7.47 0 0 0-5.1-2Z"/></svg>
+        <button class="theme-toggle nav-utility-action" id="themeToggle" type="button" title="Toggle theme" aria-label="Toggle theme">
+          <svg class="inline-icon" width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M15.5 13.5A6.98 6.98 0 0 1 4 14.39c2.83-1.09 4.56-2.42 5.6-4.4 1.04-2 1.33-4.16.75-6.9A6.98 6.98 0 0 1 15.5 13.5ZM5.45 16.92A7.98 7.98 0 1 0 9.88 2.04a.6.6 0 0 0-.61.73c.69 2.82.43 4.88-.55 6.76-.94 1.78-2.55 3.03-5.55 4.1a.6.6 0 0 0-.3.9 7.95 7.95 0 0 0 2.59 2.39Z"/></svg>
         </button>
         <a class="button nav-utility-action logout" href="/accounts/logout/" title="Logout">
           <svg class="inline-icon" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M8.5 11.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2ZM12 4.35V11h7.44l-1.72-1.72a.75.75 0 0 1-.07-.98l.07-.08a.75.75 0 0 1 .98-.07l.08.07 3 3c.26.26.29.68.07.97l-.07.09-3 3a.75.75 0 0 1-1.13-.97l.07-.09 1.71-1.72H12v6.75c0 .47-.42.82-.88.74l-8.5-1.5a.75.75 0 0 1-.62-.74v-12c0-.37.27-.68.63-.74l8.5-1.4c.46-.07.87.28.87.74Zm-1.5.89-7 1.15v10.73l7 1.24V5.24ZM13 18.5h.87a.75.75 0 0 0 .65-.75l-.01-4.25H13v5Zm0-8.5V5h.75c.37 0 .69.28.74.65v.1L14.5 10H13Z"/></svg> Logout
         </a>
       </div>
       {% else %}
-      <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">
-        <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M9.38 7.25c0 .63.52 1.13 1.13 1.13h.49v3.24c0 .97-.78 1.75-1.75 1.75H7.87c1.24 1.44 3.1 2.38 5.13 2.38 3.87 0 7-3.14 7-7 0-3.34-2.33-6.1-5.44-6.76a.75.75 0 0 1-.6-1.04.75.75 0 0 1 1.02-.6c3.78.84 6.6 4.26 6.6 8.4a8.5 8.5 0 1 1-15.35-3.9.75.75 0 0 1 1.02.6.75.75 0 0 1-.6 1.04 7 7 0 0 0-1.26.34c-1.33.4-2.31 1.6-2.31 3.03Z"/></svg>
+      <button class="theme-toggle" id="themeToggle" type="button" title="Toggle theme" aria-label="Toggle theme">
+        <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M15.5 13.5A6.98 6.98 0 0 1 4 14.39c2.83-1.09 4.56-2.42 5.6-4.4 1.04-2 1.33-4.16.75-6.9A6.98 6.98 0 0 1 15.5 13.5ZM5.45 16.92A7.98 7.98 0 1 0 9.88 2.04a.6.6 0 0 0-.61.73c.69 2.82.43 4.88-.55 6.76-.94 1.78-2.55 3.03-5.55 4.1a.6.6 0 0 0-.3.9 7.95 7.95 0 0 0 2.59 2.39Z"/></svg>
       </button>
       {% endif %}
     </div>
@@ -646,6 +665,10 @@
     // Dark/Light mode toggle
     const themeToggle = document.getElementById('themeToggle');
     const html = document.documentElement;
+    const themeIcons = {
+      light: '<svg class="inline-icon" width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M10 2c.28 0 .5.22.5.5v1a.5.5 0 0 1-1 0v-1c0-.28.22-.5.5-.5Zm0 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0-1a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm7.5-2.5a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1h1ZM10 16c.28 0 .5.22.5.5v1a.5.5 0 0 1-1 0v-1c0-.28.22-.5.5-.5Zm-6.5-5.5a.5.5 0 0 0 0-1H2.46a.5.5 0 0 0 0 1H3.5Zm.65-6.35c.2-.2.5-.2.7 0l1 1a.5.5 0 1 1-.7.7l-1-1a.5.5 0 0 1 0-.7Zm.7 11.7a.5.5 0 0 1-.7-.7l1-1a.5.5 0 0 1 .7.7l-1 1Zm11-11.7a.5.5 0 0 0-.7 0l-1 1a.5.5 0 0 0 .7.7l1-1a.5.5 0 0 0 0-.7Zm-.7 11.7a.5.5 0 0 0 .7-.7l-1-1a.5.5 0 0 0-.7.7l1 1Z"/></svg>',
+      dark: '<svg class="inline-icon" width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M15.5 13.5A6.98 6.98 0 0 1 4 14.39c2.83-1.09 4.56-2.42 5.6-4.4 1.04-2 1.33-4.16.75-6.9A6.98 6.98 0 0 1 15.5 13.5ZM5.45 16.92A7.98 7.98 0 1 0 9.88 2.04a.6.6 0 0 0-.61.73c.69 2.82.43 4.88-.55 6.76-.94 1.78-2.55 3.03-5.55 4.1a.6.6 0 0 0-.3.9 7.95 7.95 0 0 0 2.59 2.39Z"/></svg>'
+    };
     
     // Initialize theme from localStorage or system preference
     function initializeTheme() {
@@ -663,26 +686,23 @@
     
     function updateThemeIcon(theme) {
       if (!themeToggle) return;
-      const icon = themeToggle.querySelector('i');
-      if (theme === 'dark') {
-        icon.classList.remove('ms-Icon--ClearNight');
-        icon.classList.add('ms-Icon--ClearDay');
-      } else {
-        icon.classList.remove('ms-Icon--ClearDay');
-        icon.classList.add('ms-Icon--ClearNight');
-      }
+      themeToggle.innerHTML = themeIcons[theme] || themeIcons.light;
+      themeToggle.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+      themeToggle.setAttribute('aria-label', themeToggle.title);
     }
     
     if (themeToggle) {
-      themeToggle.addEventListener('click', () => {
+      themeToggle.addEventListener('click', (event) => {
+        event.preventDefault();
         const current = html.getAttribute('data-theme') || 'light';
         const next = current === 'light' ? 'dark' : 'light';
         html.setAttribute('data-theme', next);
         localStorage.setItem('theme', next);
         updateThemeIcon(next);
       });
-      initializeTheme();
     }
+
+    initializeTheme();
 
     const navToggle = document.getElementById('navToggle');
     const navLinks = document.getElementById('navLinks');
