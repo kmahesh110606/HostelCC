@@ -6,7 +6,7 @@
 
 **Problem:** Students could rate the same menu item multiple times in the same month, inflating feedback data.
 
-**Solution:** Added a database-level uniqueness constraint to enforce one rating per student per menu item per month.
+**Solution:** Added a database-level uniqueness constraint to enforce one rating per student per menu item per month
 
 **Files Modified:**
 - `mess/models.py` — Added `unique_together = ("student", "menu_item", "month")` to `Feedback` model
