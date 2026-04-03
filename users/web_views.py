@@ -1,5 +1,6 @@
 import json
 import logging
+from urllib.parse import urljoin
 
 from django.conf import settings
 from django.contrib import messages
@@ -42,6 +43,25 @@ def _notifications_cache_version() -> int:
 
 def _bump_notifications_cache_version() -> None:
     cache.set("dashboard:notifications:version", _notifications_cache_version() + 1, timeout=None)
+
+
+def _normalized_file_url(file_field) -> str:
+    """Return a browser-safe URL for a stored file across storage backends."""
+    if not file_field:
+        return ""
+    try:
+        raw_url = str(file_field.url or "").strip()
+    except Exception:
+        return ""
+
+    if not raw_url:
+        return ""
+
+    # Keep absolute URLs and root-relative URLs as-is.
+    if raw_url.startswith(("http://", "https://", "/")):
+        return raw_url
+
+    return urljoin(settings.MEDIA_URL, raw_url)
 
 
 def _get_fixed_otp_code() -> str:
@@ -736,6 +756,9 @@ def notification_panel(request: HttpRequest) -> HttpResponse:
         notifications = AppNotification.objects.filter(is_active=True).filter(
             audience__in=[AppNotification.Audience.ALL, request.user.role]
         )[:20]
+
+    for notification in notifications:
+        notification.poster_web_url = _normalized_file_url(notification.poster)
 
     return render(
         request,
