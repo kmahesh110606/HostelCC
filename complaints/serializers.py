@@ -1,5 +1,8 @@
+from django.conf import settings
 from rest_framework import serializers
+from django.urls import reverse
 
+from hostel_app.upload_limits import upload_size_error
 from .models import Complaint, ComplaintReply, ComplaintVote
 
 
@@ -81,6 +84,14 @@ class ComplaintSerializer(serializers.ModelSerializer):
         if media is None and self.instance is not None:
             media = getattr(self.instance, "media", None)
 
+        media_error = upload_size_error(
+            media,
+            getattr(settings, "MAX_COMPLAINT_MEDIA_BYTES", 8 * 1024 * 1024),
+            "Complaint media",
+        )
+        if media_error:
+            raise serializers.ValidationError({"media": media_error})
+
         if not text and not media:
             raise serializers.ValidationError({"detail": "Add complaint text or attach image/video."})
 
@@ -102,9 +113,12 @@ class ComplaintSerializer(serializers.ModelSerializer):
         return obj.student.room_no if obj.student else ""
 
     def get_media_url(self, obj):
-        if obj.media:
-            # Return relative media URL so it works across all environments (localhost, 10.0.2.2, prod, etc.)
-            return obj.media.url
+        if obj.media and obj.pk:
+            media_path = reverse("complaints-media", args=[obj.pk])
+            request = self.context.get("request")
+            if request is not None:
+                return request.build_absolute_uri(media_path)
+            return media_path
         return ""
 
     def get_can_delete(self, obj):

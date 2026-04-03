@@ -1,8 +1,18 @@
 from django.contrib import admin
+from django.db.models import Avg, Count
 from django.utils import timezone
 from django.utils.html import format_html
 
-from .models import Caterer, Feedback, MenuPollOption, MenuPollVote, MessChangeRequest, MessMenu, MessMenuArchive
+from .models import (
+    Caterer,
+    Feedback,
+    MenuPollOption,
+    MenuPollVote,
+    MessChangeRequest,
+    MessMenu,
+    MessMenuArchive,
+    MessMonthlyArchive,
+)
 
 
 @admin.register(MessMenu)
@@ -61,6 +71,43 @@ class MessMenuArchiveAdmin(admin.ModelAdmin):
 class FeedbackAdmin(admin.ModelAdmin):
     list_display = ("student", "week_day", "meal_time", "menu_item", "rating", "month", "created_at")
     list_filter = ("month", "week_day", "meal_time", "rating")
+    actions = ["archive_feedback_trends_by_month"]
+
+    def archive_feedback_trends_by_month(self, request, queryset):
+        months = list(queryset.values_list("month", flat=True).distinct())
+        archived_months = []
+
+        for month in months:
+            month_feedback = Feedback.objects.filter(month=month)
+            trends = list(
+                month_feedback.values("menu_item", "week_day", "meal_time")
+                .annotate(avg_rating=Avg("rating"), total_votes=Count("id"))
+                .order_by("-avg_rating", "-total_votes", "menu_item")
+            )
+            snapshot = {
+                "month": month,
+                "kind": "FEEDBACK",
+                "trends": trends,
+                "total_feedback": month_feedback.count(),
+                "archived_at": timezone.now().isoformat(),
+            }
+            MessMonthlyArchive.objects.update_or_create(
+                month=month,
+                kind=MessMonthlyArchive.Kind.FEEDBACK,
+                defaults={"payload": snapshot},
+            )
+            month_feedback.delete()
+            archived_months.append(month)
+
+        self.message_user(
+            request,
+            format_html(
+                "Archived feedback trends for <strong>{}</strong> and cleared the live month data.",
+                ", ".join(archived_months) if archived_months else "no months",
+            ),
+        )
+
+    archive_feedback_trends_by_month.short_description = "Archive feedback trends for selected month(s) and reset live feedback"
 
 
 @admin.register(MenuPollOption)
@@ -68,10 +115,50 @@ class MenuPollOptionAdmin(admin.ModelAdmin):
     list_display = ("month", "item_name", "poll_type", "vote_count")
     list_filter = ("month", "poll_type")
     search_fields = ("item_name",)
+    actions = ["archive_poll_trends_by_month"]
 
     def vote_count(self, obj):
         return obj.votes.count()
     vote_count.short_description = "Votes"
+
+    def archive_poll_trends_by_month(self, request, queryset):
+        months = list(queryset.values_list("month", flat=True).distinct())
+        archived_months = []
+
+        for month in months:
+            options = MenuPollOption.objects.filter(month=month).annotate(vote_count=Count("votes"))
+            snapshot = {
+                "month": month,
+                "kind": "POLL",
+                "options": [
+                    {
+                        "item_name": option.item_name,
+                        "poll_type": option.poll_type,
+                        "votes": option.vote_count,
+                    }
+                    for option in options
+                ],
+                "total_options": options.count(),
+                "archived_at": timezone.now().isoformat(),
+            }
+            MessMonthlyArchive.objects.update_or_create(
+                month=month,
+                kind=MessMonthlyArchive.Kind.POLL,
+                defaults={"payload": snapshot},
+            )
+            MenuPollVote.objects.filter(option__month=month).delete()
+            options.delete()
+            archived_months.append(month)
+
+        self.message_user(
+            request,
+            format_html(
+                "Archived poll trends for <strong>{}</strong> and reset the live poll tables.",
+                ", ".join(archived_months) if archived_months else "no months",
+            ),
+        )
+
+    archive_poll_trends_by_month.short_description = "Archive poll trends for selected month(s) and reset live polls"
 
 
 @admin.register(MenuPollVote)
@@ -82,24 +169,52 @@ class MenuPollVoteAdmin(admin.ModelAdmin):
     actions = ["reset_poll_votes_by_month"]
 
     def reset_poll_votes_by_month(self, request, queryset):
-        """Reset (delete) all poll votes for a specific month to free up DB space."""
-        # Get unique months from the queryset
-        months = queryset.values_list("option__month", flat=True).distinct()
+        """Archive poll snapshot data and delete live poll votes/options for selected month(s)."""
+        months = list(queryset.values_list("option__month", flat=True).distinct())
         deleted_count = 0
         for month in months:
-            deleted, _ = MenuPollVote.objects.filter(option__month=month).delete()
-            deleted_count += deleted
+            options = MenuPollOption.objects.filter(month=month).annotate(vote_count=Count("votes"))
+            snapshot = {
+                "month": month,
+                "kind": "POLL",
+                "options": [
+                    {
+                        "item_name": option.item_name,
+                        "poll_type": option.poll_type,
+                        "votes": option.vote_count,
+                    }
+                    for option in options
+                ],
+                "total_options": options.count(),
+                "archived_at": timezone.now().isoformat(),
+            }
+            MessMonthlyArchive.objects.update_or_create(
+                month=month,
+                kind=MessMonthlyArchive.Kind.POLL,
+                defaults={"payload": snapshot},
+            )
+            deleted_votes, _ = MenuPollVote.objects.filter(option__month=month).delete()
+            deleted_options, _ = options.delete()
+            deleted_count += deleted_votes + deleted_options
         
         self.message_user(
             request,
             format_html(
-                "✓ Deleted <strong>{}</strong> poll votes and associated poll options for {}. "
+                "Archived poll trends and deleted <strong>{}</strong> poll rows for {}. "
                 "Students can now vote again for the next month.",
                 deleted_count,
-                ", ".join(months),
+                ", ".join(months) if months else "no months",
             ),
         )
-    reset_poll_votes_by_month.short_description = "Reset poll votes for selected month(s)"
+    reset_poll_votes_by_month.short_description = "Archive and reset poll votes for selected month(s)"
+
+
+@admin.register(MessMonthlyArchive)
+class MessMonthlyArchiveAdmin(admin.ModelAdmin):
+    list_display = ("month", "kind", "archived_at")
+    list_filter = ("kind", "month")
+    search_fields = ("month", "kind")
+    readonly_fields = ("month", "kind", "payload", "archived_at")
 
 
 @admin.register(MessChangeRequest)

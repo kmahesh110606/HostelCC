@@ -1,5 +1,7 @@
+import mimetypes
+
 from django.db.models import Count, Q
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -181,6 +183,29 @@ class ComplaintViewSet(viewsets.ModelViewSet):
 
         complaint.refresh_vote_counts()
         return Response(ComplaintSerializer(complaint, context={"request": request}).data)
+
+    @action(detail=True, methods=["get"], url_path="media")
+    def media(self, request, pk=None):
+        complaint = self.get_object()
+        if not complaint.media:
+            return Response({"detail": "No media attached for this complaint."}, status=404)
+
+        file_name = complaint.media.name.rsplit("/", 1)[-1] or "complaint-media"
+        guessed_type, _ = mimetypes.guess_type(file_name)
+        if complaint.media_type == Complaint.MediaType.VIDEO:
+            content_type = guessed_type or "video/mp4"
+        elif complaint.media_type == Complaint.MediaType.IMAGE:
+            content_type = guessed_type or "image/jpeg"
+        else:
+            content_type = guessed_type or "application/octet-stream"
+
+        response = FileResponse(
+            complaint.media.open("rb"),
+            content_type=content_type,
+            as_attachment=False,
+        )
+        response["Cache-Control"] = "public, max-age=3600"
+        return response
 
     @action(detail=False, methods=["get"], permission_classes=[IsWarden], url_path="unresolved-print")
     def unresolved_print(self, request):

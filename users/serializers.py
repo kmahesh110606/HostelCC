@@ -1,8 +1,10 @@
+from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from hostel_app.upload_limits import upload_size_error
 from discipline.models import DisciplineCase
 from .models import AppNotification, OTPChallenge
 from students.utils import resolve_student_for_user
@@ -268,6 +270,16 @@ class AppNotificationSerializer(serializers.ModelSerializer):
         if not obj.created_by:
             return ""
         return obj.created_by.get_full_name().strip() or obj.created_by.username
+
+    def validate_poster(self, value):
+        poster_error = upload_size_error(
+            value,
+            getattr(settings, "MAX_NOTIFICATION_POSTER_BYTES", 4 * 1024 * 1024),
+            "Notification poster",
+        )
+        if poster_error:
+            raise serializers.ValidationError(poster_error)
+        return value
 
     def get_poster_url(self, obj):
         if not obj.poster:

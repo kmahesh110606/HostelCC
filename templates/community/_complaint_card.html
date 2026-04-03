@@ -41,10 +41,10 @@
   {% if item.obj.media %}
   {% if item.obj.media_type == 'VIDEO' %}
   <video controls preload="none" class="feed-media">
-    <source src="{{ item.obj.media.url }}" />
+    <source src="{{ item.media_url|default:item.obj.media.url }}" />
   </video>
   {% else %}
-  <img src="{{ item.obj.media.url }}" alt="Complaint media" class="feed-media" loading="lazy" decoding="async" />
+  <img src="{{ item.media_url|default:item.obj.media.url }}" alt="Complaint media" class="feed-media" loading="lazy" decoding="async" />
   {% endif %}
   {% endif %}
 
@@ -84,7 +84,9 @@
     </form>
 
     <button type="button" class="action-pill comments open-comments-btn" data-modal-target="comments-modal-{{ item.obj.id }}" aria-label="Open comments for complaint {{ item.obj.id }}">
-      <i class="ms-Icon ms-Icon--CommentSolid"></i>
+      <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:block; color:#0078D4; fill:none; stroke:currentColor; stroke-width:2;">
+        <path d="M5 5.75A2.75 2.75 0 0 1 7.75 3h8.5A2.75 2.75 0 0 1 19 5.75v6.5A2.75 2.75 0 0 1 16.25 15H10.1l-3.33 3.04c-.72.66-1.88.15-1.88-.83V15.3A2.75 2.75 0 0 1 5 12.55v-6.8Z"/>
+      </svg>
       <span id="reply-count-{{ item.obj.id }}" class="vote-count">{{ item.obj.reply_count|default:0 }}</span>
     </button>
 

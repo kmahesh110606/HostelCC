@@ -3,6 +3,7 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.db.models import Avg, Count, Q
 from django.db import IntegrityError
 from django.http import HttpRequest, HttpResponse
@@ -143,12 +144,62 @@ def mess_portal(request: HttpRequest) -> HttpResponse:
                 messages.success(request, "Vote submitted.")
             return redirect("mess-portal")
 
+        if action == "request_mess_change":
+            if not student:
+                messages.error(request, "Only student accounts can change mess.")
+                return redirect("mess-portal")
+            if not student.mess_change_unlocked:
+                messages.error(request, "Mess change is currently locked by admin.")
+                return redirect("mess-portal")
+
+            raw_caterer_id = (request.POST.get("requested_caterer_id") or "").strip()
+            if not raw_caterer_id:
+                messages.error(request, "Please select a caterer.")
+                return redirect("mess-portal")
+
+            try:
+                requested_caterer_id = int(raw_caterer_id)
+            except ValueError:
+                messages.error(request, "Invalid caterer selection.")
+                return redirect("mess-portal")
+
+            selected_caterer = Caterer.objects.filter(
+                id=requested_caterer_id,
+                block_id=student.block_id,
+                meal_types=student.mess_allotment,
+            ).first()
+            if not selected_caterer:
+                messages.error(request, "Selected caterer is not available for your block and mess type.")
+                return redirect("mess-portal")
+
+            student.mess_caterer = selected_caterer
+            student.mess_allotment = selected_caterer.meal_types
+            student.mess_change_unlocked = False
+            try:
+                student.save(update_fields=["mess_caterer", "mess_allotment", "mess_change_unlocked"])
+            except ValidationError as exc:
+                messages.error(request, "; ".join(getattr(exc, "messages", [str(exc)])))
+                return redirect("mess-portal")
+
+            messages.success(request, "Mess caterer updated successfully.")
+            return redirect("mess-portal")
+
     if selected_mess_type == "FOODPARK":
         menus = MessMenu.objects.none()
     else:
         menus = MessMenu.objects.filter(mess_type=selected_mess_type).order_by("week_day")
         if selected_mess_type in VEG_FALLBACK_TYPES and not menus.exists():
             menus = MessMenu.objects.filter(mess_type="VEG").order_by("week_day")
+
+    is_foodpark_student = bool(student and selected_mess_type == "FOODPARK")
+    available_mess_change_caterers = []
+    can_request_mess_change = False
+    if student:
+        available_mess_change_caterers = list(
+            Caterer.objects.filter(block=student.block, meal_types=selected_mess_type).order_by("name", "id")
+        )
+        can_request_mess_change = student.mess_change_unlocked and bool(available_mess_change_caterers)
+
     menu_map = {
         menu.week_day: {
             "breakfast": _split_items(menu.breakfast_items),
@@ -174,6 +225,11 @@ def mess_portal(request: HttpRequest) -> HttpResponse:
         scoped_feedback.values("menu_item")
         .annotate(avg_rating=Avg("rating"), total=Count("id"))
         .order_by("avg_rating", "-total")[:10]
+    )
+    top_rated = (
+        scoped_feedback.values("menu_item")
+        .annotate(avg_rating=Avg("rating"), total=Count("id"))
+        .order_by("-avg_rating", "-total")[:6]
     )
 
     can_view_staff_feedback = request.user.role in {"MESS_MANAGER", "WARDEN"}
@@ -211,6 +267,7 @@ def mess_portal(request: HttpRequest) -> HttpResponse:
         {
             "menu_cards": menu_cards,
             "least_rated": least_rated,
+            "top_rated": top_rated,
             "add_options": add_options,
             "remove_options": remove_options,
             "month": month,
@@ -224,6 +281,9 @@ def mess_portal(request: HttpRequest) -> HttpResponse:
             "available_mess_types": list(MESS_TYPES.keys()),
             "can_view_staff_feedback": can_view_staff_feedback,
             "staff_feedback": staff_feedback,
+            "available_mess_change_caterers": available_mess_change_caterers,
+            "can_request_mess_change": can_request_mess_change,
+            "is_foodpark_student": is_foodpark_student,
         },
     )
 

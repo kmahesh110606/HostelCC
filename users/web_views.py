@@ -12,6 +12,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
+from hostel_app.upload_limits import upload_size_error
 from hostels.models import HostelBlock, Room
 from mess.options import (
     MESS_TYPES,
@@ -29,6 +30,18 @@ from students.utils import resolve_student_for_user
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+def _notifications_cache_version() -> int:
+    version = cache.get("dashboard:notifications:version", 1)
+    try:
+        return int(version)
+    except (TypeError, ValueError):
+        return 1
+
+
+def _bump_notifications_cache_version() -> None:
+    cache.set("dashboard:notifications:version", _notifications_cache_version() + 1, timeout=None)
 
 
 def _get_fixed_otp_code() -> str:
@@ -630,7 +643,7 @@ def dashboard_router(request: HttpRequest) -> HttpResponse:
         "ADMIN": "dashboard/admin.html",
     }
     template = role_to_template.get(request.user.role, "dashboard/student.html")
-    cache_key = f"dashboard:notifications:v1:{request.user.role}"
+    cache_key = f"dashboard:notifications:v{_notifications_cache_version()}:{request.user.role}"
     notifications = cache.get(cache_key)
     if notifications is None:
         notifications = list(
@@ -675,6 +688,7 @@ def notification_panel(request: HttpRequest) -> HttpResponse:
                 messages.error(request, "Notification not found.")
             else:
                 target.delete()
+                _bump_notifications_cache_version()
                 messages.success(request, "Notification deleted.")
             return redirect("notification-panel")
 
@@ -689,12 +703,21 @@ def notification_panel(request: HttpRequest) -> HttpResponse:
             messages.error(request, "Title and message are required.")
         else:
             if poster:
+                poster_error = upload_size_error(
+                    poster,
+                    getattr(settings, "MAX_NOTIFICATION_POSTER_BYTES", 4 * 1024 * 1024),
+                    "Notification poster",
+                )
+                if poster_error:
+                    messages.error(request, poster_error)
+                    return redirect("notification-panel")
+
                 lower_name = poster.name.lower()
                 if not (lower_name.endswith(".png") or lower_name.endswith(".jpg") or lower_name.endswith(".jpeg") or lower_name.endswith(".pdf")):
                     messages.error(request, "Poster must be PNG, JPG, JPEG, or PDF.")
                     return redirect("notification-panel")
 
-            AppNotification.objects.create(
+            notification = AppNotification.objects.create(
                 title=title,
                 message=message,
                 audience=audience,
@@ -703,6 +726,7 @@ def notification_panel(request: HttpRequest) -> HttpResponse:
                 poster=poster,
                 created_by=request.user,
             )
+            _bump_notifications_cache_version()
             messages.success(request, "Notification published.")
         return redirect("notification-panel")
 

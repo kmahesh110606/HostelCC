@@ -127,6 +127,9 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+MAX_COMPLAINT_MEDIA_BYTES = int(os.getenv("MAX_COMPLAINT_MEDIA_MB", "20")) * 1024 * 1024
+MAX_NOTIFICATION_POSTER_BYTES = int(os.getenv("MAX_NOTIFICATION_POSTER_MB", "20")) * 1024 * 1024
+
 AUTH_USER_MODEL = "users.User"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
@@ -147,6 +150,12 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "user": "200/min",
         "anon": "50/min",
+        "auth_login": "10/min",
+        "auth_otp_request": "5/min",
+        "auth_otp_verify": "15/min",
+        "auth_first_password": "5/min",
+        "auth_signup_request": "5/min",
+        "auth_signup_complete": "5/min",
         "feedback": "10/min",
         "complaints": "15/min",
     },

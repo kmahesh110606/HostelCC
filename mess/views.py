@@ -292,7 +292,25 @@ class MessChangeRequestViewSet(viewsets.ModelViewSet):
         if not student.mess_change_unlocked:
             raise ValidationError({"detail": "Mess change is currently locked."})
 
-        serializer.save(student=student)
+        requested_caterer_id = serializer.validated_data.get("requested_caterer_id")
+        selected_caterer = Caterer.objects.filter(
+            id=requested_caterer_id,
+            block_id=student.block_id,
+            meal_types=student.mess_allotment,
+        ).first()
+        if not selected_caterer:
+            raise ValidationError({"detail": "Selected caterer is not available for your block and mess type."})
+
+        student.mess_caterer = selected_caterer
+        student.mess_allotment = selected_caterer.meal_types
+        student.mess_change_unlocked = False
+        student.save(update_fields=["mess_caterer", "mess_allotment", "mess_change_unlocked"])
+
+        serializer.save(
+            student=student,
+            status=MessChangeRequest.Status.APPROVED,
+            requested_mess=selected_caterer.name,
+        )
 
     def get_permissions(self):
         if self.action in ["approve", "reject"]:

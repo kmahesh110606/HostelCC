@@ -324,12 +324,40 @@
     {% endfor %}
   </section>
 
+  {% if student %}
+  <section class="tab mess-tab">
+    <span class="label"><i class="ms-Icon ms-Icon--Switch"></i> Mess Change</span>
+    <h2><i class="ms-Icon ms-Icon--CalendarReply"></i> Change Your Mess</h2>
+    <p class="muted">When admin unlocks mess change, you can switch to a caterer in your block and current mess type.</p>
+    <form method="post" style="display: grid; gap: 10px; max-width: 520px; margin-top: 10px; {% if not can_request_mess_change %}opacity: 0.55;{% endif %}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="request_mess_change" />
+      <div>
+        <label for="requested_caterer_id">Choose Caterer</label>
+        <select id="requested_caterer_id" name="requested_caterer_id" {% if not can_request_mess_change %}disabled{% endif %} required>
+          <option value="">Select caterer</option>
+          {% for c in available_mess_change_caterers %}
+          <option value="{{ c.id }}" {% if student.mess_caterer and student.mess_caterer.id == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" {% if not can_request_mess_change %}disabled{% endif %}><i class="ms-Icon ms-Icon--Accept"></i> Change Mess</button>
+    </form>
+    {% if not student.mess_change_unlocked %}
+    <p class="inline-note">Mess change is greyed out until admin unlocks it.</p>
+    {% elif not available_mess_change_caterers %}
+    <p class="inline-note">No caterers are currently available for your block and mess type.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
   <section class="tab mess-tab">
     <span class="label"><i class="ms-Icon ms-Icon--People"></i> Feedback And Polls</span>
     <h2><i class="ms-Icon ms-Icon--AllApps"></i> {{ month }} Student Actions</h2>
-    <p class="muted">Rate food and vote on the meeting poll from one place.</p>
+    <p class="muted">Vote on the meeting poll and, where supported, rate food from one place.</p>
 
     <div class="action-grid" style="margin-top: 10px;">
+      {% if not is_foodpark_student %}
       <article class="action-card">
         <h3><i class="ms-Icon ms-Icon--Like"></i> Rate Food</h3>
         <p class="muted">Choose day, meal time, and menu item from dropdowns before rating.</p>
@@ -387,6 +415,7 @@
           <button type="submit" style="margin-top: 12px;"><i class="ms-Icon ms-Icon--Send"></i> Submit Rating</button>
         </form>
       </article>
+      {% endif %}
 
       <article class="action-card">
         <h3><i class="ms-Icon ms-Icon--AllApps"></i> Poll For Mess Meeting</h3>
@@ -407,6 +436,7 @@
           {% endif %}
         </p>
 
+        {% if not is_foodpark_student %}
         <h4 style="margin-top: 14px;">Least Rated Dishes</h4>
         <div style="display: grid; gap: 8px;">
           {% for row in least_rated %}
@@ -416,6 +446,18 @@
           </div>
           {% empty %}
           <p class="muted">No rating data yet.</p>
+          {% endfor %}
+        </div>
+
+        <h4 style="margin-top: 16px;">Top Trends</h4>
+        <div style="display: grid; gap: 8px;">
+          {% for row in top_rated %}
+          <div style="border: 1px solid color-mix(in srgb, var(--success) 30%, var(--line)); border-radius: 8px; padding: 8px; background: color-mix(in srgb, var(--success) 7%, var(--panel));">
+            <strong>{{ row.menu_item }}</strong>
+            <p class="muted" style="margin: 4px 0 0;">Avg: {{ row.avg_rating|floatformat:2 }} • Votes: {{ row.total }}</p>
+          </div>
+          {% empty %}
+          <p class="muted">No trend data yet.</p>
           {% endfor %}
         </div>
 
@@ -438,6 +480,7 @@
           <p class="muted">No item-wise feedback available for your assigned mess.</p>
           {% endfor %}
         </div>
+        {% endif %}
         {% endif %}
 
         {% if can_manage_polls %}

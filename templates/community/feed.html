@@ -418,6 +418,23 @@
     background: rgba(232, 17, 35, 0.08);
   }
 
+  .btn-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    display: inline-block;
+    animation: btn-spin 0.7s linear infinite;
+    vertical-align: middle;
+  }
+
+  @keyframes btn-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   @media (max-width: 1080px) {
     .community-layout {
       grid-template-columns: 1fr;
@@ -624,6 +641,7 @@
     };
 
     let noticeTimer = null;
+    const busyForms = new WeakSet();
 
     function escapeHtml(text) {
       const div = document.createElement('div');
@@ -698,6 +716,47 @@
 
         return data;
       });
+    }
+
+    function setFormLoading(form, isLoading) {
+      if (!form) {
+        return;
+      }
+
+      const submitButton = form.querySelector('button[type="submit"]');
+      if (!submitButton) {
+        return;
+      }
+
+      if (isLoading) {
+        if (!submitButton.dataset.defaultHtml) {
+          submitButton.dataset.defaultHtml = submitButton.innerHTML;
+        }
+
+        const actionInput = form.querySelector('input[name="action"]');
+        const action = actionInput ? actionInput.value : '';
+        let label = 'Submitting...';
+        if (action === 'create') {
+          label = 'Posting...';
+        } else if (action === 'comment') {
+          label = 'Posting...';
+        } else if (action === 'delete') {
+          label = 'Deleting...';
+        } else if (action === 'vote' || action === 'set_status') {
+          label = 'Updating...';
+        }
+
+        submitButton.disabled = true;
+        submitButton.setAttribute('aria-busy', 'true');
+        submitButton.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> ' + label;
+        return;
+      }
+
+      submitButton.disabled = false;
+      submitButton.removeAttribute('aria-busy');
+      if (submitButton.dataset.defaultHtml) {
+        submitButton.innerHTML = submitButton.dataset.defaultHtml;
+      }
     }
 
     function ensureEmptyState() {
@@ -848,6 +907,12 @@
 
       event.preventDefault();
 
+      if (busyForms.has(form)) {
+        return;
+      }
+      busyForms.add(form);
+      setFormLoading(form, true);
+
       requestJson(form)
         .then(function (data) {
           const actionInput = form.querySelector('input[name="action"]');
@@ -961,6 +1026,10 @@
         })
         .catch(function (error) {
           showNotice(error.message || 'Unable to complete that action.', 'error');
+        })
+        .finally(function () {
+          busyForms.delete(form);
+          setFormLoading(form, false);
         });
     });
 

@@ -5,11 +5,12 @@ from django.contrib.auth import authenticate, get_user_model
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
 from users.otp_queue import OtpEmailJob, enqueue_otp_email
-from rest_framework import viewsets
+from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework.throttling import ScopedRateThrottle
 
 from hostels.models import HostelBlock, Room
 from mess.options import (
@@ -116,6 +117,8 @@ def _token_payload_for_user(user):
 class LoginView(TokenObtainPairView):
     serializer_class = RoleAwareTokenSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_login"
 
 
 class HealthView(APIView):
@@ -134,6 +137,8 @@ class MeView(APIView):
 
 class RequestOTPView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_otp_request"
 
     def post(self, request):
         serializer = OTPRequestSerializer(data=request.data)
@@ -170,6 +175,8 @@ class RequestOTPView(APIView):
 
 class VerifyOTPView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_otp_verify"
 
     def post(self, request):
         serializer = OTPVerifySerializer(data=request.data)
@@ -187,6 +194,8 @@ class VerifyOTPView(APIView):
 
 class FirstTimePasswordSetupView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_first_password"
 
     def post(self, request):
         serializer = FirstTimePasswordSerializer(data=request.data)
@@ -234,6 +243,8 @@ class SignupOptionsView(APIView):
 
 class SignupRequestOTPView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_signup_request"
 
     def post(self, request):
         serializer = SignupOTPRequestSerializer(data=request.data)
@@ -273,6 +284,8 @@ class SignupRequestOTPView(APIView):
 
 class SignupCompleteView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_signup_complete"
 
     def post(self, request):
         serializer = SignupCompleteSerializer(data=request.data)

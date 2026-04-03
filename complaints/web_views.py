@@ -1,5 +1,7 @@
 import csv
 
+from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Prefetch, Q
@@ -7,7 +9,10 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
+from django.urls import reverse
+from django.views.decorators.http import require_http_methods
 
+from hostel_app.upload_limits import upload_size_error
 from students.models import Student
 
 from .models import Complaint, ComplaintReply, ComplaintVote
@@ -151,12 +156,18 @@ def _build_community_item(request: HttpRequest, complaint: Complaint) -> dict:
             user_vote = "up" if vote.value == ComplaintVote.Value.UPVOTE else "down"
             break
 
+    media_url = ""
+    if complaint.media and complaint.pk:
+        media_path = reverse("complaints-media", args=[complaint.pk])
+        media_url = request.build_absolute_uri(media_path)
+
     return {
         "obj": complaint,
         "author_name": author_name,
         "registration_no": complaint.student.roll_no if complaint.student else "",
         "block_name": complaint.student.block.block_name if complaint.student and complaint.student.block else "",
         "room_no": complaint.student.room_no if complaint.student else "",
+        "media_url": media_url,
         "can_delete": request.user.role == "ADMIN"
         or complaint.author_id == request.user.id
         or bool(complaint.student and complaint.student.user_id == request.user.id),
@@ -238,6 +249,17 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                     return JsonResponse({"success": False, "error": error}, status=400)
                 messages.error(request, error)
             else:
+                media_error = upload_size_error(
+                    uploaded,
+                    getattr(settings, "MAX_COMPLAINT_MEDIA_BYTES", 8 * 1024 * 1024),
+                    "Complaint media",
+                )
+                if media_error:
+                    if _is_xhr(request):
+                        return JsonResponse({"success": False, "error": media_error}, status=400)
+                    messages.error(request, media_error)
+                    return redirect("community-feed")
+
                 student = Student.objects.filter(user=request.user).first()
                 complaint = Complaint.objects.create(
                     student=student,
@@ -447,7 +469,7 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                 'upvotes': complaint.upvotes,
                 'downvotes': complaint.downvotes,
                 'reply_count': getattr(complaint, "reply_count", 0),
-                'media': complaint.media.url if complaint.media else None,
+                'media': item['media_url'] or None,
                 'media_type': complaint.media_type,
                 'can_manage': item['can_manage'],
             })

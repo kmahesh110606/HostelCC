@@ -48,6 +48,24 @@ class MessMenuArchive(models.Model):
         return f"{self.archived_month} - {self.get_mess_type_display()} - {self.get_week_day_display()}"
 
 
+class MessMonthlyArchive(models.Model):
+    class Kind(models.TextChoices):
+        FEEDBACK = "FEEDBACK", "Feedback Trends"
+        POLL = "POLL", "Poll Snapshot"
+
+    month = models.CharField(max_length=7, db_index=True)
+    kind = models.CharField(max_length=20, choices=Kind.choices, db_index=True)
+    payload = models.JSONField(default=dict)
+    archived_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-month", "kind", "-archived_at"]
+        unique_together = ("month", "kind")
+
+    def __str__(self) -> str:
+        return f"{self.month} - {self.get_kind_display()}"
+
+
 class Caterer(models.Model):
     name = models.CharField(max_length=120)
     meal_types = models.CharField(max_length=20, choices=MESS_TYPE_CHOICES)
