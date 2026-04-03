@@ -133,11 +133,11 @@
           <span class="label">{{ n.level }} | {{ n.audience }}</span>
         </div>
         <p class="notification-message">{{ n.message }}</p>
-        {% if n.poster %}
+        {% if n.poster_web_url %}
           {% if '.pdf' in n.poster.name|lower %}
-          <p class="notification-pdf-link-wrap"><a class="button secondary" href="{{ n.poster.url }}" target="_blank" rel="noopener"><i class="ms-Icon ms-Icon--Document"></i> Open Poster PDF</a></p>
+          <p class="notification-pdf-link-wrap"><a class="button secondary" href="{{ n.poster_web_url }}" target="_blank" rel="noopener"><i class="ms-Icon ms-Icon--Document"></i> Open Poster PDF</a></p>
           {% else %}
-          <img src="{{ n.poster.url }}" alt="Notification poster" class="notification-poster" />
+          <img src="{{ n.poster_web_url }}" alt="Notification poster" class="notification-poster" />
           {% endif %}
         {% endif %}
         <p class="notification-meta">Posted on {{ n.created_at|date:'d M Y, h:i A' }}</p>

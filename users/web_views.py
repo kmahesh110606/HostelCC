@@ -7,10 +7,11 @@ from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
-from users.otp_queue import OtpEmailJob, enqueue_otp_email
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
+from users.otp_queue import OtpEmailJob, send_otp_email
 
 from hostel_app.upload_limits import upload_size_error
 from hostels.models import HostelBlock, Room
@@ -44,6 +45,13 @@ def _bump_notifications_cache_version() -> None:
     cache.set("dashboard:notifications:version", _notifications_cache_version() + 1, timeout=None)
 
 
+def _notification_poster_url(request: HttpRequest, notification: AppNotification) -> str:
+    if not notification.poster or not notification.pk:
+        return ""
+    poster_path = reverse("app-notifications-poster", args=[notification.pk])
+    return request.build_absolute_uri(poster_path)
+
+
 def _get_fixed_otp_code() -> str:
     if not getattr(settings, "DEBUG", False):
         return ""
@@ -65,7 +73,7 @@ def _issue_otp(user) -> tuple[bool, str]:
         return False, "Email service is not configured. Please contact admin."
 
     try:
-        enqueue_otp_email(
+        send_otp_email(
             OtpEmailJob(
                 email=user.email,
                 otp_code=challenge.otp_code,
@@ -736,6 +744,9 @@ def notification_panel(request: HttpRequest) -> HttpResponse:
         notifications = AppNotification.objects.filter(is_active=True).filter(
             audience__in=[AppNotification.Audience.ALL, request.user.role]
         )[:20]
+
+    for notification in notifications:
+        notification.poster_web_url = _notification_poster_url(request, notification)
 
     return render(
         request,

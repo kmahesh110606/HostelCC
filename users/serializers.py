@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -282,7 +283,10 @@ class AppNotificationSerializer(serializers.ModelSerializer):
         return value
 
     def get_poster_url(self, obj):
-        if not obj.poster:
+        if not obj.poster or not obj.pk:
             return ""
-        # Return relative media URL so it works across all environments (localhost, 10.0.2.2, prod, etc.)
-        return obj.poster.url
+        poster_path = reverse("app-notifications-poster", args=[obj.pk])
+        request = self.context.get("request")
+        if request is not None:
+            return request.build_absolute_uri(poster_path)
+        return poster_path
