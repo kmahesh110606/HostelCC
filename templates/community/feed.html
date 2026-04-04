@@ -819,13 +819,22 @@
         return;
       }
 
+      const actionInput = form.querySelector('input[name="action"]');
+      const action = actionInput ? actionInput.value : '';
+      const preserveButtonContent = action === 'vote';
+
       if (isLoading) {
+        if (preserveButtonContent) {
+          submitButton.disabled = true;
+          submitButton.setAttribute('aria-busy', 'true');
+          submitButton.classList.add('is-loading');
+          return;
+        }
+
         if (!submitButton.dataset.defaultHtml) {
           submitButton.dataset.defaultHtml = submitButton.innerHTML;
         }
 
-        const actionInput = form.querySelector('input[name="action"]');
-        const action = actionInput ? actionInput.value : '';
         let label = 'Submitting...';
         if (action === 'create') {
           label = 'Posting...';
@@ -845,7 +854,8 @@
 
       submitButton.disabled = false;
       submitButton.removeAttribute('aria-busy');
-      if (submitButton.dataset.defaultHtml) {
+      submitButton.classList.remove('is-loading');
+      if (!preserveButtonContent && submitButton.dataset.defaultHtml) {
         submitButton.innerHTML = submitButton.dataset.defaultHtml;
       }
     }
