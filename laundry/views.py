@@ -210,9 +210,10 @@ def _get_or_create_schedule_for_student(student):
     if schedule:
         return schedule
 
+    # Try to infer day from room ranges; fallback to MON if no room ranges match
     inferred_day = _infer_student_day_from_room_ranges(student)
     if not inferred_day:
-        return None
+        inferred_day = LaundrySchedule.DayChoices.MON
 
     schedule, _ = LaundrySchedule.objects.get_or_create(
         student=student,
