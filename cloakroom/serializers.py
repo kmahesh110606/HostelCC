@@ -5,10 +5,25 @@ from .models import CloakroomEntry, CloakroomRoom
 
 class CloakroomRoomSerializer(serializers.ModelSerializer):
     block_name = serializers.CharField(source="block.block_name", read_only=True)
+    display_name = serializers.SerializerMethodField()
 
     class Meta:
         model = CloakroomRoom
-        fields = ["id", "block", "block_name", "room_no", "is_active"]
+        fields = [
+            "id",
+            "block",
+            "block_name",
+            "room_no",
+            "item_name",
+            "next_token_no",
+            "display_name",
+            "is_active",
+        ]
+
+    def get_display_name(self, obj):
+        basket = (obj.item_name or "").strip()
+        storage = f"{obj.block.block_name}-{obj.room_no}"
+        return f"{basket} @ {storage}" if basket else storage
 
 
 class CloakroomEntrySerializer(serializers.ModelSerializer):
@@ -30,6 +45,7 @@ class CloakroomEntrySerializer(serializers.ModelSerializer):
             "student_roll_no",
             "block_name",
             "room_no",
+            "basket_token_no",
             "token_no",
             "item_name",
             "storage_room_no",

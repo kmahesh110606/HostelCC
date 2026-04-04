@@ -176,9 +176,9 @@ def _today_status(schedule: LaundrySchedule) -> dict[str, str]:
 
 
 class LaundryScheduleSerializer(serializers.ModelSerializer):
-    student_roll_no = serializers.CharField(source="student.roll_no", read_only=True)
-    block_name = serializers.CharField(source="student.block.block_name", read_only=True)
-    room_no = serializers.CharField(source="student.room_no", read_only=True)
+    student_roll_no = serializers.SerializerMethodField()
+    block_name = serializers.SerializerMethodField()
+    room_no = serializers.SerializerMethodField()
     last_submission_at = serializers.DateTimeField(read_only=True, default_timezone=timezone.get_current_timezone())
     due_collection_by = serializers.DateTimeField(read_only=True, default_timezone=timezone.get_current_timezone())
     laundry_done_at = serializers.DateTimeField(read_only=True, default_timezone=timezone.get_current_timezone())
@@ -240,6 +240,19 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
 
     def get_today_status_label(self, obj: LaundrySchedule) -> str:
         return self._get_cached_today_status(obj)["label"]
+
+    def get_student_roll_no(self, obj: LaundrySchedule) -> str:
+        student = getattr(obj, "student", None)
+        return (getattr(student, "roll_no", "") or "").strip()
+
+    def get_room_no(self, obj: LaundrySchedule) -> str:
+        student = getattr(obj, "student", None)
+        return (getattr(student, "room_no", "") or "").strip()
+
+    def get_block_name(self, obj: LaundrySchedule) -> str:
+        student = getattr(obj, "student", None)
+        block = getattr(student, "block", None) if student else None
+        return (getattr(block, "block_name", "") or "").strip()
 
     def get_next_submission_date(self, obj: LaundrySchedule):
         next_date = self._get_cached_next_submission_date(obj)

@@ -6,6 +6,8 @@ class CloakroomRoom(models.Model):
     """Admin-defined rooms available for cloakroom storage."""
     block = models.ForeignKey("hostels.HostelBlock", on_delete=models.CASCADE, related_name="cloakroom_rooms")
     room_no = models.CharField(max_length=10)
+    item_name = models.CharField(max_length=180, blank=True, default="")
+    next_token_no = models.PositiveIntegerField(default=1)
     is_active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -14,7 +16,9 @@ class CloakroomRoom(models.Model):
         ordering = ["block__block_name", "room_no"]
 
     def __str__(self) -> str:
-        return f"CR: {self.block.block_name}-{self.room_no}"
+        item = self.item_name.strip()
+        base = f"CR: {self.block.block_name}-{self.room_no}"
+        return f"{item} @ {base}" if item else base
 
 
 class CloakroomEntry(models.Model):
@@ -23,6 +27,7 @@ class CloakroomEntry(models.Model):
         RETURNED = "RETURNED", "Returned"
 
     student = models.ForeignKey("students.Student", on_delete=models.CASCADE, related_name="cloakroom_entries")
+    basket_token_no = models.PositiveIntegerField(default=0, db_index=True)
     token_no = models.PositiveIntegerField(db_index=True)
     item_name = models.CharField(max_length=180)
     storage_room_no = models.CharField(max_length=20)
@@ -49,4 +54,4 @@ class CloakroomEntry(models.Model):
         ordering = ["-submitted_at", "-id"]
 
     def __str__(self) -> str:
-        return f"Token {self.token_no} - {self.student.roll_no}"
+        return f"Token {self.token_no} ({self.basket_token_no}) - {self.student.roll_no}"

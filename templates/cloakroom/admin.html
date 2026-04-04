@@ -37,10 +37,19 @@
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label for="room_no" class="form-label">Room Number</label>
+                            <label for="room_no" class="form-label">Storage Room Number</label>
                             <input type="text" class="form-control" id="room_no" name="room_no" placeholder="e.g., 101" required>
                         </div>
-                        <button type="submit" class="btn btn-success w-100">Add Room</button>
+                        <div class="mb-3">
+                            <label for="item_name" class="form-label">Basket Item</label>
+                            <select class="form-select" id="item_name" name="item_name" required>
+                                <option value="">-- Select Item --</option>
+                                {% for item in required_item_choices %}
+                                    <option value="{{ item }}">{{ item }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Add Basket</button>
                     </form>
                 </div>
             </div>
@@ -90,14 +99,16 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header bg-info text-white">
-                    <h5 class="mb-0">Active Cloakroom Rooms</h5>
+                    <h5 class="mb-0">Active Cloakroom Baskets</h5>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
                             <tr>
+                                <th>Basket Item</th>
                                 <th>Block</th>
-                                <th>Room Number</th>
+                                <th>Storage Room</th>
+                                <th>Next Token</th>
                                 <th>Added Date</th>
                                 <th>Status</th>
                                 <th>Action</th>
@@ -106,8 +117,10 @@
                         <tbody>
                             {% for room in cloakroom_rooms %}
                                 <tr>
-                                    <td><strong>{{ room.block.block_name }}</strong></td>
+                                    <td><strong>{{ room.item_name|default:"-" }}</strong></td>
+                                    <td>{{ room.block.block_name }}</td>
                                     <td>{{ room.room_no }}</td>
+                                    <td>#{{ room.next_token_no }}</td>
                                     <td>{{ room.created_at|date:"d M Y" }}</td>
                                     <td>
                                         {% if room.is_active %}
@@ -118,7 +131,7 @@
                                     </td>
                                     <td>
                                         {% if room.is_active %}
-                                            <form method="post" class="d-inline" onsubmit="return confirm('Deactivate this room?');">
+                                            <form method="post" class="d-inline" onsubmit="return confirm('Deactivate this basket?');">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="action" value="delete_room">
                                                 <input type="hidden" name="room_id" value="{{ room.id }}">
@@ -131,7 +144,7 @@
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted p-3">No cloakroom rooms defined yet.</td>
+                                    <td colspan="7" class="text-center text-muted p-3">No cloakroom baskets defined yet.</td>
                                 </tr>
                             {% endfor %}
                         </tbody>

@@ -1,5 +1,6 @@
 import json
 
+from django.db import transaction
 from django.db.models import Max
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -126,6 +127,19 @@ def _normalize_item_code(item_name: str) -> str | None:
     return _ITEM_ALIASES.get(key)
 
 
+def _parse_storage_room_no(storage_room_no: str) -> tuple[str, str] | None:
+    cleaned = (storage_room_no or "").strip().upper()
+    if not cleaned:
+        return None
+
+    parts = [part for part in cleaned.split("-") if part]
+    if len(parts) >= 3 and parts[0] == "CR":
+        return parts[1], "-".join(parts[2:])
+    if len(parts) >= 2:
+        return parts[0], "-".join(parts[1:])
+    return None
+
+
 class CloakroomEntryViewSet(viewsets.GenericViewSet):
     serializer_class = CloakroomEntrySerializer
     permission_classes = [IsAuthenticated]
@@ -186,6 +200,10 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
         if not student.cloakroom_unlocked:
             raise ValidationError({"detail": "Cloak room service is locked for this student."})
 
+        storage_parts = _parse_storage_room_no(storage_room_no)
+        if not storage_parts:
+            raise ValidationError({"storage_room_no": "Use a valid storage room code like CR-D2-101."})
+
         prior_item_names = list(CloakroomEntry.objects.filter(student=student).values_list("item_name", flat=True))
         chair_submitted = any(_normalize_item_code(name) == "CHAIR" for name in prior_item_names)
         if item_code != "CHAIR" and not chair_submitted:
@@ -199,15 +217,37 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
         if any(_normalize_item_code(name) == item_code for name in already_pending_names):
             raise ValidationError({"item_name": "This item is already pending collection for the student."})
 
-        entry = CloakroomEntry.objects.create(
-            student=student,
-            token_no=_room_token_no_for_student(student),
-            item_name=_ITEM_CODE_TO_LABEL[item_code],
-            storage_room_no=storage_room_no,
-            notes=notes,
-            status=CloakroomEntry.Status.SUBMITTED,
-            submitted_by=request.user,
-        )
+        block_name, room_no = storage_parts
+        with transaction.atomic():
+            basket = (
+                CloakroomRoom.objects.select_for_update()
+                .select_related("block")
+                .filter(block__block_name__iexact=block_name, room_no__iexact=room_no, is_active=True)
+                .first()
+            )
+            if not basket:
+                raise ValidationError({"storage_room_no": "Cloakroom basket not found for the selected room."})
+
+            basket_item_code = _normalize_item_code(basket.item_name)
+            if basket_item_code and basket_item_code != item_code:
+                raise ValidationError({"item_name": "Selected item does not match the configured basket item."})
+
+            basket_seq = basket.next_token_no
+            entry = CloakroomEntry.objects.create(
+                student=student,
+                basket_token_no=basket_seq,
+                token_no=_room_token_no_for_student(student),
+                item_name=_ITEM_CODE_TO_LABEL[item_code],
+                storage_room_no=storage_room_no,
+                notes=notes,
+                status=CloakroomEntry.Status.SUBMITTED,
+                submitted_by=request.user,
+            )
+            basket.next_token_no = basket_seq + 1
+            if not basket.item_name.strip():
+                basket.item_name = _ITEM_CODE_TO_LABEL[item_code]
+            basket.save(update_fields=["next_token_no", "item_name"])
+
         payload = self.get_serializer(entry).data
         payload["message"] = "Cloak room item submitted successfully."
         return Response(payload, status=status.HTTP_201_CREATED)
