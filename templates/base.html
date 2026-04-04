@@ -9,7 +9,7 @@
     :root {
       /* Light Mode */
       --light-bg: #edf2ff;
-      --light-bg-gradient: radial-gradient(circle at 12% 18%, #e0e7ff 0%, rgba(224, 231, 255, 0) 36%), radial-gradient(circle at 88% 12%, #ede9fe 0%, rgba(237, 233, 254, 0) 32%), linear-gradient(165deg, #f8faff 0%, #eef2ff 42%, #eaf0ff 100%);
+      --light-bg-gradient: radial-gradient(circle at 12% 18%, #e0e7ff 0%, rgba(224, 231, 255, 0) 36%), radial-gradient(circle at 88% 12%, #dbeafe 0%, rgba(219, 234, 254, 0) 32%), linear-gradient(165deg, #f8faff 0%, #eef2ff 42%, #eaf0ff 100%);
       --light-panel: rgba(255, 255, 255, 0.74);
       --light-text: #121827;
       --light-muted: #5f6b86;
@@ -17,7 +17,7 @@
       
       /* Dark Mode */
       --dark-bg: #0B0F1A;
-      --dark-bg-gradient: radial-gradient(circle at 14% 10%, rgba(99, 102, 241, 0.28) 0%, rgba(99, 102, 241, 0) 35%), radial-gradient(circle at 84% 16%, rgba(139, 92, 246, 0.26) 0%, rgba(139, 92, 246, 0) 34%), radial-gradient(circle at 52% 86%, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0) 36%), linear-gradient(165deg, #0b0f1a 0%, #10172b 45%, #111a31 100%);
+      --dark-bg-gradient: radial-gradient(circle at 14% 10%, rgba(99, 102, 241, 0.28) 0%, rgba(99, 102, 241, 0) 35%), radial-gradient(circle at 84% 16%, rgba(96, 165, 250, 0.26) 0%, rgba(96, 165, 250, 0) 34%), radial-gradient(circle at 52% 86%, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0) 36%), linear-gradient(165deg, #0b0f1a 0%, #10172b 45%, #111a31 100%);
       --dark-panel: rgba(255, 255, 255, 0.05);
       --dark-text: #edf2ff;
       --dark-muted: #b6c2df;
@@ -26,7 +26,7 @@
       /* Accent Colors */
       --primary-dark: #4F46E5;
       --primary: #6366F1;
-      --primary-light: #8B5CF6;
+      --primary-light: #60A5FA;
       --success: #22C55E;
       --warning: #F59E0B;
       --error: #EF4444;
@@ -169,6 +169,7 @@
       font-family: Inter, Poppins, "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
       background: var(--bg-gradient);
       color: var(--text);
+      padding-top: 86px;
       transition: background-color var(--motion-medium) ease-in-out, color var(--motion-medium) ease-in-out, background var(--motion-medium) ease-in-out;
     }
 
@@ -254,8 +255,10 @@
       background: color-mix(in srgb, var(--panel) 88%, var(--primary-light) 12%);
       border-bottom: 1px solid var(--line);
       padding: 12px 0;
-      position: sticky;
+      position: fixed;
       top: 0;
+      left: 0;
+      right: 0;
       z-index: 120;
       box-shadow: var(--shadow-sm);
       backdrop-filter: blur(18px);
