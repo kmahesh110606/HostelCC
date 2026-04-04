@@ -210,6 +210,9 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
     def _next_date_cache_key(self, obj: LaundrySchedule) -> str:
         return f"_cached_next_submission_date_{obj.id}"
 
+    def _month_days_cache_key(self, obj: LaundrySchedule) -> str:
+        return f"_cached_month_submission_days_{obj.id}"
+
     def _get_cached_today_status(self, obj: LaundrySchedule) -> dict[str, str]:
         key = self._status_cache_key(obj)
         cached = getattr(self, key, None)
@@ -288,14 +291,27 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
 
     def get_month_submission_days(self, obj: LaundrySchedule) -> list[int]:
         """Return list of day numbers in current month that are submission days for this student."""
+        request = self.context.get("request")
+        role = getattr(getattr(request, "user", None), "role", "") if request else ""
+        if role != "STUDENT":
+            return []
+
+        key = self._month_days_cache_key(obj)
+        cached = getattr(self, key, None)
+        if cached is not None:
+            return cached
+
         try:
-            return _get_submission_days_for_month(obj)
+            computed = _get_submission_days_for_month(obj)
         except Exception:
             logger.exception(
                 "Failed to compute month_submission_days for laundry schedule id=%s",
                 getattr(obj, "id", None),
             )
-            return []
+            computed = []
+
+        setattr(self, key, computed)
+        return computed
 
     class Meta:
         model = LaundrySchedule
