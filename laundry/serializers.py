@@ -1,10 +1,14 @@
 import calendar
+import logging
 from datetime import date, datetime, time, timedelta
 
 from rest_framework import serializers
 from django.utils import timezone
 
 from .models import LaundryEvent, LaundryHoliday, LaundryRoomRange, LaundrySchedule
+
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_upper(value: str | None) -> str:
@@ -203,18 +207,22 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
 
         request = self.context.get("request")
         role = getattr(getattr(request, "user", None), "role", "") if request else ""
-        if role == "STUDENT":
-            computed = _today_status(obj)
-        else:
-            # Lightweight status for large manager/admin lists to avoid timeout.
-            if obj.collection_status and not obj.submission_status:
-                computed = {"code": "collected", "label": "Collected"}
-            elif obj.laundry_done_at and obj.submission_status:
-                computed = {"code": "ready_for_collection", "label": "Ready for Collection"}
-            elif obj.submission_status and not obj.collection_status:
-                computed = {"code": "in_progress", "label": "In Progress"}
+        try:
+            if role == "STUDENT":
+                computed = _today_status(obj)
             else:
-                computed = {"code": "ready", "label": "Ready to Submit"}
+                # Lightweight status for large manager/admin lists to avoid timeout.
+                if obj.collection_status and not obj.submission_status:
+                    computed = {"code": "collected", "label": "Collected"}
+                elif obj.laundry_done_at and obj.submission_status:
+                    computed = {"code": "ready_for_collection", "label": "Ready for Collection"}
+                elif obj.submission_status and not obj.collection_status:
+                    computed = {"code": "in_progress", "label": "In Progress"}
+                else:
+                    computed = {"code": "ready", "label": "Ready to Submit"}
+        except Exception:
+            logger.exception("Failed to compute today_status for laundry schedule id=%s", getattr(obj, "id", None))
+            computed = {"code": "ready", "label": "Ready to Submit"}
 
         setattr(self, key, computed)
         return computed
@@ -227,10 +235,17 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
 
         request = self.context.get("request")
         role = getattr(getattr(request, "user", None), "role", "") if request else ""
-        if role == "STUDENT":
-            computed = _next_submission_date(obj)
-        else:
-            computed = _next_date_for_day_code(obj.day_of_week)
+        try:
+            if role == "STUDENT":
+                computed = _next_submission_date(obj)
+            else:
+                computed = _next_date_for_day_code(obj.day_of_week)
+        except Exception:
+            logger.exception(
+                "Failed to compute next_submission_date for laundry schedule id=%s",
+                getattr(obj, "id", None),
+            )
+            computed = None
 
         setattr(self, key, computed)
         return computed
@@ -263,7 +278,14 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
 
     def get_month_submission_days(self, obj: LaundrySchedule) -> list[int]:
         """Return list of day numbers in current month that are submission days for this student."""
-        return _get_submission_days_for_month(obj)
+        try:
+            return _get_submission_days_for_month(obj)
+        except Exception:
+            logger.exception(
+                "Failed to compute month_submission_days for laundry schedule id=%s",
+                getattr(obj, "id", None),
+            )
+            return []
 
     class Meta:
         model = LaundrySchedule

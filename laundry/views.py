@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from datetime import date, timedelta
 
@@ -22,6 +23,9 @@ from .serializers import (
     LaundryRoomRangeSerializer,
     LaundryScheduleSerializer,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_upper(value: str | None) -> str:
@@ -215,10 +219,19 @@ def _get_or_create_schedule_for_student(student):
     if not inferred_day:
         inferred_day = LaundrySchedule.DayChoices.MON
 
-    schedule, _ = LaundrySchedule.objects.get_or_create(
-        student=student,
-        defaults={"day_of_week": inferred_day},
-    )
+    try:
+        schedule, _ = LaundrySchedule.objects.get_or_create(
+            student=student,
+            defaults={"day_of_week": inferred_day},
+        )
+    except Exception:
+        logger.exception("Unable to create laundry schedule for student_id=%s", getattr(student, "id", None))
+        return (
+            LaundrySchedule.objects.select_related("student", "student__block", "student__user")
+            .filter(student=student)
+            .first()
+        )
+
     return (
         LaundrySchedule.objects.select_related("student", "student__block", "student__user")
         .filter(id=schedule.id)
@@ -377,7 +390,11 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
             if not student:
                 return queryset.none()
             # Ensure student has a schedule; if creation fails, still return what we have
-            schedule = _get_or_create_schedule_for_student(student)
+            try:
+                schedule = _get_or_create_schedule_for_student(student)
+            except Exception:
+                logger.exception("Failed resolving laundry schedule queryset for student_id=%s", student.id)
+                schedule = None
             if not schedule:
                 # Fallback: try to get existing schedule even if creation failed
                 return queryset.filter(student_id=student.id)
@@ -405,7 +422,11 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
         schedule = self.get_queryset().filter(student_id=student_id).first()
         if not schedule:
             student = Student.objects.select_related("block", "user").filter(id=student_id).first()
-            schedule = _get_or_create_schedule_for_student(student)
+            try:
+                schedule = _get_or_create_schedule_for_student(student)
+            except Exception:
+                logger.exception("Failed generating laundry QR schedule for student_id=%s", student_id)
+                schedule = None
         if not schedule:
             return Response({"detail": "Laundry schedule not found for student."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -590,7 +611,11 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
             )
             if not schedule:
                 student = Student.objects.select_related("block", "user").filter(id=student_id).first()
-                schedule = _get_or_create_schedule_for_student(student)
+                try:
+                    schedule = _get_or_create_schedule_for_student(student)
+                except Exception:
+                    logger.exception("Failed creating schedule while scanning QR for student_id=%s", student_id)
+                    schedule = None
             if not schedule:
                 return Response(
                     {"detail": "Laundry schedule not found for student.", "color": "red"},
@@ -647,7 +672,14 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
                 .first()
             )
             if not schedule:
-                schedule = _get_or_create_schedule_for_student(student)
+                try:
+                    schedule = _get_or_create_schedule_for_student(student)
+                except Exception:
+                    logger.exception(
+                        "Failed creating schedule while scanning QR by roll_no=%s",
+                        roll_no,
+                    )
+                    schedule = None
 
         if not schedule:
             return Response(
