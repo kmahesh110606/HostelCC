@@ -16,12 +16,12 @@
       --light-line: #d8e0f2;
       
       /* Dark Mode */
-      --dark-bg: #0b1228;
-      --dark-bg-gradient: linear-gradient(180deg, #111a35 0%, #0b1228 100%);
-      --dark-panel: #141e3d;
+      --dark-bg: #000000;
+      --dark-bg-gradient: linear-gradient(180deg, #000000 0%, #000000 100%);
+      --dark-panel: #1a2852;
       --dark-text: #f1f5ff;
-      --dark-muted: #a7b1cb;
-      --dark-line: #2a355b;
+      --dark-muted: #c0cbe8;
+      --dark-line: #475d95;
       
       /* Accent Colors */
       --primary-dark: #1b2c75;
@@ -100,6 +100,41 @@
       --shadow-sm: 0 1px 2px rgba(18, 18, 20, 0.04);
       --shadow-md: 0 2px 8px rgba(18, 18, 20, 0.06);
       --shadow-lg: 0 8px 18px rgba(18, 18, 20, 0.10);
+    }
+
+    html[data-theme="dark"] .tab,
+    html[data-theme="dark"] .card-surface,
+    html[data-theme="dark"] .feed-card,
+    html[data-theme="dark"] .community-panel,
+    html[data-theme="dark"] .comment-modal-card,
+    html[data-theme="dark"] .notification-card,
+    html[data-theme="dark"] .day-panel,
+    html[data-theme="dark"] .meal-card,
+    html[data-theme="dark"] .action-card,
+    html[data-theme="dark"] .poll-modal-card,
+    html[data-theme="dark"] .laundry-card,
+    html[data-theme="dark"] .student-calendar-card,
+    html[data-theme="dark"] .laundry-confirm-card,
+    html[data-theme="dark"] .discipline-card,
+    html[data-theme="dark"] .auth-panel,
+    html[data-theme="dark"] .messages li,
+    html[data-theme="dark"] .role-badge,
+    html[data-theme="dark"] .theme-toggle,
+    html[data-theme="dark"] .button.secondary,
+    html[data-theme="dark"] input,
+    html[data-theme="dark"] select,
+    html[data-theme="dark"] textarea {
+      border-color: color-mix(in srgb, var(--line) 84%, #ffffff 16%) !important;
+    }
+
+    html[data-theme="dark"] .button.secondary,
+    html[data-theme="dark"] .theme-toggle,
+    html[data-theme="dark"] .role-badge {
+      background: color-mix(in srgb, var(--panel) 92%, #ffffff 8%);
+    }
+
+    html[data-theme="dark"] .messages li {
+      background: color-mix(in srgb, var(--panel) 88%, #ffffff 12%);
     }
 
     * { box-sizing: border-box; }
