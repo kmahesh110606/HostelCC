@@ -1,6 +1,14 @@
 from rest_framework import serializers
 
-from .models import CloakroomEntry
+from .models import CloakroomEntry, CloakroomRoom
+
+
+class CloakroomRoomSerializer(serializers.ModelSerializer):
+    block_name = serializers.CharField(source="block.block_name", read_only=True)
+
+    class Meta:
+        model = CloakroomRoom
+        fields = ["id", "block", "block_name", "room_no", "is_active"]
 
 
 class CloakroomEntrySerializer(serializers.ModelSerializer):

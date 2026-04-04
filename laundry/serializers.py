@@ -1,3 +1,4 @@
+import calendar
 from datetime import date, datetime, time, timedelta
 
 from rest_framework import serializers
@@ -127,6 +128,24 @@ def _next_date_for_day_code(day_code: str, start_date: date | None = None):
     return base + timedelta(days=delta)
 
 
+def _get_submission_days_for_month(schedule: LaundrySchedule, target_date: date | None = None) -> list[int]:
+    """Get list of day numbers in the given month that are submission days for this student."""
+    if not schedule:
+        return []
+
+    target = target_date or timezone.localdate()
+    year, month = target.year, target.month
+    _, last_day = calendar.monthrange(year, month)
+
+    submission_days = []
+    for day in range(1, last_day + 1):
+        current_date = date(year, month, day)
+        if _is_submission_day(schedule, current_date):
+            submission_days.append(day)
+
+    return submission_days
+
+
 def _today_status(schedule: LaundrySchedule) -> dict[str, str]:
     today = timezone.localdate()
     tz = timezone.get_current_timezone()
@@ -168,6 +187,7 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
     today_status_label = serializers.SerializerMethodField()
     next_submission_date = serializers.SerializerMethodField()
     server_today_ist = serializers.SerializerMethodField()
+    month_submission_days = serializers.SerializerMethodField()
 
     def _status_cache_key(self, obj: LaundrySchedule) -> str:
         return f"_cached_today_status_{obj.id}"
@@ -228,6 +248,10 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
     def get_server_today_ist(self, obj: LaundrySchedule) -> str:
         return timezone.localdate().isoformat()
 
+    def get_month_submission_days(self, obj: LaundrySchedule) -> list[int]:
+        """Return list of day numbers in current month that are submission days for this student."""
+        return _get_submission_days_for_month(obj)
+
     class Meta:
         model = LaundrySchedule
         fields = [
@@ -250,6 +274,7 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
             "today_status_label",
             "next_submission_date",
             "server_today_ist",
+            "month_submission_days",
         ]
 
 

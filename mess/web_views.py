@@ -37,6 +37,17 @@ def _scoped_feedback_queryset_for_user(user):
     queryset = Feedback.objects.select_related("student", "student__block").all()
     role = getattr(user, "role", "")
 
+    if role == "STUDENT":
+        student = Student.objects.select_related("block").filter(user=user).first()
+        if not student:
+            return queryset.none()
+
+        mess_type = canonical_mess_type(student.mess_allotment)
+        if not mess_type:
+            return queryset.none()
+
+        return queryset.filter(student__mess_allotment=mess_type)
+
     if role in {"MESS_MANAGER", "WARDEN"}:
         assigned_mess_name = (getattr(user, "assigned_mess_name", "") or "").strip()
         if not assigned_mess_name:
@@ -110,6 +121,33 @@ def mess_portal(request: HttpRequest) -> HttpResponse:
                 messages.success(request, "Rating submitted.")
             except IntegrityError:
                 messages.warning(request, "You have already rated this menu item this month. Your previous rating was not updated.")
+            return redirect("mess-portal")
+
+        if action == "reply_feedback":
+            if request.user.role != "MESS_MANAGER":
+                messages.error(request, "Only mess managers can reply to feedback.")
+                return redirect("mess-portal")
+
+            raw_feedback_id = (request.POST.get("feedback_id") or "").strip()
+            manager_reply = (request.POST.get("manager_reply") or "").strip()
+            if not raw_feedback_id or not manager_reply:
+                messages.error(request, "Please select a feedback item and enter a reply.")
+                return redirect("mess-portal")
+
+            try:
+                feedback_id = int(raw_feedback_id)
+            except ValueError:
+                messages.error(request, "Invalid feedback selection.")
+                return redirect("mess-portal")
+
+            feedback = _scoped_feedback_queryset_for_user(request.user).filter(id=feedback_id).first()
+            if not feedback:
+                messages.error(request, "Feedback not found for your assigned mess.")
+                return redirect("mess-portal")
+
+            feedback.manager_reply = manager_reply
+            feedback.save(update_fields=["manager_reply"])
+            messages.success(request, "Reply saved.")
             return redirect("mess-portal")
 
         if action == "create_poll":
@@ -250,6 +288,12 @@ def mess_portal(request: HttpRequest) -> HttpResponse:
                     "created_at": feedback.created_at,
                 }
             )
+        staff_feedback.sort(
+            key=lambda item: (
+                item["rating"],
+                -(item["created_at"].timestamp() if item["created_at"] else 0),
+            )
+        )
 
     add_options = MenuPollOption.objects.filter(month=month, poll_type=MenuPollOption.PollType.ADD).annotate(
         total_votes=Count("votes")
@@ -280,6 +324,7 @@ def mess_portal(request: HttpRequest) -> HttpResponse:
             "selected_mess_type": selected_mess_type,
             "available_mess_types": list(MESS_TYPES.keys()),
             "can_view_staff_feedback": can_view_staff_feedback,
+            "can_reply_staff_feedback": request.user.role == "MESS_MANAGER",
             "staff_feedback": staff_feedback,
             "available_mess_change_caterers": available_mess_change_caterers,
             "can_request_mess_change": can_request_mess_change,
