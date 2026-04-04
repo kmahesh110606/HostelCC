@@ -24,6 +24,12 @@ from .serializers import (
     LaundryRoomRangeSerializer,
     LaundryScheduleSerializer,
 )
+from .web_views import (
+    _build_student_month_days,
+    _get_or_create_schedule_for_student,
+    _next_submission_date,
+    _student_today_status,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -517,6 +523,73 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
         }
         cache.set(cache_key, payload, timeout=300)
         return Response(payload)
+
+    @action(detail=False, methods=["get"], url_path="student-portal")
+    def student_portal(self, request):
+        if request.user.role != "STUDENT":
+            return Response({"detail": "Only students can access the laundry portal data."}, status=status.HTTP_403_FORBIDDEN)
+
+        student = _resolve_student_for_laundry_user(request.user)
+        if not student:
+            return Response({"detail": "Student profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        schedule = _get_or_create_schedule_for_student(student)
+        if not schedule:
+            return Response({"detail": "Laundry schedule not found for student."}, status=status.HTTP_404_NOT_FOUND)
+
+        student_room_rules = list(
+            LaundryRoomRange.objects.filter(is_active=True, block_name__iexact=_safe_student_block_name(student))
+        )
+        holiday_dates = list(
+            LaundryHoliday.objects.filter(is_active=True).order_by("holiday_date").values_list("holiday_date", flat=True)
+        )
+        calendar_days, schedule_month_name, schedule_year = _build_student_month_days(
+            schedule,
+            student_room_rules,
+            holiday_cache=holiday_dates,
+        )
+        student_today_status = _student_today_status(
+            schedule,
+            student_room_rules,
+            holiday_cache=holiday_dates,
+        )
+        next_submission_date = _next_submission_date(
+            schedule,
+            student_room_rules,
+            holiday_cache=holiday_dates,
+        )
+
+        student_email = (
+            (schedule.student.user.email if schedule.student.user else "")
+            or (schedule.student.user.username if schedule.student.user else "")
+            or ""
+        )
+        student_qr_text = json.dumps(
+            {
+                "student_id": schedule.student_id,
+                "qr_token": str(schedule.qr_token),
+                "roll_no": schedule.student.roll_no,
+                "email": student_email.strip().lower(),
+                "room_no": schedule.student.room_no,
+                "block_name": _safe_student_block_name(schedule.student),
+            },
+            separators=(",", ":"),
+        )
+
+        schedule_data = LaundryScheduleSerializer(schedule, context={"request": request}).data
+        return Response(
+            {
+                "student_schedule": schedule_data,
+                "calendar_days": calendar_days,
+                "schedule_month_name": schedule_month_name,
+                "schedule_year": schedule_year,
+                "student_today_status": student_today_status,
+                "next_submission_date": next_submission_date.isoformat() if next_submission_date else None,
+                "last_submission_local": timezone.localtime(schedule.last_submission_at).isoformat() if schedule.last_submission_at else None,
+                "due_collection_local": timezone.localtime(schedule.due_collection_by).isoformat() if schedule.due_collection_by and schedule.submission_status and not schedule.collection_status else None,
+                "student_qr_text": student_qr_text,
+            }
+        )
 
     @action(detail=True, methods=["post"], url_path="submission")
     def mark_submission(self, request, pk=None):
