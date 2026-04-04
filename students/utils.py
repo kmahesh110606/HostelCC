@@ -27,6 +27,19 @@ def resolve_student_for_user(user):
 
     matches = list(base_qs.filter(lookup)[:2])
     if len(matches) != 1:
+        full_name = " ".join(
+            part.strip()
+            for part in ((user.first_name or ""), (user.last_name or ""))
+            if part and part.strip()
+        ).strip()
+        if full_name:
+            name_matches = list(base_qs.filter(name__iexact=full_name)[:2])
+            if len(name_matches) == 1:
+                student = name_matches[0]
+                if student.user_id is None:
+                    student.user = user
+                    student.save(update_fields=["user"])
+                return student
         return None
 
     student = matches[0]
