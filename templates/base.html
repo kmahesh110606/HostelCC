@@ -766,6 +766,19 @@
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent) !important;
     }
 
+    select option,
+    select optgroup {
+      color: var(--text);
+      background-color: var(--bg);
+    }
+
+    html[data-theme="dark"] select,
+    html[data-theme="dark"] select option,
+    html[data-theme="dark"] select optgroup {
+      color: #ecf4ff;
+      background-color: #0f1f3a;
+    }
+
     button,
     .button {
       display: inline-flex;

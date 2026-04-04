@@ -82,6 +82,14 @@
         <div class="vit-card-title">Venues</div>
         <p class="muted">Manage storage locations</p>
       </a>
+
+      <a href="{% url 'cloakroom-portal' %}" class="vit-action-card">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 3.5A2.5 2.5 0 0 0 3.5 6v12A2.5 2.5 0 0 0 6 20.5h12A2.5 2.5 0 0 0 20.5 18V6A2.5 2.5 0 0 0 18 3.5H6Zm0 1.5h12c.55 0 1 .45 1 1v12c0 .55-.45 1-1 1H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1Zm3 2a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm0 4.5c-1.66 0-3 .78-3 1.75V16h6v-1.25c0-.97-1.34-1.75-3-1.75Zm6-1.5h3v1.5h-3v-1.5Zm0 3h3V15h-3v-1.5Z"></path>
+        </svg>
+        <div class="vit-card-title">Cloakroom</div>
+        <p class="muted">Manage unlocks, submissions, and returns</p>
+      </a>
     </div>
   </section>
 
@@ -255,6 +263,10 @@
 
   .vit-action-card svg {
     color: var(--vit-blue);
+  }
+
+  html[data-theme="dark"] .vit-action-card svg {
+    color: var(--icon-tone);
   }
 
   .vit-card-title {
