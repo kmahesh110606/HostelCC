@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import CloakroomEntry
+from .models import CloakroomEntry, CloakroomRoom
+
+
+@admin.register(CloakroomRoom)
+class CloakroomRoomAdmin(admin.ModelAdmin):
+    list_display = ("block", "room_no", "is_active", "created_at")
+    list_filter = ("block", "is_active")
+    search_fields = ("room_no", "block__block_name")
+    ordering = ("block__block_name", "room_no")
 
 
 @admin.register(CloakroomEntry)

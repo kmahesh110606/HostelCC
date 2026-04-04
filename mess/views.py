@@ -161,7 +161,10 @@ class FeedbackViewSet(viewsets.ModelViewSet):
             student = Student.objects.filter(user=self.request.user).first()
             if not student:
                 return queryset.none()
-            return queryset.filter(student=student)
+            mess_type = canonical_mess_type(student.mess_allotment)
+            if not mess_type:
+                return queryset.none()
+            return queryset.filter(student__mess_allotment=mess_type)
 
         if role in {"MESS_MANAGER", "WARDEN"}:
             assigned_mess_name = (getattr(self.request.user, "assigned_mess_name", "") or "").strip()

@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Cloakroom Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Cloakroom Administration</h1>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <!-- Add/Manage Cloakroom Rooms -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Manage Cloakroom Rooms</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_room">
+                        <div class="mb-3">
+                            <label for="block_id" class="form-label">Block</label>
+                            <select class="form-select" id="block_id" name="block_id" required>
+                                <option value="">-- Select Block --</option>
+                                {% for block in blocks %}
+                                    <option value="{{ block.id }}">{{ block.block_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="room_no" class="form-label">Room Number</label>
+                            <input type="text" class="form-control" id="room_no" name="room_no" placeholder="e.g., 101" required>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Add Room</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Unlock/Lock -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Manage Student Access</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="student_search" class="form-label">Search Student</label>
+                        <input type="text" class="form-control" id="student_search" placeholder="Search by roll no or name...">
+                    </div>
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        {% for student in students %}
+                            <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
+                                <div>
+                                    <strong>{{ student.roll_no }}</strong> - {{ student.name }}
+                                    <br>
+                                    <small class="text-muted">{{ student.block.block_name }}-{{ student.room_no }}</small>
+                                </div>
+                                <form method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="toggle_student_unlock">
+                                    <input type="hidden" name="student_id" value="{{ student.id }}">
+                                    {% if student.cloakroom_unlocked %}
+                                        <button type="submit" class="btn btn-sm btn-success">Unlocked</button>
+                                    {% else %}
+                                        <button type="submit" class="btn btn-sm btn-danger">Locked</button>
+                                    {% endif %}
+                                </form>
+                            </div>
+                        {% empty %}
+                            <p class="text-muted text-center p-3">No students found.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Cloakroom Rooms -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Active Cloakroom Rooms</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Block</th>
+                                <th>Room Number</th>
+                                <th>Added Date</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for room in cloakroom_rooms %}
+                                <tr>
+                                    <td><strong>{{ room.block.block_name }}</strong></td>
+                                    <td>{{ room.room_no }}</td>
+                                    <td>{{ room.created_at|date:"d M Y" }}</td>
+                                    <td>
+                                        {% if room.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if room.is_active %}
+                                            <form method="post" class="d-inline" onsubmit="return confirm('Deactivate this room?');">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="delete_room">
+                                                <input type="hidden" name="room_id" value="{{ room.id }}">
+                                                <button type="submit" class="btn btn-sm btn-danger">Deactivate</button>
+                                            </form>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted p-3">No cloakroom rooms defined yet.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('student_search').addEventListener('keyup', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const studentDivs = document.querySelectorAll('[data-student-id]');
+    studentDivs.forEach(div => {
+        const text = div.textContent.toLowerCase();
+        div.style.display = text.includes(searchTerm) ? '' : 'none';
+    });
+});
+</script>
+
+<style>
+    .form-control:focus, .form-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+</style>
+{% endblock %}

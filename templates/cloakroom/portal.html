@@ -92,12 +92,23 @@
     text-align: left;
     font-size: 13px;
   }
+
+  .admin-link {
+    display: inline-block;
+    margin-bottom: 16px;
+  }
 </style>
 
 <div class="tabs">
   <section class="tab">
     <h2>Cloak Room</h2>
     <p class="muted">Track submitted items with token numbers and storage room mapping.</p>
+
+    {% if can_manage_cloakroom and is_admin %}
+    <div class="admin-link">
+      <a href="{% url 'cloakroom-admin' %}" class="secondary">⚙️ Go to Admin Panel</a>
+    </div>
+    {% endif %}
 
     {% if student and not cloakroom_unlocked %}
     <p class="muted">Cloak room access is currently locked by admin for your profile.</p>
@@ -167,8 +178,23 @@
 
           <p class="muted" style="margin-top: 8px; margin-bottom: 8px;">Chair must be submitted first for each student.</p>
 
-          <label for="storage_room_no">Storage Room No</label>
-          <input id="storage_room_no" name="storage_room_no" placeholder="CR-1" required />
+          <label for="storage_block">Storage Block</label>
+          <select id="storage_block" name="storage_block" required onchange="updateRoomDropdown()">
+            <option value="">Select block</option>
+            {% for block in blocks %}
+            <option value="{{ block.id }}">{{ block.block_name }}</option>
+            {% endfor %}
+          </select>
+
+          <label for="storage_room_no">Storage Room</label>
+          <select id="storage_room_no" name="storage_room_no" required>
+            <option value="">Select room</option>
+            {% for room in cloakroom_rooms %}
+            <option value="CR-{{ room.block.block_name }}-{{ room.room_no }}" data-block-id="{{ room.block.id }}" data-room-no="{{ room.room_no }}">
+              {{ room.block.block_name }}-{{ room.room_no }}
+            </option>
+            {% endfor %}
+          </select>
 
           <label for="notes">Notes (optional)</label>
           <textarea id="notes" name="notes" rows="2"></textarea>
@@ -186,7 +212,7 @@
           <textarea id="return_qr_text" name="qr_text" rows="3" placeholder='{{ sample_qr }}'></textarea>
 
           <label for="token_no">Token No</label>
-          <input id="token_no" name="token_no" type="number" min="1" />
+          <input id="token_no" name="token_no" type="number" min="0" />
 
           <p class="muted" style="margin-top: 8px; margin-bottom: 8px;">
             If a student has multiple pending items, token no is required with QR.
@@ -206,19 +232,41 @@
           <input type="hidden" name="action" value="move_items" />
 
           <label for="token_start">Token Range Start (optional)</label>
-          <input id="token_start" name="token_start" type="number" min="1" />
+          <input id="token_start" name="token_start" type="number" min="0" />
 
           <label for="token_end">Token Range End (optional)</label>
-          <input id="token_end" name="token_end" type="number" min="1" />
+          <input id="token_end" name="token_end" type="number" min="0" />
 
-          <label for="block_name">Block Name (optional)</label>
-          <input id="block_name" name="block_name" placeholder="D2" />
+          <label for="move_block_name">From Block (optional)</label>
+          <select id="move_block_name" name="block_name">
+            <option value="">Any block</option>
+            {% for block in blocks %}
+            <option value="{{ block.block_name }}">{{ block.block_name }}</option>
+            {% endfor %}
+          </select>
 
-          <label for="room_no">Room No (optional)</label>
-          <input id="room_no" name="room_no" placeholder="A-101" />
+          <label for="move_room_no">From Room (optional)</label>
+          <select id="move_room_no" name="room_no">
+            <option value="">Any room</option>
+            {% for room in cloakroom_rooms %}
+            <option value="{{ room.room_no }}" data-block-id="{{ room.block.id }}">
+              {{ room.block.block_name }}-{{ room.room_no }}
+            </option>
+            {% endfor %}
+          </select>
 
-          <label for="move_storage_room_no">Move To Storage Room</label>
-          <input id="move_storage_room_no" name="storage_room_no" placeholder="CR-2" required />
+          <label for="move_to_block">To Block</label>
+          <select id="move_to_block" name="to_block_name" required onchange="updateMoveToRoomDropdown()">
+            <option value="">Select destination block</option>
+            {% for block in blocks %}
+            <option value="{{ block.block_name }}">{{ block.block_name }}</option>
+            {% endfor %}
+          </select>
+
+          <label for="move_to_room_no">To Room</label>
+          <select id="move_to_room_no" name="storage_room_no" required>
+            <option value="">Select destination room</option>
+          </select>
 
           <label for="move_notes">Move Notes (optional)</label>
           <textarea id="move_notes" name="move_notes" rows="2"></textarea>
@@ -256,8 +304,72 @@
   </section>
 </div>
 
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
+  // Data structure for rooms by block
+  const roomsByBlock = {
+    {% for room in cloakroom_rooms %}
+      '{{ room.block.id }}': [
+        {% if forloop.first or room.block.id != prev_block_id %}
+        {% endif %}
+        {id: '{{ room.id }}', blockName: '{{ room.block.block_name }}', roomNo: '{{ room.room_no }}'}{{ forloop.last|default:"," }}
+      ]
+      {% if not forloop.last and room.block.id != prev_block_id %}
+      ,
+      {% endif %}
+    {% endfor %}
+  };
+
+  // Alternative simpler data structure
+  const allRooms = [
+    {% for room in cloakroom_rooms %}
+    {id: '{{ room.id }}', blockId: '{{ room.block.id }}', blockName: '{{ room.block.block_name }}', roomNo: '{{ room.room_no }}'}{{ forloop.last|default:"," }}
+    {% endfor %}
+  ];
+
+  function updateRoomDropdown() {
+    const blockSelect = document.getElementById('storage_block');
+    const roomSelect = document.getElementById('storage_room_no');
+    const selectedBlockId = blockSelect.value;
+    
+    // Clear current options except the first
+    roomSelect.innerHTML = '<option value="">Select room</option>';
+    
+    if (!selectedBlockId) return;
+    
+    // Filter rooms for selected block
+    const filteredRooms = allRooms.filter(room => room.blockId === selectedBlockId);
+    
+    filteredRooms.forEach(room => {
+      const option = document.createElement('option');
+      option.value = 'CR-' + room.blockName + '-' + room.roomNo;
+      option.textContent = room.blockName + '-' + room.roomNo;
+      roomSelect.appendChild(option);
+    });
+  }
+
+  function updateMoveToRoomDropdown() {
+    const blockSelect = document.getElementById('move_to_block');
+    const roomSelect = document.getElementById('move_to_room_no');
+    const selectedBlockName = blockSelect.value;
+    
+    // Clear current options except the first
+    roomSelect.innerHTML = '<option value="">Select destination room</option>';
+    
+    if (!selectedBlockName) return;
+    
+    // Filter rooms for selected block
+    const filteredRooms = allRooms.filter(room => room.blockName === selectedBlockName);
+    
+    filteredRooms.forEach(room => {
+      const option = document.createElement('option');
+      option.value = 'CR-' + room.blockName + '-' + room.roomNo;
+      option.textContent = room.blockName + '-' + room.roomNo;
+      roomSelect.appendChild(option);
+    });
+  }
+
   (function () {
     const value = "{{ student_qr_text|escapejs }}";
     const target = document.getElementById("cloakroom-student-qr");

@@ -8,12 +8,14 @@ from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_http_methods
 
+from hostels.models import HostelBlock
 from laundry.models import LaundrySchedule
 from students.models import Student
 from students.utils import resolve_student_for_user
 
-from .models import CloakroomEntry
+from .models import CloakroomEntry, CloakroomRoom
 from .views import _parse_student_qr, _resolve_student_from_payload
 
 
@@ -60,6 +62,21 @@ def _normalize_item_code(item_name: str) -> str | None:
     if not key:
         return None
     return _ITEM_ALIASES.get(key)
+
+
+def _room_token_no_for_student(student) -> int:
+    room_entries = CloakroomEntry.objects.filter(student__room_no__iexact=student.room_no)
+    if getattr(student, "block_id", None):
+        room_entries = room_entries.filter(student__block_id=student.block_id)
+    elif getattr(student, "block", None) and getattr(student.block, "block_name", ""):
+        room_entries = room_entries.filter(student__block__block_name__iexact=student.block.block_name)
+
+    existing_token = room_entries.order_by("token_no").values_list("token_no", flat=True).first()
+    if existing_token is not None:
+        return existing_token
+
+    last_token = CloakroomEntry.objects.order_by("-token_no").values_list("token_no", flat=True).first()
+    return 0 if last_token is None else last_token + 1
 
 
 def _student_qr_payload_text(student, user) -> str:
@@ -244,10 +261,9 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
                 return redirect("cloakroom-portal")
 
             try:
-                last_token = CloakroomEntry.objects.order_by("-token_no").values_list("token_no", flat=True).first() or 1000
                 entry = CloakroomEntry.objects.create(
                     student=target_student,
-                    token_no=last_token + 1,
+                    token_no=_room_token_no_for_student(target_student),
                     item_name=_ITEM_CODE_TO_LABEL[item_code],
                     storage_room_no=storage_room_no,
                     notes=notes,
@@ -281,7 +297,7 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
                 messages.error(request, "Provide token no or student QR text.")
                 return redirect("cloakroom-portal")
 
-            entry = None
+            entries = []
             if qr_text:
                 parsed = _parse_student_qr(qr_text)
                 if not parsed:
@@ -297,42 +313,53 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
                     status=CloakroomEntry.Status.SUBMITTED,
                 )
                 if token_no is not None:
-                    entry = pending.filter(token_no=token_no).first()
-                    if not entry:
+                    entries = list(pending.filter(token_no=token_no).order_by("submitted_at", "id"))
+                    if not entries:
                         messages.error(request, "No pending token found for this student.")
                         return redirect("cloakroom-portal")
                 else:
-                    count = pending.count()
-                    if count == 0:
+                    entries = list(pending.order_by("submitted_at", "id"))
+                    if not entries:
                         messages.error(request, "No pending cloak room item found for this student.")
                         return redirect("cloakroom-portal")
-                    if count > 1:
-                        tokens = ", ".join(str(token) for token in pending.values_list("token_no", flat=True)[:10])
-                        messages.error(request, f"Multiple pending tokens: {tokens}. Please enter token no.")
-                        return redirect("cloakroom-portal")
-                    entry = pending.first()
             else:
-                entry = CloakroomEntry.objects.filter(token_no=token_no).first()
-                if not entry:
+                entries = list(
+                    CloakroomEntry.objects.filter(token_no=token_no, status=CloakroomEntry.Status.SUBMITTED).order_by(
+                        "submitted_at", "id"
+                    )
+                )
+                if not entries:
                     messages.error(request, "Token not found.")
                     return redirect("cloakroom-portal")
 
-            if entry.status == CloakroomEntry.Status.RETURNED:
-                messages.info(request, "This token is already marked as returned.")
-                return redirect("cloakroom-portal")
-
             try:
-                entry.status = CloakroomEntry.Status.RETURNED
-                entry.returned_by = request.user
-                entry.returned_at = timezone.now()
-                if return_notes:
-                    entry.notes = _append_note(entry.notes, f"Return note: {return_notes}")
-                entry.save(update_fields=["status", "returned_by", "returned_at", "notes"])
+                returned_count = 0
+                first_entry = None
+                for entry in entries:
+                    if entry.status == CloakroomEntry.Status.RETURNED:
+                        continue
+                    if first_entry is None:
+                        first_entry = entry
+                    entry.status = CloakroomEntry.Status.RETURNED
+                    entry.returned_by = request.user
+                    entry.returned_at = timezone.now()
+                    if return_notes:
+                        entry.notes = _append_note(entry.notes, f"Return note: {return_notes}")
+                    entry.save(update_fields=["status", "returned_by", "returned_at", "notes"])
+                    returned_count += 1
             except DatabaseError:
                 logger.exception("Cloakroom return failed due to database error")
                 messages.error(request, "Cloak room is temporarily unavailable. Please try again in a few minutes.")
                 return redirect("cloakroom-portal")
-            messages.success(request, f"Token #{entry.token_no} marked as collected.")
+            if returned_count == 0:
+                messages.info(request, "This token is already marked as returned.")
+            elif returned_count == 1:
+                messages.success(request, f"Token #{first_entry.token_no if first_entry else token_no} marked as collected.")
+            else:
+                messages.success(
+                    request,
+                    f"Token #{first_entry.token_no if first_entry else token_no} marked as collected for {returned_count} item(s).",
+                )
             return redirect("cloakroom-portal")
 
         if action == "move_items":
@@ -426,6 +453,16 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
             student_qr_text = ""
         item_status_rows = _build_item_status_rows(entries)
 
+    # Get available cloakroom rooms and blocks for staff forms
+    try:
+        blocks = list(HostelBlock.objects.all().order_by("block_name")) if can_manage else []
+        cloakroom_rooms = list(CloakroomRoom.objects.filter(is_active=True).select_related("block").order_by("block__block_name", "room_no")) if can_manage else []
+    except DatabaseError:
+        blocks = []
+        cloakroom_rooms = []
+
+    is_admin = getattr(request.user, "role", "") in {"ADMIN", "SUPERVISOR", "DIRECTOR"}
+
     return render(
         request,
         "cloakroom/portal.html",
@@ -434,9 +471,12 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
             "cloakroom_unlocked": cloakroom_unlocked,
             "entries": entries,
             "can_manage_cloakroom": can_manage,
+            "is_admin": is_admin,
             "required_item_choices": [label for _, label in REQUIRED_CLOAKROOM_ITEMS],
             "student_qr_text": student_qr_text,
             "item_status_rows": item_status_rows,
+            "blocks": blocks,
+            "cloakroom_rooms": cloakroom_rooms,
             "sample_qr": json.dumps(
                 {
                     "roll_no": student.roll_no if student else "22BCE0001",
@@ -447,3 +487,90 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
             ),
         },
     )
+
+
+def _can_admin_cloakroom(user) -> bool:
+    """Check if user can access cloakroom admin pages."""
+    return getattr(user, "role", "") in {"ADMIN", "SUPERVISOR", "DIRECTOR"}
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def cloakroom_admin(request: HttpRequest) -> HttpResponse:
+    """Admin page for cloakroom management: rooms and student unlock/lock."""
+    if not _can_admin_cloakroom(request.user):
+        messages.error(request, "You don't have permission to access cloakroom admin.")
+        return redirect("cloakroom-portal")
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "add_room":
+            block_id = request.POST.get("block_id", "").strip()
+            room_no = request.POST.get("room_no", "").strip()
+
+            if not block_id or not room_no:
+                messages.error(request, "Block and room number are required.")
+                return redirect("cloakroom-admin")
+
+            try:
+                block = HostelBlock.objects.get(id=int(block_id))
+            except (HostelBlock.DoesNotExist, ValueError):
+                messages.error(request, "Invalid block selected.")
+                return redirect("cloakroom-admin")
+
+            room_no = room_no.upper()
+            _, created = CloakroomRoom.objects.get_or_create(block=block, room_no=room_no)
+            if created:
+                messages.success(request, f"Added cloakroom room {block.block_name}-{room_no}.")
+            else:
+                CloakroomRoom.objects.filter(block=block, room_no=room_no).update(is_active=True)
+                messages.info(request, f"Reactivated cloakroom room {block.block_name}-{room_no}.")
+            return redirect("cloakroom-admin")
+
+        elif action == "delete_room":
+            room_id = request.POST.get("room_id", "").strip()
+            try:
+                room = CloakroomRoom.objects.get(id=int(room_id))
+                block_name = room.block.block_name
+                room_no = room.room_no
+                room.is_active = False
+                room.save(update_fields=["is_active"])
+                messages.success(request, f"Deactivated cloakroom room {block_name}-{room_no}.")
+            except (CloakroomRoom.DoesNotExist, ValueError):
+                messages.error(request, "Invalid room selected.")
+            return redirect("cloakroom-admin")
+
+        elif action == "toggle_student_unlock":
+            student_id = request.POST.get("student_id", "").strip()
+            try:
+                student = Student.objects.get(id=int(student_id))
+                student.cloakroom_unlocked = not student.cloakroom_unlocked
+                student.save(update_fields=["cloakroom_unlocked"])
+                status = "unlocked" if student.cloakroom_unlocked else "locked"
+                messages.success(request, f"Cloakroom service {status} for {student.roll_no}.")
+            except (Student.DoesNotExist, ValueError):
+                messages.error(request, "Invalid student selected.")
+            return redirect("cloakroom-admin")
+
+    try:
+        blocks = list(HostelBlock.objects.all().order_by("block_name"))
+        cloakroom_rooms = list(CloakroomRoom.objects.select_related("block").order_by("block__block_name", "room_no"))
+        all_students = list(Student.objects.select_related("block").order_by("roll_no")[:500])
+    except DatabaseError:
+        logger.exception("Cloakroom admin load failed")
+        blocks = []
+        cloakroom_rooms = []
+        all_students = []
+        messages.error(request, "Cloakroom data is temporarily unavailable.")
+
+    return render(
+        request,
+        "cloakroom/admin.html",
+        {
+            "blocks": blocks,
+            "cloakroom_rooms": cloakroom_rooms,
+            "students": all_students,
+        },
+    )
+

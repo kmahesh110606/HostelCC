@@ -11,8 +11,8 @@ from rest_framework.response import Response
 from students.models import Student
 from students.utils import resolve_student_for_user
 
-from .models import CloakroomEntry
-from .serializers import CloakroomEntrySerializer
+from .models import CloakroomEntry, CloakroomRoom
+from .serializers import CloakroomEntrySerializer, CloakroomRoomSerializer
 
 
 REQUIRED_CLOAKROOM_ITEMS = (
@@ -94,9 +94,19 @@ def _resolve_student_from_payload(payload: dict[str, str]):
     return None
 
 
-def _next_token_no() -> int:
-    current = CloakroomEntry.objects.aggregate(max_token=Max("token_no")).get("max_token") or 1000
-    return current + 1
+def _room_token_no_for_student(student: Student) -> int:
+    room_entries = CloakroomEntry.objects.filter(student__room_no__iexact=student.room_no)
+    if getattr(student, "block_id", None):
+        room_entries = room_entries.filter(student__block_id=student.block_id)
+    elif getattr(student, "block", None) and getattr(student.block, "block_name", ""):
+        room_entries = room_entries.filter(student__block__block_name__iexact=student.block.block_name)
+
+    existing_token = room_entries.order_by("token_no").values_list("token_no", flat=True).first()
+    if existing_token is not None:
+        return existing_token
+
+    current = CloakroomEntry.objects.aggregate(max_token=Max("token_no")).get("max_token")
+    return 0 if current is None else current + 1
 
 
 def _append_note(existing: str, extra: str) -> str:
@@ -191,7 +201,7 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
 
         entry = CloakroomEntry.objects.create(
             student=student,
-            token_no=_next_token_no(),
+            token_no=_room_token_no_for_student(student),
             item_name=_ITEM_CODE_TO_LABEL[item_code],
             storage_room_no=storage_room_no,
             notes=notes,
@@ -226,6 +236,8 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
         )
         entry = None
 
+        entries = []
+
         if qr_text:
             parsed = _parse_student_qr(qr_text)
             if not parsed:
@@ -237,41 +249,41 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
 
             pending = entry_queryset.filter(student=student, status=CloakroomEntry.Status.SUBMITTED)
             if token_no is not None:
-                entry = pending.filter(token_no=token_no).first()
-                if not entry:
+                entries = list(pending.filter(token_no=token_no).order_by("submitted_at", "id"))
+                if not entries:
                     raise ValidationError({"token_no": "No pending token found for this student."})
             else:
-                pending_count = pending.count()
-                if pending_count == 0:
+                entries = list(pending.order_by("submitted_at", "id"))
+                if not entries:
                     raise ValidationError({"detail": "No pending cloak room item found for this student."})
-                if pending_count > 1:
-                    tokens = list(pending.values_list("token_no", flat=True)[:10])
-                    raise ValidationError(
-                        {
-                            "token_no": "Multiple pending tokens exist for this student. Provide token_no with QR.",
-                            "pending_tokens": tokens,
-                        }
-                    )
-                entry = pending.first()
         else:
-            entry = entry_queryset.filter(token_no=token_no).first()
-            if not entry:
+            entries = list(entry_queryset.filter(token_no=token_no, status=CloakroomEntry.Status.SUBMITTED).order_by("submitted_at", "id"))
+            if not entries:
                 raise ValidationError({"token_no": "Token not found."})
 
-        if entry.status == CloakroomEntry.Status.RETURNED:
-            payload = self.get_serializer(entry).data
+        returned_entries = []
+        for entry in entries:
+            if entry.status == CloakroomEntry.Status.RETURNED:
+                continue
+            entry.status = CloakroomEntry.Status.RETURNED
+            entry.returned_at = timezone.now()
+            entry.returned_by = request.user
+            if notes:
+                entry.notes = _append_note(entry.notes, f"Return note: {notes}")
+            entry.save(update_fields=["status", "returned_at", "returned_by", "notes"])
+            returned_entries.append(entry)
+
+        if not returned_entries:
+            payload = self.get_serializer(entries[0]).data
             payload["message"] = "Token already marked as returned."
+            payload["returned_count"] = 0
             return Response(payload)
 
-        entry.status = CloakroomEntry.Status.RETURNED
-        entry.returned_at = timezone.now()
-        entry.returned_by = request.user
-        if notes:
-            entry.notes = _append_note(entry.notes, f"Return note: {notes}")
-        entry.save(update_fields=["status", "returned_at", "returned_by", "notes"])
-
-        payload = self.get_serializer(entry).data
-        payload["message"] = "Cloak room item marked as collected."
+        payload = self.get_serializer(returned_entries[0]).data
+        payload["message"] = "Cloak room item(s) marked as collected."
+        payload["returned_count"] = len(returned_entries)
+        if len(returned_entries) > 1:
+            payload["returned_tokens"] = [entry.token_no for entry in returned_entries]
         return Response(payload)
 
     @action(detail=False, methods=["post"], url_path="move")
@@ -346,5 +358,23 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
                 "updated_count": updated,
                 "matched_count": len(entries),
                 "updated_tokens": [entry.token_no for entry in entries[:40]],
+            }
+        )
+
+    @action(detail=False, methods=["get"], url_path="available-rooms")
+    def available_rooms(self, request):
+        """Get available cloakroom rooms by block."""
+        rooms = CloakroomRoom.objects.filter(is_active=True).select_related("block").order_by(
+            "block__block_name", "room_no"
+        )
+
+        block_name_filter = (request.query_params.get("block_name") or "").strip().upper()
+        if block_name_filter:
+            rooms = rooms.filter(block__block_name__iexact=block_name_filter)
+
+        return Response(
+            {
+                "rooms": CloakroomRoomSerializer(rooms, many=True).data,
+                "total": len(rooms),
             }
         )

@@ -164,6 +164,24 @@
     gap: 8px;
   }
 
+  .feedback-scrollbox {
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 4px;
+    display: grid;
+    gap: 8px;
+    scrollbar-width: thin;
+  }
+
+  .feedback-scrollbox::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .feedback-scrollbox::-webkit-scrollbar-thumb {
+    background: var(--line);
+    border-radius: 99px;
+  }
+
   .stat-card {
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -181,6 +199,19 @@
 
   .feedback-comment {
     margin: 6px 0 0;
+  }
+
+  .feedback-reply-form {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--line);
+  }
+
+  .feedback-reply-form textarea {
+    min-height: 84px;
+    resize: vertical;
   }
 
   .poll-save-btn {
@@ -547,7 +578,7 @@
 
         {% if can_view_staff_feedback %}
         <h4 class="section-heading-sm">Recent Item Feedback (Your Mess)</h4>
-        <div class="stack-list">
+        <div class="feedback-scrollbox">
           {% for row in staff_feedback %}
           <div class="stat-card">
             <strong>{{ row.item_name }}</strong>
@@ -558,6 +589,16 @@
             {% endif %}
             {% if row.manager_reply %}
             <p class="muted feedback-comment">Reply: {{ row.manager_reply }}</p>
+            {% endif %}
+            {% if can_reply_staff_feedback %}
+            <form method="post" class="feedback-reply-form">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="reply_feedback" />
+              <input type="hidden" name="feedback_id" value="{{ row.id }}" />
+              <label for="reply-{{ row.id }}">Reply to student</label>
+              <textarea id="reply-{{ row.id }}" name="manager_reply" placeholder="Write a short reply" required>{% if row.manager_reply %}{{ row.manager_reply }}{% endif %}</textarea>
+              <button type="submit" class="button secondary">Save Reply</button>
+            </form>
             {% endif %}
           </div>
           {% empty %}
