@@ -9,7 +9,7 @@
     :root {
       /* Light Mode */
       --light-bg: #edf2ff;
-      --light-bg-gradient: linear-gradient(180deg, #f8faff 0%, #edf3ff 100%);
+      --light-bg-gradient: linear-gradient(180deg, #f8fbff 0%, #eaf6fb 100%);
       --light-panel: rgba(255, 255, 255, 0.74);
       --light-text: #121827;
       --light-muted: #5f6b86;
@@ -17,7 +17,7 @@
       
       /* Dark Mode */
       --dark-bg: #0B0F1A;
-      --dark-bg-gradient: linear-gradient(180deg, #0b0f1a 0%, #101a33 100%);
+      --dark-bg-gradient: linear-gradient(180deg, #0b0f1a 0%, #0f1f3a 62%, #10253e 100%);
       --dark-panel: rgba(255, 255, 255, 0.05);
       --dark-text: #edf2ff;
       --dark-muted: #b6c2df;
@@ -26,7 +26,7 @@
       /* Accent Colors */
       --primary-dark: #132B8D;
       --primary: #1C39BB;
-      --primary-light: #335BD6;
+      --primary-light: #24C6DC;
       --success: #22C55E;
       --warning: #F59E0B;
       --error: #EF4444;
@@ -59,7 +59,8 @@
       --text: var(--dark-text);
       --muted: var(--dark-muted);
       --line: var(--dark-line);
-      --icon-filter: invert(93%) sepia(12%) saturate(1038%) hue-rotate(183deg) brightness(108%) contrast(101%);
+      --icon-tone: #9edfff;
+      --icon-filter: invert(88%) sepia(12%) saturate(1242%) hue-rotate(167deg) brightness(104%) contrast(101%);
     }
     
     @media (prefers-color-scheme: dark) {
@@ -70,7 +71,8 @@
         --text: var(--dark-text);
         --muted: var(--dark-muted);
         --line: var(--dark-line);
-        --icon-filter: invert(93%) sepia(12%) saturate(1038%) hue-rotate(183deg) brightness(108%) contrast(101%);
+        --icon-tone: #9edfff;
+        --icon-filter: invert(88%) sepia(12%) saturate(1242%) hue-rotate(167deg) brightness(104%) contrast(101%);
         --shadow-sm: 0 4px 12px rgba(12, 24, 62, 0.22);
         --shadow-md: 0 10px 24px rgba(12, 24, 62, 0.28);
         --shadow-lg: 0 16px 34px rgba(12, 24, 62, 0.34);
@@ -84,7 +86,8 @@
       --text: var(--dark-text);
       --muted: var(--dark-muted);
       --line: var(--dark-line);
-      --icon-filter: invert(93%) sepia(12%) saturate(1038%) hue-rotate(183deg) brightness(108%) contrast(101%);
+      --icon-tone: #9edfff;
+      --icon-filter: invert(88%) sepia(12%) saturate(1242%) hue-rotate(167deg) brightness(104%) contrast(101%);
       --shadow-sm: 0 4px 12px rgba(12, 24, 62, 0.22);
       --shadow-md: 0 10px 24px rgba(12, 24, 62, 0.28);
       --shadow-lg: 0 16px 34px rgba(12, 24, 62, 0.34);
@@ -97,7 +100,8 @@
       --text: var(--light-text);
       --muted: var(--light-muted);
       --line: var(--light-line);
-      --icon-filter: invert(27%) sepia(6%) saturate(600%) hue-rotate(180deg) brightness(93%) contrast(88%);
+      --icon-tone: #9edfff;
+      --icon-filter: invert(88%) sepia(12%) saturate(1242%) hue-rotate(167deg) brightness(104%) contrast(101%);
       --shadow-sm: 0 4px 10px rgba(28, 57, 187, 0.1);
       --shadow-md: 0 10px 20px rgba(28, 57, 187, 0.14);
       --shadow-lg: 0 16px 30px rgba(28, 57, 187, 0.18);
@@ -145,7 +149,7 @@
     html[data-theme="dark"] .button svg,
     html[data-theme="dark"] button svg,
     html[data-theme="dark"] .inline-icon {
-      color: #dbe7ff;
+      color: var(--icon-tone);
     }
 
     * { box-sizing: border-box; }
@@ -156,7 +160,12 @@
     body {
       width: 100%;
       max-width: 100%;
+      min-height: 100%;
       overflow-x: hidden;
+    }
+
+    html {
+      background: var(--bg);
     }
 
     img,
@@ -168,6 +177,9 @@
       margin: 0;
       font-family: Inter, Poppins, "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
       background: var(--bg-gradient);
+      background-attachment: fixed;
+      background-repeat: no-repeat;
+      min-height: 100vh;
       color: var(--text);
       padding-top: 86px;
       transition: background-color var(--motion-medium) ease-in-out, color var(--motion-medium) ease-in-out, background var(--motion-medium) ease-in-out;
@@ -393,7 +405,13 @@
       width: 16px;
       height: 16px;
       vertical-align: middle;
-      color: var(--text);
+      color: var(--icon-tone);
+    }
+
+    .ms-Icon,
+    .inline-icon,
+    .dashboard-icon {
+      color: var(--icon-tone);
     }
     
     .nav-item svg {
@@ -769,8 +787,26 @@
     .nav-item[aria-current="page"] {
       border-color: color-mix(in srgb, var(--primary) 72%, var(--line) 28%);
       background: color-mix(in srgb, var(--primary) 18%, var(--panel) 82%);
-      color: color-mix(in srgb, var(--primary-dark) 72%, var(--text) 28%);
+      color: var(--text);
       box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 35%, transparent);
+    }
+
+    html[data-theme="dark"] .brand-title {
+      color: #eaf2ff;
+    }
+
+    html[data-theme="dark"] .brand-subtitle,
+    html[data-theme="dark"] .muted {
+      color: #c6d5ef;
+    }
+
+    html[data-theme="dark"] .nav-item.is-active,
+    html[data-theme="dark"] .nav-item[aria-current="page"] {
+      color: #eef5ff;
+    }
+
+    html[data-theme="dark"] .linklike:hover {
+      color: #7edbe8;
     }
 
     .messages li {
@@ -1128,12 +1164,18 @@
       dark: '<svg class="inline-icon" width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M15.5 13.5A6.98 6.98 0 0 1 4 14.39c2.83-1.09 4.56-2.42 5.6-4.4 1.04-2 1.33-4.16.75-6.9A6.98 6.98 0 0 1 15.5 13.5ZM5.45 16.92A7.98 7.98 0 1 0 9.88 2.04a.6.6 0 0 0-.61.73c.69 2.82.43 4.88-.55 6.76-.94 1.78-2.55 3.03-5.55 4.1a.6.6 0 0 0-.3.9 7.95 7.95 0 0 0 2.59 2.39Z"/></svg>'
     };
     
-    // Initialize theme (dark-first)
+    // Initialize theme from saved user preference
     function initializeTheme() {
       const savedTheme = localStorage.getItem('theme');
-      const theme = savedTheme === 'light' ? 'dark' : (savedTheme || 'dark');
+      const currentTheme = html.getAttribute('data-theme');
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      const theme = (savedTheme === 'light' || savedTheme === 'dark')
+        ? savedTheme
+        : (currentTheme || systemTheme);
       html.setAttribute('data-theme', theme);
-      localStorage.setItem('theme', theme);
+      if (!savedTheme) {
+        localStorage.setItem('theme', theme);
+      }
       updateThemeIcon(theme);
     }
     

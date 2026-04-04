@@ -4,7 +4,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Max, Prefetch, Q
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
@@ -194,6 +194,39 @@ def _serialize_active_complaint(complaint: Complaint) -> dict:
     }
 
 
+def _base_community_queryset_for_user(user):
+    complaints = Complaint.objects.all()
+    if user.role == "SUPERVISOR" and user.department:
+        complaints = complaints.filter(category=user.department)
+    return complaints
+
+
+def _build_category_leaderboard_payload(request: HttpRequest) -> list[dict]:
+    category_labels = dict(Complaint.Category.choices)
+    rows = (
+        _base_community_queryset_for_user(request.user)
+        .values("category")
+        .annotate(
+            complaint_count=Count("id"),
+            top_post_upvotes=Max("upvotes"),
+        )
+        .order_by("-complaint_count", "-top_post_upvotes", "category")[:5]
+    )
+
+    leaderboard = []
+    for index, row in enumerate(rows, start=1):
+        leaderboard.append(
+            {
+                "rank": index,
+                "category": row["category"],
+                "category_label": category_labels.get(row["category"], row["category"]),
+                "complaint_count": row["complaint_count"],
+                "top_post_upvotes": row["top_post_upvotes"] or 0,
+            }
+        )
+    return leaderboard
+
+
 def _render_community_card(request: HttpRequest, complaint: Complaint) -> str:
     item = _build_community_item(request, complaint)
     return render_to_string(
@@ -279,6 +312,7 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                             "visible": _complaint_matches_current_filters(request, complaint) and can_insert_in_view,
                             "card_html": _render_community_card(request, complaint),
                             "active_complaints": _build_active_complaints_payload(request),
+                            "leaderboard": _build_category_leaderboard_payload(request),
                         }
                     )
                 messages.success(request, "Post published.")
@@ -354,6 +388,7 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                             "status_label": complaint.status_display_label,
                             "visible": _complaint_matches_current_filters(request, complaint),
                             "active_complaints": _build_active_complaints_payload(request),
+                            "leaderboard": _build_category_leaderboard_payload(request),
                         }
                     )
                 messages.success(request, "Complaint status updated.")
@@ -396,6 +431,7 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                     "upvotes": complaint.upvotes,
                     "downvotes": complaint.downvotes,
                     "user_vote": user_vote,
+                    "leaderboard": _build_category_leaderboard_payload(request),
                 })
             
             return redirect("community-feed")
@@ -421,6 +457,7 @@ def community_feed(request: HttpRequest) -> HttpResponse:
                             "success": True,
                             "deleted_id": complaint_id,
                             "active_complaints": _build_active_complaints_payload(request),
+                            "leaderboard": _build_category_leaderboard_payload(request),
                         }
                     )
                 messages.success(request, "Post deleted.")
@@ -442,6 +479,7 @@ def community_feed(request: HttpRequest) -> HttpResponse:
         complaint_items.append(_build_community_item(request, complaint))
 
     active_complaints = scope["active_scope"].filter(status=Complaint.Status.OPEN)[:12]
+    category_leaderboard = _build_category_leaderboard_payload(request)
     query = scope["query"]
     category_filter = scope["category_filter"]
     media_filter = scope["media_filter"]
@@ -477,6 +515,7 @@ def community_feed(request: HttpRequest) -> HttpResponse:
         return JsonResponse({
             'items': items_data,
             'active_complaints': [_serialize_active_complaint(complaint) for complaint in active_complaints],
+            'leaderboard': category_leaderboard,
             'total': paginator.count,
             'has_more': page_obj.has_next(),
             'page': page_obj.number,
@@ -498,6 +537,7 @@ def community_feed(request: HttpRequest) -> HttpResponse:
             "status_choices": Complaint.Status.choices,
             "block_choices": sorted({choice for choice in Student.objects.values_list("block__block_name", flat=True).distinct() if choice}),
             "active_complaints": active_complaints,
+            "category_leaderboard": category_leaderboard,
             "show_management_panel": request.user.role in {"SUPERVISOR", "WARDEN", "ADMIN"},
         },
     )
