@@ -29,6 +29,38 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 
+def _resolve_student_for_laundry_user(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return None
+
+    student = resolve_student_for_user(user)
+    if student:
+        return student
+
+    base_qs = Student.objects.select_related("block", "user")
+
+    direct = base_qs.filter(user=user).first()
+    if direct:
+        return direct
+
+    email = (getattr(user, "email", "") or "").strip().lower()
+    if email:
+        by_email = base_qs.filter(user__email__iexact=email).first()
+        if by_email:
+            return by_email
+
+    username = (getattr(user, "username", "") or "").strip()
+    email_local = email.split("@", 1)[0] if "@" in email else ""
+    candidate_roll_nos = {value for value in (username, email_local) if value}
+    if not candidate_roll_nos:
+        return None
+
+    matches = list(base_qs.filter(roll_no__in=candidate_roll_nos)[:2])
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
 def _safe_student_block_name(student) -> str:
     if not student:
         return ""
@@ -401,7 +433,7 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         user = self.request.user
         if user.is_authenticated and user.role == "STUDENT":
-            student = resolve_student_for_user(user)
+            student = _resolve_student_for_laundry_user(user)
             if not student:
                 return queryset.none()
             # Ensure student has a schedule; if creation fails, still return what we have
@@ -449,7 +481,7 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
         if request.user.role not in allowed_roles:
             return Response({"detail": "Not allowed to view student QR data."}, status=status.HTTP_403_FORBIDDEN)
         if request.user.role == "STUDENT":
-            student = resolve_student_for_user(request.user)
+            student = _resolve_student_for_laundry_user(request.user)
             if not student or student.id != schedule.student_id:
                 return Response({"detail": "You can only access your own QR."}, status=status.HTTP_403_FORBIDDEN)
 
