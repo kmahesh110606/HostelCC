@@ -5,7 +5,7 @@ HostelCC has been completely redesigned with Microsoft Fluent Design principles,
 
 ---
 
-## 🎨 Design System
+## 🎨 Design System.
 
 ### Color Palette - Microsoft Fluent
 - **Primary Dark**: `#001F3F` (Deep Navy)
