@@ -164,6 +164,79 @@
     gap: 8px;
   }
 
+  .room-ranges-dropdown-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .room-range-item {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+    overflow: hidden;
+  }
+
+  .room-range-summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+  }
+
+  .room-range-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .room-range-summary-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .room-range-chip {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--bg);
+  }
+
+  .room-range-body {
+    border-top: 1px solid var(--line);
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .room-range-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+  }
+
+  .room-range-field {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
+    background: var(--bg);
+  }
+
+  .room-range-field-label {
+    font-size: 12px;
+    margin: 0 0 4px;
+    color: var(--muted);
+  }
+
+  .room-range-field-value {
+    margin: 0;
+    font-weight: 700;
+  }
+
   .confirm-title {
     margin: 0 0 10px;
   }
@@ -346,7 +419,7 @@
     place-items: center;
     font-weight: 600;
     background: var(--panel);
-    color: #ffffff;
+    color: var(--text);
   }
 
   .month-cell.blank {
@@ -358,31 +431,31 @@
   .month-cell.highlight {
     background: rgba(16, 124, 16, 0.14);
     border-color: rgba(16, 124, 16, 0.55);
-    color: #ffffff;
+    color: var(--text);
   }
 
   .month-cell.scheduled {
     background: rgba(0, 120, 212, 0.16);
     border-color: rgba(0, 120, 212, 0.5);
-    color: #ffffff;
+    color: var(--text);
   }
 
   .month-cell.submitted {
     background: rgba(16, 124, 16, 0.14);
     border-color: rgba(16, 124, 16, 0.55);
-    color: #ffffff;
+    color: var(--text);
   }
 
   .month-cell.pending-collection {
     background: rgba(255, 185, 0, 0.2);
     border-color: rgba(255, 185, 0, 0.7);
-    color: #ffffff;
+    color: var(--text);
   }
 
   .month-cell.skipped {
     background: rgba(232, 17, 35, 0.12);
     border-color: rgba(232, 17, 35, 0.5);
-    color: #ffffff;
+    color: var(--text);
   }
 
   .month-cell.today {
@@ -433,6 +506,16 @@
   }
 
   .admin-date-row > span:first-child {
+    color: var(--text);
+  }
+
+  html[data-theme="dark"] .month-cell,
+  html[data-theme="dark"] .month-cell.highlight,
+  html[data-theme="dark"] .month-cell.scheduled,
+  html[data-theme="dark"] .month-cell.submitted,
+  html[data-theme="dark"] .month-cell.pending-collection,
+  html[data-theme="dark"] .month-cell.skipped,
+  html[data-theme="dark"] .admin-date-row > span:first-child {
     color: #ffffff;
   }
 
@@ -854,47 +937,55 @@
     </div>
 
     <div class="table-wrap table-wrap-bottom">
-      <table class="laundry-table laundry-table-ranges">
-        <thead>
-          <tr>
-            <th>Block</th>
-            <th>Schedule Slot</th>
-            <th>From</th>
-            <th>To</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="room-ranges-table-body">
-          {% for rule in room_ranges %}
-          <tr>
-            <td>{{ rule.block_name }}</td>
-            <td>
-              {% if rule.scheduled_date %}
-                {{ rule.scheduled_date }}
-              {% elif rule.day_of_week %}
-                {{ rule.get_day_of_week_display }}
-              {% else %}
-                -
-              {% endif %}
-            </td>
-            <td>{{ rule.room_from }}</td>
-            <td>{{ rule.room_to }}</td>
-            <td>
-              <form method="post" class="room-range-delete-form" data-confirm-message="Delete this room range?">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="delete_room_range" />
-                <input type="hidden" name="room_range_id" value="{{ rule.id }}" />
-                <button type="submit" class="button danger"><i class="ms-Icon ms-Icon--Delete"></i> Delete</button>
-              </form>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="5" class="muted">No room ranges defined yet.</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div id="room-ranges-table-body" class="room-ranges-dropdown-list">
+        {% for rule in room_ranges %}
+        <details class="room-range-item">
+          <summary class="room-range-summary">
+            <span>{{ rule.block_name }} | {% if rule.scheduled_date %}{{ rule.scheduled_date }}{% elif rule.day_of_week %}{{ rule.get_day_of_week_display }}{% else %}-{% endif %}</span>
+            <span class="room-range-summary-meta">
+              <span class="room-range-chip">{{ rule.room_from }}-{{ rule.room_to }}</span>
+              <i class="ms-Icon ms-Icon--ChevronDown"></i>
+            </span>
+          </summary>
+          <div class="room-range-body">
+            <div class="room-range-fields">
+              <div class="room-range-field">
+                <p class="room-range-field-label">Block</p>
+                <p class="room-range-field-value">{{ rule.block_name }}</p>
+              </div>
+              <div class="room-range-field">
+                <p class="room-range-field-label">Schedule Slot</p>
+                <p class="room-range-field-value">
+                  {% if rule.scheduled_date %}
+                    {{ rule.scheduled_date }}
+                  {% elif rule.day_of_week %}
+                    {{ rule.get_day_of_week_display }}
+                  {% else %}
+                    -
+                  {% endif %}
+                </p>
+              </div>
+              <div class="room-range-field">
+                <p class="room-range-field-label">From</p>
+                <p class="room-range-field-value">{{ rule.room_from }}</p>
+              </div>
+              <div class="room-range-field">
+                <p class="room-range-field-label">To</p>
+                <p class="room-range-field-value">{{ rule.room_to }}</p>
+              </div>
+            </div>
+            <form method="post" class="room-range-delete-form" data-confirm-message="Delete this room range?">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="delete_room_range" />
+              <input type="hidden" name="room_range_id" value="{{ rule.id }}" />
+              <button type="submit" class="button danger"><i class="ms-Icon ms-Icon--Delete"></i> Delete</button>
+            </form>
+          </div>
+        </details>
+        {% empty %}
+        <div class="muted">No room ranges defined yet.</div>
+        {% endfor %}
+      </div>
     </div>
 
     <form method="get" class="filters-form">
@@ -1057,7 +1148,7 @@
         return;
       }
 
-      roomRangesTableBody.innerHTML = '<tr><td colspan="5" class="muted">No room ranges defined yet.</td></tr>';
+      roomRangesTableBody.innerHTML = '<div class="muted">No room ranges defined yet.</div>';
 
       const bulkActionsRow = document.getElementById('room-ranges-bulk-actions');
       if (bulkActionsRow) {
@@ -1100,11 +1191,11 @@
           renderEmptyRoomRangesState();
           showNotice(data.deleted_count ? ('Removed ' + data.deleted_count + ' room ranges.') : 'No room ranges matched the current view.', 'success');
         } else {
-          const row = form.closest('tr');
+          const row = form.closest('.room-range-item');
           if (row) {
             row.remove();
           }
-          if (roomRangesTableBody && !roomRangesTableBody.querySelector('tr')) {
+          if (roomRangesTableBody && !roomRangesTableBody.querySelector('.room-range-item')) {
             renderEmptyRoomRangesState();
           }
           showNotice('Room range removed.', 'success');

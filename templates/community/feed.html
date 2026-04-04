@@ -675,6 +675,7 @@
     </form>
 
     <h3 class="leaderboard-title">Top Complaint Categories</h3>
+    <p class="muted">Ranked by score = (complaints x 2) + top single-post thumbs up.</p>
     <div class="active-list" id="category-leaderboard-list">
       {% for entry in category_leaderboard %}
       <div class="active-item leaderboard-item">
@@ -682,7 +683,7 @@
           <span><span class="leaderboard-rank">{{ entry.rank }}</span> {{ entry.category_label }}</span>
           <span class="tag-chip">{{ entry.complaint_count }} complaints</span>
         </div>
-        <p class="leaderboard-metrics">Top single post: {{ entry.top_post_upvotes }} thumbs up</p>
+        <p class="leaderboard-metrics">Score: {{ entry.score }} | Top single post: {{ entry.top_post_upvotes }} thumbs up</p>
       </div>
       {% empty %}
       <p class="muted">No complaints yet.</p>
@@ -989,7 +990,7 @@
           '<span><span class="leaderboard-rank">' + escapeHtml(String(rank)) + '</span> ' + escapeHtml(item.category_label || item.category || 'Complaint') + '</span>' +
           '<span class="tag-chip">' + escapeHtml(String(item.complaint_count || 0)) + ' complaints</span>' +
           '</div>' +
-          '<p class="leaderboard-metrics">Top single post: ' + escapeHtml(String(item.top_post_upvotes || 0)) + ' thumbs up</p>' +
+          '<p class="leaderboard-metrics">Score: ' + escapeHtml(String(item.score || 0)) + ' | Top single post: ' + escapeHtml(String(item.top_post_upvotes || 0)) + ' thumbs up</p>' +
           '</div>';
       }).join('');
     }

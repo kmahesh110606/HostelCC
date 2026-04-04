@@ -203,25 +203,39 @@ def _base_community_queryset_for_user(user):
 
 def _build_category_leaderboard_payload(request: HttpRequest) -> list[dict]:
     category_labels = dict(Complaint.Category.choices)
-    rows = (
+    rows = list(
         _base_community_queryset_for_user(request.user)
         .values("category")
         .annotate(
             complaint_count=Count("id"),
             top_post_upvotes=Max("upvotes"),
         )
-        .order_by("-complaint_count", "-top_post_upvotes", "category")[:5]
     )
 
+    for row in rows:
+        row["top_post_upvotes"] = row["top_post_upvotes"] or 0
+        row["score"] = (row["complaint_count"] * 2) + row["top_post_upvotes"]
+
+    rows.sort(
+        key=lambda row: (
+            -row["score"],
+            -row["complaint_count"],
+            -row["top_post_upvotes"],
+            row["category"],
+        )
+    )
+    top_rows = rows[:5]
+
     leaderboard = []
-    for index, row in enumerate(rows, start=1):
+    for index, row in enumerate(top_rows, start=1):
         leaderboard.append(
             {
                 "rank": index,
                 "category": row["category"],
                 "category_label": category_labels.get(row["category"], row["category"]),
                 "complaint_count": row["complaint_count"],
-                "top_post_upvotes": row["top_post_upvotes"] or 0,
+                "top_post_upvotes": row["top_post_upvotes"],
+                "score": row["score"],
             }
         )
     return leaderboard

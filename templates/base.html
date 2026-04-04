@@ -100,8 +100,8 @@
       --text: var(--light-text);
       --muted: var(--light-muted);
       --line: var(--light-line);
-      --icon-tone: #9edfff;
-      --icon-filter: invert(88%) sepia(12%) saturate(1242%) hue-rotate(167deg) brightness(104%) contrast(101%);
+      --icon-tone: #1734a1;
+      --icon-filter: invert(18%) sepia(78%) saturate(2232%) hue-rotate(219deg) brightness(88%) contrast(96%);
       --shadow-sm: 0 4px 10px rgba(28, 57, 187, 0.1);
       --shadow-md: 0 10px 20px rgba(28, 57, 187, 0.14);
       --shadow-lg: 0 16px 30px rgba(28, 57, 187, 0.18);
@@ -292,7 +292,8 @@
       right: 0;
       z-index: 120;
       box-shadow: var(--shadow-sm);
-      backdrop-filter: none;
+      backdrop-filter: blur(14px) saturate(130%);
+      -webkit-backdrop-filter: blur(14px) saturate(130%);
       overflow: hidden;
     }
 
@@ -511,6 +512,29 @@
       height: 1em;
       display: block;
       filter: var(--icon-filter);
+    }
+
+    /* Semantic icon colors keep meaning regardless of theme */
+    .ms-Icon--Like,
+    .ms-Icon--Accept {
+      color: var(--success) !important;
+    }
+
+    .ms-Icon--Dislike,
+    .ms-Icon--Delete,
+    .ms-Icon--IncidentTriangle {
+      color: var(--error) !important;
+    }
+
+    .ms-Icon--Like .ms-icon-img,
+    .ms-Icon--Accept .ms-icon-img {
+      filter: invert(62%) sepia(62%) saturate(451%) hue-rotate(84deg) brightness(92%) contrast(91%) !important;
+    }
+
+    .ms-Icon--Dislike .ms-icon-img,
+    .ms-Icon--Delete .ms-icon-img,
+    .ms-Icon--IncidentTriangle .ms-icon-img {
+      filter: invert(34%) sepia(86%) saturate(1670%) hue-rotate(337deg) brightness(96%) contrast(92%) !important;
     }
 
     .ms-Icon--GlobalNavButton { --icon-url: url("data:image/svg+xml,%3Csvg%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M2%205.75c0-.41.34-.75.75-.75h15.5a.75.75%200%200%201%200%201.5H2.75A.75.75%200%200%201%202%205.75Zm0%2012c0-.41.34-.75.75-.75h12.5a.75.75%200%200%201%200%201.5H2.75a.75.75%200%200%201-.75-.75ZM2.75%2011a.75.75%200%200%200%200%201.5h18.5a.75.75%200%200%200%200-1.5H2.75Z%22%2F%3E%3C%2Fsvg%3E"); }
