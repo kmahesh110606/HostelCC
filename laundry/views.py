@@ -376,7 +376,11 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
             student = resolve_student_for_user(user)
             if not student:
                 return queryset.none()
-            _get_or_create_schedule_for_student(student)
+            # Ensure student has a schedule; if creation fails, still return what we have
+            schedule = _get_or_create_schedule_for_student(student)
+            if not schedule:
+                # Fallback: try to get existing schedule even if creation failed
+                return queryset.filter(student_id=student.id)
             return queryset.filter(student_id=student.id)
         return queryset
 

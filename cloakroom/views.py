@@ -95,19 +95,14 @@ def _resolve_student_from_payload(payload: dict[str, str]):
     return None
 
 
-def _room_token_no_for_student(student: Student) -> int:
-    room_entries = CloakroomEntry.objects.filter(student__room_no__iexact=student.room_no)
-    if getattr(student, "block_id", None):
-        room_entries = room_entries.filter(student__block_id=student.block_id)
-    elif getattr(student, "block", None) and getattr(student.block, "block_name", ""):
-        room_entries = room_entries.filter(student__block__block_name__iexact=student.block.block_name)
-
-    existing_token = room_entries.order_by("token_no").values_list("token_no", flat=True).first()
-    if existing_token is not None:
-        return existing_token
-
-    current = CloakroomEntry.objects.aggregate(max_token=Max("token_no")).get("max_token")
-    return 0 if current is None else current + 1
+def _next_token_no_for_item(item_code: str) -> int:
+    item_label = _ITEM_CODE_TO_LABEL[item_code]
+    current = (
+        CloakroomEntry.objects.filter(item_name__iexact=item_label)
+        .aggregate(max_token=Max("token_no"))
+        .get("max_token")
+    )
+    return 1001 if current is None else current + 1
 
 
 def _append_note(existing: str, extra: str) -> str:
@@ -174,21 +169,15 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
             raise PermissionDenied("Only hostel staff can submit cloakroom entries.")
 
         qr_text = (request.data.get("qr_text") or "").strip()
+        basket_id = (request.data.get("basket_id") or "").strip()
         item_name = (request.data.get("item_name") or "").strip()
         storage_room_no = (request.data.get("storage_room_no") or "").strip().upper()
         notes = (request.data.get("notes") or "").strip()
 
         if not qr_text:
             raise ValidationError({"qr_text": "QR text is required."})
-        if not item_name:
-            raise ValidationError({"item_name": "Item name is required."})
-        if not storage_room_no:
-            raise ValidationError({"storage_room_no": "Storage room number is required."})
-
-        item_code = _normalize_item_code(item_name)
-        if not item_code:
-            allowed = ", ".join(label for _, label in REQUIRED_CLOAKROOM_ITEMS)
-            raise ValidationError({"item_name": f"Allowed items: {allowed}."})
+        if not basket_id and not storage_room_no:
+            raise ValidationError({"storage_room_no": "Storage room number or basket id is required."})
 
         parsed = _parse_student_qr(qr_text)
         if not parsed:
@@ -200,44 +189,74 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
         if not student.cloakroom_unlocked:
             raise ValidationError({"detail": "Cloak room service is locked for this student."})
 
-        storage_parts = _parse_storage_room_no(storage_room_no)
-        if not storage_parts:
-            raise ValidationError({"storage_room_no": "Use a valid storage room code like CR-D2-101."})
-
-        prior_item_names = list(CloakroomEntry.objects.filter(student=student).values_list("item_name", flat=True))
-        chair_submitted = any(_normalize_item_code(name) == "CHAIR" for name in prior_item_names)
-        if item_code != "CHAIR" and not chair_submitted:
-            raise ValidationError({"item_name": "Chair must be submitted first before other items."})
-
-        already_pending = CloakroomEntry.objects.filter(
-            student=student,
-            status=CloakroomEntry.Status.SUBMITTED,
-        )
-        already_pending_names = list(already_pending.values_list("item_name", flat=True))
-        if any(_normalize_item_code(name) == item_code for name in already_pending_names):
-            raise ValidationError({"item_name": "This item is already pending collection for the student."})
-
-        block_name, room_no = storage_parts
         with transaction.atomic():
-            basket = (
-                CloakroomRoom.objects.select_for_update()
-                .select_related("block")
-                .filter(block__block_name__iexact=block_name, room_no__iexact=room_no, is_active=True)
-                .first()
-            )
+            basket = None
+            if basket_id:
+                basket = (
+                    CloakroomRoom.objects.select_for_update()
+                    .select_related("block")
+                    .filter(id=basket_id, is_active=True)
+                    .first()
+                )
+            if basket is None:
+                storage_parts = _parse_storage_room_no(storage_room_no)
+                if not storage_parts:
+                    raise ValidationError({"storage_room_no": "Use a valid storage room code like CR-D2-101."})
+                block_name, room_no = storage_parts
+                basket = (
+                    CloakroomRoom.objects.select_for_update()
+                    .select_related("block")
+                    .filter(block__block_name__iexact=block_name, room_no__iexact=room_no, is_active=True)
+                    .first()
+                )
             if not basket:
                 raise ValidationError({"storage_room_no": "Cloakroom basket not found for the selected room."})
 
-            basket_item_code = _normalize_item_code(basket.item_name)
+            basket_item_name = (basket.item_name or "").strip()
+            if not item_name:
+                item_name = basket_item_name
+
+            item_code = _normalize_item_code(item_name) if item_name else None
+            if not item_code and basket_item_name:
+                item_code = _normalize_item_code(basket_item_name)
+            if not item_code:
+                allowed = ", ".join(label for _, label in REQUIRED_CLOAKROOM_ITEMS)
+                raise ValidationError({"item_name": f"Allowed items: {allowed}."})
+
+            basket_item_code = _normalize_item_code(basket_item_name)
             if basket_item_code and basket_item_code != item_code:
                 raise ValidationError({"item_name": "Selected item does not match the configured basket item."})
+
+            item_label = _ITEM_CODE_TO_LABEL[item_code]
+
+            if not storage_room_no:
+                storage_room_no = f"CR-{basket.block.block_name}-{basket.room_no}"
+
+            list(
+                CloakroomRoom.objects.select_for_update()
+                .filter(is_active=True, item_name__iexact=item_label)
+                .values_list("id", flat=True)
+            )
+
+            prior_item_names = list(CloakroomEntry.objects.filter(student=student).values_list("item_name", flat=True))
+            chair_submitted = any(_normalize_item_code(name) == "CHAIR" for name in prior_item_names)
+            if item_code != "CHAIR" and not chair_submitted:
+                raise ValidationError({"item_name": "Chair must be submitted first before other items."})
+
+            already_pending = CloakroomEntry.objects.filter(
+                student=student,
+                status=CloakroomEntry.Status.SUBMITTED,
+            )
+            already_pending_names = list(already_pending.values_list("item_name", flat=True))
+            if any(_normalize_item_code(name) == item_code for name in already_pending_names):
+                raise ValidationError({"item_name": "This item is already pending collection for the student."})
 
             basket_seq = basket.next_token_no
             entry = CloakroomEntry.objects.create(
                 student=student,
                 basket_token_no=basket_seq,
-                token_no=_room_token_no_for_student(student),
-                item_name=_ITEM_CODE_TO_LABEL[item_code],
+                token_no=_next_token_no_for_item(item_code),
+                item_name=item_label,
                 storage_room_no=storage_room_no,
                 notes=notes,
                 status=CloakroomEntry.Status.SUBMITTED,
@@ -245,11 +264,14 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
             )
             basket.next_token_no = basket_seq + 1
             if not basket.item_name.strip():
-                basket.item_name = _ITEM_CODE_TO_LABEL[item_code]
+                basket.item_name = item_label
             basket.save(update_fields=["next_token_no", "item_name"])
 
         payload = self.get_serializer(entry).data
-        payload["message"] = "Cloak room item submitted successfully."
+        payload["message"] = (
+            f"Cloak room item submitted successfully. Item Token #{entry.token_no}, "
+            f"Basket Token #{entry.basket_token_no}."
+        )
         return Response(payload, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["post"], url_path="return")

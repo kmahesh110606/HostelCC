@@ -4,7 +4,7 @@ import logging
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import DatabaseError, transaction
-from django.db.models import Q
+from django.db.models import Max, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -78,19 +78,14 @@ def _parse_storage_room_no(storage_room_no: str) -> tuple[str, str] | None:
     return None
 
 
-def _room_token_no_for_student(student) -> int:
-    room_entries = CloakroomEntry.objects.filter(student__room_no__iexact=student.room_no)
-    if getattr(student, "block_id", None):
-        room_entries = room_entries.filter(student__block_id=student.block_id)
-    elif getattr(student, "block", None) and getattr(student.block, "block_name", ""):
-        room_entries = room_entries.filter(student__block__block_name__iexact=student.block.block_name)
-
-    existing_token = room_entries.order_by("token_no").values_list("token_no", flat=True).first()
-    if existing_token is not None:
-        return existing_token
-
-    last_token = CloakroomEntry.objects.order_by("-token_no").values_list("token_no", flat=True).first()
-    return 0 if last_token is None else last_token + 1
+def _next_token_no_for_item(item_code: str) -> int:
+    item_label = _ITEM_CODE_TO_LABEL[item_code]
+    max_token = (
+        CloakroomEntry.objects.filter(item_name__iexact=item_label)
+        .aggregate(max_token=Max("token_no"))
+        .get("max_token")
+    )
+    return 1001 if max_token is None else max_token + 1
 
 
 def _student_qr_payload_text(student, user) -> str:
@@ -231,18 +226,17 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
                 return redirect("cloakroom-portal")
 
             qr_text = (request.POST.get("qr_text") or "").strip()
+            basket_id = (request.POST.get("basket_id") or "").strip()
             item_name = (request.POST.get("item_name") or "").strip()
             storage_room_no = (request.POST.get("storage_room_no") or "").strip().upper()
             notes = (request.POST.get("notes") or "").strip()
 
-            item_code = _normalize_item_code(item_name)
-            if not item_code:
-                allowed = ", ".join(label for _, label in REQUIRED_CLOAKROOM_ITEMS)
-                messages.error(request, f"Allowed items: {allowed}.")
+            if not qr_text:
+                messages.error(request, "QR text is required.")
                 return redirect("cloakroom-portal")
 
-            if not qr_text or not item_name or not storage_room_no:
-                messages.error(request, "QR text, item name, and storage room are required.")
+            if not basket_id and not storage_room_no:
+                messages.error(request, "Storage room number or basket is required.")
                 return redirect("cloakroom-portal")
 
             parsed = _parse_student_qr(qr_text)
@@ -258,66 +252,94 @@ def cloakroom_portal(request: HttpRequest) -> HttpResponse:
                 messages.error(request, "Cloak room service is locked for this student.")
                 return redirect("cloakroom-portal")
 
-            prior_item_names = list(CloakroomEntry.objects.filter(student=target_student).values_list("item_name", flat=True))
-            chair_submitted = any(_normalize_item_code(name) == "CHAIR" for name in prior_item_names)
-            if item_code != "CHAIR" and not chair_submitted:
-                messages.error(request, "Chair must be submitted first before other items.")
-                return redirect("cloakroom-portal")
-
-            pending_names = list(
-                CloakroomEntry.objects.filter(
-                    student=target_student,
-                    status=CloakroomEntry.Status.SUBMITTED,
-                ).values_list("item_name", flat=True)
-            )
-            if any(_normalize_item_code(name) == item_code for name in pending_names):
-                messages.error(request, "This item is already pending collection for this student.")
-                return redirect("cloakroom-portal")
-
-            storage_parts = _parse_storage_room_no(storage_room_no)
-            if not storage_parts:
-                messages.error(request, "Use a valid storage room code like CR-D2-101.")
-                return redirect("cloakroom-portal")
-            block_name, room_no = storage_parts
-
             try:
                 with transaction.atomic():
-                    basket = (
-                        CloakroomRoom.objects
-                        .select_for_update()
-                        .select_related("block")
-                        .filter(block__block_name__iexact=block_name, room_no__iexact=room_no, is_active=True)
-                        .first()
-                    )
+                    basket = None
+                    if basket_id:
+                        basket = (
+                            CloakroomRoom.objects
+                            .select_for_update()
+                            .select_related("block")
+                            .filter(id=basket_id, is_active=True)
+                            .first()
+                        )
+                    if basket is None:
+                        storage_parts = _parse_storage_room_no(storage_room_no)
+                        if not storage_parts:
+                            messages.error(request, "Use a valid storage room code like CR-D2-101.")
+                            return redirect("cloakroom-portal")
+                        block_name, room_no = storage_parts
+                        basket = (
+                            CloakroomRoom.objects
+                            .select_for_update()
+                            .select_related("block")
+                            .filter(block__block_name__iexact=block_name, room_no__iexact=room_no, is_active=True)
+                            .first()
+                        )
                     if not basket:
                         messages.error(request, "Cloakroom basket not found for the selected room.")
                         return redirect("cloakroom-portal")
 
-                    basket_item_code = _normalize_item_code(basket.item_name)
+                    basket_item_name = (basket.item_name or "").strip()
+                    if not item_name:
+                        item_name = basket_item_name
+
+                    item_code = _normalize_item_code(item_name) if item_name else None
+                    if not item_code and basket_item_name:
+                        item_code = _normalize_item_code(basket_item_name)
+                    if not item_code:
+                        allowed = ", ".join(label for _, label in REQUIRED_CLOAKROOM_ITEMS)
+                        messages.error(request, f"Allowed items: {allowed}.")
+                        return redirect("cloakroom-portal")
+
+                    basket_item_code = _normalize_item_code(basket_item_name)
                     if basket_item_code and basket_item_code != item_code:
                         messages.error(request, "Selected item does not match the configured basket item.")
+                        return redirect("cloakroom-portal")
+
+                    item_label = _ITEM_CODE_TO_LABEL[item_code]
+                    list(
+                        CloakroomRoom.objects.select_for_update()
+                        .filter(is_active=True, item_name__iexact=item_label)
+                        .values_list("id", flat=True)
+                    )
+
+                    prior_item_names = list(CloakroomEntry.objects.filter(student=target_student).values_list("item_name", flat=True))
+                    chair_submitted = any(_normalize_item_code(name) == "CHAIR" for name in prior_item_names)
+                    if item_code != "CHAIR" and not chair_submitted:
+                        messages.error(request, "Chair must be submitted first before other items.")
+                        return redirect("cloakroom-portal")
+
+                    pending_names = list(
+                        CloakroomEntry.objects.filter(
+                            student=target_student,
+                            status=CloakroomEntry.Status.SUBMITTED,
+                        ).values_list("item_name", flat=True)
+                    )
+                    if any(_normalize_item_code(name) == item_code for name in pending_names):
+                        messages.error(request, "This item is already pending collection for this student.")
                         return redirect("cloakroom-portal")
 
                     basket_seq = basket.next_token_no
                     entry = CloakroomEntry.objects.create(
                         student=target_student,
                         basket_token_no=basket_seq,
-                        token_no=_room_token_no_for_student(target_student),
-                        item_name=_ITEM_CODE_TO_LABEL[item_code],
-                        storage_room_no=storage_room_no,
+                        token_no=_next_token_no_for_item(item_code),
+                        item_name=item_label,
+                        storage_room_no=storage_room_no or f"CR-{basket.block.block_name}-{basket.room_no}",
                         notes=notes,
                         status=CloakroomEntry.Status.SUBMITTED,
                         submitted_by=request.user,
                     )
                     basket.next_token_no = basket_seq + 1
                     if not basket.item_name.strip():
-                        basket.item_name = _ITEM_CODE_TO_LABEL[item_code]
+                        basket.item_name = item_label
                     basket.save(update_fields=["next_token_no", "item_name"])
             except DatabaseError:
                 logger.exception("Cloakroom submit failed due to database error")
                 messages.error(request, "Cloak room is temporarily unavailable. Please try again in a few minutes.")
                 return redirect("cloakroom-portal")
-            messages.success(request, f"Item submitted. Basket Token #{entry.basket_token_no}, Overall Token #{entry.token_no}.")
+            messages.success(request, f"Item submitted. Basket Token #{entry.basket_token_no}, Item Token #{entry.token_no}.")
             return redirect("cloakroom-portal")
 
         if action == "return_item":

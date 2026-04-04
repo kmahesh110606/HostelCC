@@ -168,33 +168,17 @@
           <label for="qr_text">Student QR Text</label>
           <textarea id="qr_text" name="qr_text" rows="3" required placeholder='{{ sample_qr }}'></textarea>
 
-          <label for="item_name">Item Name</label>
-          <select id="item_name" name="item_name" required>
-            <option value="">Select item</option>
-            {% for item in required_item_choices %}
-            <option value="{{ item }}">{{ item }}</option>
-            {% endfor %}
-          </select>
-
-          <p class="muted" style="margin-top: 8px; margin-bottom: 8px;">Chair must be submitted first for each student.</p>
-
-          <label for="storage_block">Storage Block</label>
-          <select id="storage_block" name="storage_block" required onchange="updateRoomDropdown()">
-            <option value="">Select block</option>
-            {% for block in blocks %}
-            <option value="{{ block.id }}">{{ block.block_name }}</option>
-            {% endfor %}
-          </select>
-
-          <label for="storage_room_no">Storage Room</label>
-          <select id="storage_room_no" name="storage_room_no" required>
-            <option value="">Select room</option>
+          <label for="basket_id">Basket</label>
+          <select id="basket_id" name="basket_id" required>
+            <option value="">Select basket</option>
             {% for room in cloakroom_rooms %}
-            <option value="CR-{{ room.block.block_name }}-{{ room.room_no }}" data-block-id="{{ room.block.id }}" data-room-no="{{ room.room_no }}">
-              {{ room.block.block_name }}-{{ room.room_no }}
+            <option value="{{ room.id }}">
+              {{ room.item_name|default:"Basket" }} @ CR-{{ room.block.block_name }}-{{ room.room_no }}
             </option>
             {% endfor %}
           </select>
+
+          <p class="muted" style="margin-top: 8px; margin-bottom: 8px;">The basket determines the item, block, and room automatically.</p>
 
           <label for="notes">Notes (optional)</label>
           <textarea id="notes" name="notes" rows="2"></textarea>
@@ -307,47 +291,11 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-  // Data structure for rooms by block
-  const roomsByBlock = {
-    {% for room in cloakroom_rooms %}
-      '{{ room.block.id }}': [
-        {% if forloop.first or room.block.id != prev_block_id %}
-        {% endif %}
-        {id: '{{ room.id }}', blockName: '{{ room.block.block_name }}', roomNo: '{{ room.room_no }}'}{{ forloop.last|default:"," }}
-      ]
-      {% if not forloop.last and room.block.id != prev_block_id %}
-      ,
-      {% endif %}
-    {% endfor %}
-  };
-
-  // Alternative simpler data structure
   const allRooms = [
     {% for room in cloakroom_rooms %}
-    {id: '{{ room.id }}', blockId: '{{ room.block.id }}', blockName: '{{ room.block.block_name }}', roomNo: '{{ room.room_no }}'}{{ forloop.last|default:"," }}
+    {id: '{{ room.id }}', blockId: '{{ room.block.id }}', blockName: '{{ room.block.block_name }}', roomNo: '{{ room.room_no }}'}{% if not forloop.last %},{% endif %}
     {% endfor %}
   ];
-
-  function updateRoomDropdown() {
-    const blockSelect = document.getElementById('storage_block');
-    const roomSelect = document.getElementById('storage_room_no');
-    const selectedBlockId = blockSelect.value;
-    
-    // Clear current options except the first
-    roomSelect.innerHTML = '<option value="">Select room</option>';
-    
-    if (!selectedBlockId) return;
-    
-    // Filter rooms for selected block
-    const filteredRooms = allRooms.filter(room => room.blockId === selectedBlockId);
-    
-    filteredRooms.forEach(room => {
-      const option = document.createElement('option');
-      option.value = 'CR-' + room.blockName + '-' + room.roomNo;
-      option.textContent = room.blockName + '-' + room.roomNo;
-      roomSelect.appendChild(option);
-    });
-  }
 
   function updateMoveToRoomDropdown() {
     const blockSelect = document.getElementById('move_to_block');
