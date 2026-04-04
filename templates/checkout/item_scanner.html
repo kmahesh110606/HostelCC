@@ -267,17 +267,17 @@ blockSelect.addEventListener('change', () => {
 function showMessage(msg, type) {
   messageArea.innerHTML = `
     <div style="padding: 12px 16px; border-radius: var(--radius-md); background: ${
-      type === 'error' ? 'rgba(232, 17, 35, 0.1)' :
-      type === 'success' ? 'rgba(16, 124, 16, 0.1)' :
-      'rgba(23, 120, 109, 0.1)'
+      type === 'error' ? 'color-mix(in srgb, var(--error) 14%, var(--panel) 86%)' :
+      type === 'success' ? 'color-mix(in srgb, var(--success) 14%, var(--panel) 86%)' :
+      'color-mix(in srgb, var(--primary) 12%, transparent)'
     }; color: ${
-      type === 'error' ? '#E81123' :
-      type === 'success' ? '#107C10' :
-      '#17786d'
+      type === 'error' ? 'var(--error)' :
+      type === 'success' ? 'var(--success)' :
+      'var(--primary)'
     }; font-weight: 500; border: 1px solid ${
-      type === 'error' ? 'rgba(232, 17, 35, 0.2)' :
-      type === 'success' ? 'rgba(16, 124, 16, 0.2)' :
-      'rgba(23, 120, 109, 0.2)'
+      type === 'error' ? 'color-mix(in srgb, var(--error) 42%, var(--line) 58%)' :
+      type === 'success' ? 'color-mix(in srgb, var(--success) 42%, var(--line) 58%)' :
+      'color-mix(in srgb, var(--primary) 28%, transparent)'
     };">
       ${msg}
     </div>

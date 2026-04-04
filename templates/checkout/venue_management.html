@@ -9,7 +9,7 @@
   
   <div style="margin-top: 24px;">
     {% if venues %}
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+      <div class="venue-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
         {% for venue in venues %}
           <div style="background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px; transition: all 200ms ease;">
             <div style="display: flex; justify-content: space-between; align-items: start;">
@@ -73,7 +73,7 @@
   {% endif %}
   
   <!-- Quick Stats -->
-  <div style="margin-top: 40px; margin-bottom: 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+  <div class="venue-quick-grid" style="margin-top: 40px; margin-bottom: 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
     <div style="background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px;">
       <div style="font-size: 24px; font-weight: 700; color: var(--primary);">{{ venues.count }}</div>
       <div class="muted">Active Venues</div>
@@ -97,7 +97,8 @@
 
 <style>
   @media (max-width: 768px) {
-    div {
+    .venue-grid,
+    .venue-quick-grid {
       grid-template-columns: 1fr !important;
     }
   }

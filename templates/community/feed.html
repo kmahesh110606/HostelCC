@@ -79,6 +79,40 @@
     margin-top: 18px;
   }
 
+  .leaderboard-title {
+    margin-top: 18px;
+  }
+
+  .leaderboard-item {
+    display: grid;
+    gap: 6px;
+  }
+
+  .leaderboard-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .leaderboard-rank {
+    display: inline-flex;
+    min-width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--panel) 90%, var(--line) 10%);
+  }
+
+  .leaderboard-metrics {
+    margin: 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
   .active-item-text {
     margin: 0;
   }
@@ -640,6 +674,22 @@
       </div>
     </form>
 
+    <h3 class="leaderboard-title">Top Complaint Categories</h3>
+    <p class="muted">Ranked by score = (complaints x 2) + top single-post thumbs up.</p>
+    <div class="active-list" id="category-leaderboard-list">
+      {% for entry in category_leaderboard %}
+      <div class="active-item leaderboard-item">
+        <div class="leaderboard-head">
+          <span><span class="leaderboard-rank">{{ entry.rank }}</span> {{ entry.category_label }}</span>
+          <span class="tag-chip">{{ entry.complaint_count }} complaints</span>
+        </div>
+        <p class="leaderboard-metrics">Score: {{ entry.score }} | Top single post: {{ entry.top_post_upvotes }} thumbs up</p>
+      </div>
+      {% empty %}
+      <p class="muted">No complaints yet.</p>
+      {% endfor %}
+    </div>
+
     {% if show_management_panel %}
     <h3 class="active-complaints-title">Active Complaints</h3>
     <div class="active-list" id="active-complaints-list">
@@ -723,6 +773,7 @@
   (function () {
     const communityFeedList = document.getElementById('community-feed-list');
     const activeComplaintsList = document.getElementById('active-complaints-list');
+    const categoryLeaderboardList = document.getElementById('category-leaderboard-list');
     const communityNotice = document.getElementById('community-notice');
 
     const statusMeta = {
@@ -819,13 +870,22 @@
         return;
       }
 
+      const actionInput = form.querySelector('input[name="action"]');
+      const action = actionInput ? actionInput.value : '';
+      const preserveButtonContent = action === 'vote';
+
       if (isLoading) {
+        if (preserveButtonContent) {
+          submitButton.disabled = true;
+          submitButton.setAttribute('aria-busy', 'true');
+          submitButton.classList.add('is-loading');
+          return;
+        }
+
         if (!submitButton.dataset.defaultHtml) {
           submitButton.dataset.defaultHtml = submitButton.innerHTML;
         }
 
-        const actionInput = form.querySelector('input[name="action"]');
-        const action = actionInput ? actionInput.value : '';
         let label = 'Submitting...';
         if (action === 'create') {
           label = 'Posting...';
@@ -845,7 +905,8 @@
 
       submitButton.disabled = false;
       submitButton.removeAttribute('aria-busy');
-      if (submitButton.dataset.defaultHtml) {
+      submitButton.classList.remove('is-loading');
+      if (!preserveButtonContent && submitButton.dataset.defaultHtml) {
         submitButton.innerHTML = submitButton.dataset.defaultHtml;
       }
     }
@@ -908,6 +969,28 @@
           '<span class="tag-chip">' + escapeHtml(item.category_label || 'Complaint') + '</span>' +
           '</div>' +
           '<p class="muted active-item-text">' + escapeHtml(truncateText(item.text || '', 90)) + '</p>' +
+          '</div>';
+      }).join('');
+    }
+
+    function renderCategoryLeaderboard(items) {
+      if (!categoryLeaderboardList) {
+        return;
+      }
+
+      if (!items || !items.length) {
+        categoryLeaderboardList.innerHTML = '<p class="muted">No complaints yet.</p>';
+        return;
+      }
+
+      categoryLeaderboardList.innerHTML = items.map(function (item, index) {
+        const rank = item.rank || (index + 1);
+        return '<div class="active-item leaderboard-item">' +
+          '<div class="leaderboard-head">' +
+          '<span><span class="leaderboard-rank">' + escapeHtml(String(rank)) + '</span> ' + escapeHtml(item.category_label || item.category || 'Complaint') + '</span>' +
+          '<span class="tag-chip">' + escapeHtml(String(item.complaint_count || 0)) + ' complaints</span>' +
+          '</div>' +
+          '<p class="leaderboard-metrics">Score: ' + escapeHtml(String(item.score || 0)) + ' | Top single post: ' + escapeHtml(String(item.top_post_upvotes || 0)) + ' thumbs up</p>' +
           '</div>';
       }).join('');
     }
@@ -1055,6 +1138,7 @@
                 }
               }
             }
+            renderCategoryLeaderboard(data.leaderboard || []);
             return;
           }
 
@@ -1068,6 +1152,7 @@
               insertComplaintCard(data.card_html);
             }
             renderActiveComplaints(data.active_complaints || []);
+            renderCategoryLeaderboard(data.leaderboard || []);
             showNotice('Complaint posted successfully.', 'success');
             return;
           }
@@ -1103,6 +1188,7 @@
               }
             }
             renderActiveComplaints(data.active_complaints || []);
+            renderCategoryLeaderboard(data.leaderboard || []);
             showNotice('Complaint status updated.', 'success');
             return;
           }
@@ -1112,6 +1198,7 @@
               removeCard(card);
             }
             renderActiveComplaints(data.active_complaints || []);
+            renderCategoryLeaderboard(data.leaderboard || []);
             showNotice('Post deleted.', 'success');
           }
         })

@@ -3,39 +3,42 @@
 {% block title %}QR Checkout - Admin Dashboard{% endblock %}
 
 {% block content %}
-<div class="shell">
-  <h1>QR Checkout Administration</h1>
-  <p class="muted">Manage chair submissions, item storage, and checkout process</p>
-  
-  <!-- Statistics Grid -->
-  <div class="tabs" style="margin-top: 24px;">
-    <div class="tab">
-      <div style="font-size: 32px; font-weight: 700; color: var(--primary);">{{ total_chairs_submitted }}</div>
-      <div class="muted" style="margin-top: 8px;">Chairs Submitted</div>
+<div class="shell vit-dashboard">
+  <section class="vit-hero">
+    <div class="vit-hero-badge">VIT</div>
+    <div>
+      <h1>QR Checkout Administration</h1>
+      <p class="muted">Manage chair submissions, item storage, and checkout process</p>
     </div>
-    <div class="tab">
-      <div style="font-size: 32px; font-weight: 700; color: var(--warning);">{{ damaged_chairs }}</div>
-      <div class="muted" style="margin-top: 8px;">Damaged Chairs</div>
-    </div>
-    <div class="tab">
-      <div style="font-size: 32px; font-weight: 700; color: var(--success);">{{ total_items_submitted }}</div>
-      <div class="muted" style="margin-top: 8px;">Items Submitted</div>
-    </div>
-    <div class="tab">
-      <div style="font-size: 32px; font-weight: 700; color: var(--info);">{{ total_venues }}</div>
-      <div class="muted" style="margin-top: 8px;">Active Venues</div>
-    </div>
-    <div class="tab">
-      <div style="font-size: 32px; font-weight: 700;">{{ chair_submission_rate }}</div>
-      <div class="muted" style="margin-top: 8px;">Submission Rate</div>
-    </div>
+  </section>
+
+  <div class="vit-kpi-grid">
+    <article class="vit-kpi kpi-main">
+      <div class="vit-kpi-value">{{ total_chairs_submitted }}</div>
+      <div class="muted">Chairs Submitted</div>
+    </article>
+    <article class="vit-kpi kpi-alert">
+      <div class="vit-kpi-value">{{ damaged_chairs }}</div>
+      <div class="muted">Damaged Chairs</div>
+    </article>
+    <article class="vit-kpi kpi-success">
+      <div class="vit-kpi-value">{{ total_items_submitted }}</div>
+      <div class="muted">Items Submitted</div>
+    </article>
+    <article class="vit-kpi kpi-main">
+      <div class="vit-kpi-value">{{ total_venues }}</div>
+      <div class="muted">Active Venues</div>
+    </article>
+    <article class="vit-kpi kpi-rate">
+      <div class="vit-kpi-value">{{ chair_submission_rate }}</div>
+      <div class="muted">Submission Rate</div>
+    </article>
   </div>
-  
-  <!-- Actions -->
-  <div style="margin-top: 32px;">
+
+  <section class="vit-section">
     <h2>Scanning Operations</h2>
-    <div class="tabs" style="margin-top: 16px;">
-      <a href="{% url 'chair-scanner' %}" class="tab" style="text-decoration: none; opacity: 1; transform: none;">
+    <div class="vit-action-grid">
+      <a href="{% url 'chair-scanner' %}" class="vit-action-card">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="18" height="18"></rect>
           <line x1="7" y1="7" x2="7" y2="7"></line>
@@ -43,62 +46,60 @@
           <line x1="7" y1="17" x2="7" y2="17"></line>
           <line x1="17" y1="17" x2="17" y2="17"></line>
         </svg>
-        <div style="margin-top: 12px; font-weight: 600;">Chair Scanning</div>
-        <p class="muted" style="margin-top: 6px; font-size: 13px;">Submit chairs</p>
+        <div class="vit-card-title">Chair Scanning</div>
+        <p class="muted">Submit chairs</p>
       </a>
-      
+
       {% if item_types %}
         {% for item in item_types %}
-          <a href="{% url 'item-scanner' item.code %}" class="tab" style="text-decoration: none; opacity: 1; transform: none;">
+          <a href="{% url 'item-scanner' item.code %}" class="vit-action-card">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 6h6m-6 4h6m-13-4h4v12h4v-12h4v12h4v-12"></path>
             </svg>
-            <div style="margin-top: 12px; font-weight: 600; font-size: 14px;">{{ item.name }}</div>
-            <p class="muted" style="margin-top: 6px; font-size: 12px;">{{ item.code }}</p>
+            <div class="vit-card-title">{{ item.name }}</div>
+            <p class="muted">{{ item.code }}</p>
           </a>
         {% endfor %}
       {% endif %}
     </div>
-  </div>
-  
-  <!-- Management Options -->
-  <div style="margin-top: 32px;">
+  </section>
+
+  <section class="vit-section">
     <h2>Management</h2>
-    <div class="tabs" style="margin-top: 16px;">
-      <a href="{% url 'submissions-list' %}" class="tab" style="text-decoration: none; opacity: 1; transform: none;">
+    <div class="vit-action-grid">
+      <a href="{% url 'submissions-list' %}" class="vit-action-card">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path>
         </svg>
-        <div style="margin-top: 12px; font-weight: 600;">View Submissions</div>
-        <p class="muted" style="margin-top: 6px; font-size: 13px;">All submitted items</p>
+        <div class="vit-card-title">View Submissions</div>
+        <p class="muted">All submitted items</p>
       </a>
-      
-      <a href="{% url 'venue-management' %}" class="tab" style="text-decoration: none; opacity: 1; transform: none;">
+
+      <a href="{% url 'venue-management' %}" class="vit-action-card">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
         </svg>
-        <div style="margin-top: 12px; font-weight: 600;">Venues</div>
-        <p class="muted" style="margin-top: 6px; font-size: 13px;">Manage storage locations</p>
+        <div class="vit-card-title">Venues</div>
+        <p class="muted">Manage storage locations</p>
       </a>
     </div>
-  </div>
-  
-  <!-- Recent Activity -->
-  <div style="margin-top: 40px;">
+  </section>
+
+  <section class="vit-section">
     <h2>Recent Chair Submissions</h2>
     {% if recent_chairs %}
-      <div style="margin-top: 16px; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;">
+      <div class="vit-list-card">
         {% for chair in recent_chairs %}
-          <div style="padding: 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;">
+          <div class="vit-list-row">
             <div>
-              <div style="font-weight: 600;">{{ chair.student.roll_no }}</div>
-              <div class="muted" style="font-size: 13px; margin-top: 4px;">{{ chair.student.name }}</div>
+              <div class="vit-list-title">{{ chair.student.roll_no }}</div>
+              <div class="muted">{{ chair.student.name }}</div>
             </div>
-            <div style="text-align: right;">
-              <div style="font-weight: 600; color: {% if chair.status == 'damaged' %}var(--warning){% else %}var(--success){% endif %};">
+            <div class="vit-list-meta">
+              <div class="vit-status {% if chair.status == 'damaged' %}status-damaged{% else %}status-ok{% endif %}">
                 {{ chair.get_status_display }}
               </div>
-              <div class="muted" style="font-size: 13px; margin-top: 4px;">{{ chair.submitted_at|date:"d M, H:i" }}</div>
+              <div class="muted">{{ chair.submitted_at|date:"d M, H:i" }}</div>
             </div>
           </div>
         {% endfor %}
@@ -108,22 +109,21 @@
         <li>No chair submissions yet</li>
       </div>
     {% endif %}
-  </div>
-  
-  <!-- Venue Status -->
-  <div style="margin-top: 40px; margin-bottom: 40px;">
+  </section>
+
+  <section class="vit-section vit-last-section">
     <h2>Venue Status</h2>
     {% if venues %}
-      <div style="margin-top: 16px; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;">
+      <div class="vit-list-card">
         {% for venue in venues %}
-          <div style="padding: 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;">
-            <div style="flex: 1;">
-              <div style="font-weight: 600;">{{ venue.name }}</div>
+          <div class="vit-list-row">
+            <div>
+              <div class="vit-list-title">{{ venue.name }}</div>
             </div>
-            <div style="text-align: right;">
-              <div style="font-weight: 600;">{{ venue.item_count }} items</div>
+            <div class="vit-list-meta">
+              <div class="vit-list-title">{{ venue.item_count }} items</div>
               {% if venue.max_capacity %}
-                <div class="muted" style="font-size: 13px; margin-top: 4px;">Capacity: {{ venue.item_count }}/{{ venue.max_capacity }}</div>
+                <div class="muted">Capacity: {{ venue.item_count }}/{{ venue.max_capacity }}</div>
               {% endif %}
             </div>
           </div>
@@ -134,21 +134,212 @@
         <li>No venues configured</li>
       </div>
     {% endif %}
-  </div>
+  </section>
 </div>
 
 <style>
-  .tab {
-    cursor: pointer;
-    transition: all 200ms ease;
+  .vit-dashboard {
+    --vit-blue: var(--primary);
+    --vit-blue-deep: var(--primary-dark);
+    --vit-accent: var(--primary-light);
+    --vit-ink: color-mix(in srgb, var(--text) 88%, var(--primary-light) 12%);
+    --vit-soft: color-mix(in srgb, var(--panel) 84%, rgba(255, 255, 255, 0.08) 16%);
+    --vit-line: color-mix(in srgb, var(--line) 78%, var(--primary) 22%);
   }
-  
-  .tab:hover {
-    transform: translateY(-2px);
+
+  .vit-hero {
+    position: relative;
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 16px;
+    align-items: center;
+    margin-top: 8px;
+    padding: 18px;
+    border-radius: 18px;
+    border: 1px solid var(--vit-line);
+    background: var(--panel);
+    box-shadow: var(--shadow-sm);
   }
-  
-  .tab svg {
-    color: var(--primary);
+
+  .vit-hero h1 {
+    margin-bottom: 8px;
+    color: var(--vit-ink);
+  }
+
+  .vit-hero-badge {
+    width: 92px;
+    height: 92px;
+    border-radius: 50%;
+    border: 2px solid color-mix(in srgb, var(--vit-accent) 64%, #ffffff 36%);
+    display: grid;
+    place-items: center;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #eff3ff;
+    background: linear-gradient(145deg, var(--vit-blue-deep), var(--vit-blue));
+    box-shadow: var(--shadow-sm);
+  }
+
+  .vit-kpi-grid {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .vit-kpi {
+    border: 1px solid var(--vit-line);
+    border-radius: 14px;
+    padding: 14px;
+    background: var(--vit-soft);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .vit-kpi-value {
+    font-size: 30px;
+    line-height: 1.05;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+
+  .kpi-main .vit-kpi-value,
+  .kpi-rate .vit-kpi-value {
+    color: var(--primary-light);
+  }
+
+  .kpi-alert .vit-kpi-value {
+    color: var(--warning);
+  }
+
+  .kpi-success .vit-kpi-value {
+    color: var(--success);
+  }
+
+  .vit-section {
+    margin-top: 32px;
+  }
+
+  .vit-section h2 {
+    color: var(--vit-ink);
+  }
+
+  .vit-last-section {
+    margin-bottom: 40px;
+  }
+
+  .vit-action-grid {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+  }
+
+  .vit-action-card {
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid var(--vit-line);
+    border-radius: 14px;
+    padding: 16px;
+    min-height: 126px;
+    background: color-mix(in srgb, var(--panel) 88%, rgba(255, 255, 255, 0.08) 12%);
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--motion-fast) var(--ease-smooth), box-shadow var(--motion-fast) var(--ease-smooth), border-color var(--motion-fast) ease;
+  }
+
+  .vit-action-card:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--vit-blue) 52%, var(--line) 48%);
+    box-shadow: var(--shadow-md);
+  }
+
+  .vit-action-card svg {
+    color: var(--vit-blue);
+  }
+
+  .vit-card-title {
+    margin-top: 10px;
+    font-weight: 700;
+  }
+
+  .vit-action-card .muted {
+    margin-top: 4px;
+    font-size: 13px;
+  }
+
+  .vit-list-card {
+    margin-top: 14px;
+    border: 1px solid var(--vit-line);
+    border-radius: 14px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--panel) 88%, rgba(255, 255, 255, 0.08) 12%);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .vit-list-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .vit-list-row:last-child {
+    border-bottom: 0;
+  }
+
+  .vit-list-title {
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+
+  .vit-list-meta {
+    text-align: right;
+  }
+
+  .vit-status {
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .status-ok {
+    color: var(--success);
+  }
+
+  .status-damaged {
+    color: var(--warning);
+  }
+
+  html[data-theme="dark"] .vit-hero h1,
+  html[data-theme="dark"] .vit-section h2,
+  html[data-theme="dark"] .vit-list-title,
+  html[data-theme="dark"] .vit-card-title {
+    color: #ecf4ff;
+  }
+
+  html[data-theme="dark"] .vit-dashboard .muted {
+    color: #c8d8ef;
+  }
+
+  @media (max-width: 768px) {
+    .vit-hero {
+      grid-template-columns: 1fr;
+      text-align: center;
+    }
+
+    .vit-hero-badge {
+      margin: 0 auto;
+    }
+
+    .vit-list-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .vit-list-meta {
+      text-align: left;
+    }
   }
 </style>
 {% endblock %}

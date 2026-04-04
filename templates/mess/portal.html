@@ -28,6 +28,7 @@
   }
 
   .day-pill {
+    appearance: none;
     border: 1px solid var(--line);
     border-radius: 999px;
     background: var(--panel);
@@ -37,6 +38,8 @@
     font-weight: 700;
     cursor: pointer;
     white-space: nowrap;
+    box-shadow: none;
+    transform: none;
     transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
   }
 
@@ -45,6 +48,8 @@
     border-color: color-mix(in srgb, var(--line) 55%, var(--primary) 45%);
     background: color-mix(in srgb, var(--panel) 90%, var(--line) 10%);
     color: var(--text);
+    box-shadow: none;
+    transform: none;
     outline: none;
   }
 
@@ -59,11 +64,23 @@
     border-color: var(--primary);
     background: color-mix(in srgb, var(--primary) 16%, var(--panel));
     color: var(--primary-dark);
+    box-shadow: none;
+    transform: none;
+  }
+
+  html[data-theme="dark"] .day-pill.active,
+  html[data-theme="dark"] .day-pill.active:hover,
+  html[data-theme="dark"] .day-pill.active:focus-visible {
+    color: #ffffff;
   }
 
   .day-panel {
     display: none;
     margin-top: 14px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    background: color-mix(in srgb, var(--panel) 96%, var(--primary-light) 4%);
   }
 
   .day-panel.active {
@@ -72,7 +89,7 @@
 
   .meal-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 10px;
     margin-top: 12px;
   }
@@ -371,6 +388,51 @@
     padding-top: 12px;
   }
 
+  @media (max-width: 768px) {
+    .mess-tab {
+      padding: 14px;
+    }
+
+    .week-strip {
+      gap: 8px;
+      overflow-x: visible;
+      flex-wrap: wrap;
+      padding-bottom: 0;
+    }
+
+    .day-pill {
+      flex: 1 1 calc(50% - 8px);
+      min-width: 122px;
+      text-align: center;
+    }
+
+    .day-panel {
+      padding: 12px;
+      margin-top: 12px;
+    }
+
+    .mess-type-form {
+      grid-template-columns: 1fr;
+      max-width: 100%;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .day-pill {
+      flex: 1 1 100%;
+    }
+
+    .action-card,
+    .poll-modal-card {
+      padding: 12px;
+    }
+
+    .poll-item {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+
   @media (max-width: 980px) {
     .meal-grid,
     .action-grid,
@@ -384,7 +446,7 @@
 <div class="mess-shell">
   <section class="tab mess-tab">
     <span class="label"><svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M3.2 3.73a1.9 1.9 0 0 1 3.09-1.31 2 2 0 0 1 2.43 0 1.9 1.9 0 0 1 3.09 1.3c.08.98.19 2.49.19 3.78a4.5 4.5 0 0 1-2.18 3.85c-.22.14-.28.3-.27.39.13 1.93.45 6.95.45 7.76a2.5 2.5 0 0 1-5 0c0-.8.32-5.83.45-7.76 0-.09-.05-.25-.27-.39A4.5 4.5 0 0 1 3 7.5c0-1.3.1-2.8.2-3.77Zm6.3 3.52a.75.75 0 0 1-1.5 0V4a.5.5 0 0 0-1 0v3.25a.75.75 0 0 1-1.5 0V3.92a.42.42 0 0 0-.42-.42.4.4 0 0 0-.4.36A46 46 0 0 0 4.5 7.5a3 3 0 0 0 1.45 2.57c.55.33 1.05.96 1 1.77-.13 1.98-.45 6.92-.45 7.66a1 1 0 1 0 2 0c0-.74-.32-5.68-.45-7.66-.05-.81.45-1.44 1-1.77A3 3 0 0 0 10.5 7.5a46 46 0 0 0-.19-3.64.4.4 0 0 0-.4-.36.42.42 0 0 0-.41.42v3.33Zm3.5.5A5.75 5.75 0 0 1 18.75 2c.41 0 .75.34.75.75v8.5c0 .32.1 1.9.22 3.64l.01.08c.13 1.91.27 3.99.27 4.53a2.5 2.5 0 0 1-5 0c0-.52.13-2.61.25-4.54l.17-2.6.03-.36h-.7c-.97 0-1.75-.78-1.75-1.75v-2.5Zm4 3.55-.02.32a797.81 797.81 0 0 0-.48 7.88 1 1 0 1 0 2 0c0-.48-.14-2.53-.27-4.5v-.11a119.4 119.4 0 0 1-.23-3.64V3.57a4.25 4.25 0 0 0-3.5 4.18v2.5c0 .14.11.25.25.25h1.5a.75.75 0 0 1 .75.8Z"/></svg> Mess Menu</span>
-    <h2><i class="ms-Icon ms-Icon--BookOpen"></i> Weekly Menu</h2>
+    <h2>Weekly Menu</h2>
     <p class="muted">Select a day to view breakfast, lunch, snacks, and dinner.</p>
 
     {% if student %}
@@ -442,7 +504,7 @@
   {% if student %}
   <section class="tab mess-tab">
     <span class="label"><i class="ms-Icon ms-Icon--Switch"></i> Mess Change</span>
-    <h2><i class="ms-Icon ms-Icon--CalendarReply"></i> Change Your Mess</h2>
+    <h2>Change Your Mess</h2>
     <p class="muted">When admin unlocks mess change, you can switch to a caterer in your block and current mess type.</p>
     <form method="post" class="mess-change-form {% if not can_request_mess_change %}is-disabled{% endif %}">
       {% csrf_token %}
@@ -468,7 +530,7 @@
 
   <section class="tab mess-tab">
     <span class="label"><i class="ms-Icon ms-Icon--People"></i> Feedback And Polls</span>
-    <h2><i class="ms-Icon ms-Icon--AllApps"></i> {{ month }} Student Actions</h2>
+    <h2>{{ month }} Student Actions</h2>
     <p class="muted">Vote on the meeting poll and, where supported, rate food from one place.</p>
 
     <div class="action-grid">
