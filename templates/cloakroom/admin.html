@@ -4,7 +4,7 @@
 {% block title %}Cloakroom Admin{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container mt-4 cloakroom-admin-shell">
     <h1 class="mb-4">Cloakroom Administration</h1>
 
     {% if messages %}
@@ -66,9 +66,9 @@
                         <label for="student_search" class="form-label">Search Student</label>
                         <input type="text" class="form-control" id="student_search" placeholder="Search by roll no or name...">
                     </div>
-                    <div style="max-height: 300px; overflow-y: auto;">
+                    <div class="student-scroll">
                         {% for student in students %}
-                            <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
+                            <div class="student-row d-flex justify-content-between align-items-center p-2 border-bottom" data-student-id="{{ student.id }}">
                                 <div>
                                     <strong>{{ student.roll_no }}</strong> - {{ student.name }}
                                     <br>
@@ -167,9 +167,110 @@ document.getElementById('student_search').addEventListener('keyup', function(e) 
 </script>
 
 <style>
+    .cloakroom-admin-shell {
+        --cloakroom-btn-blue: #2f58d8;
+        --cloakroom-btn-blue-hover: #2448ba;
+        --cloakroom-scroll-track: color-mix(in srgb, var(--panel) 78%, transparent);
+        --cloakroom-scroll-thumb: color-mix(in srgb, var(--primary) 80%, #4b6ff8 20%);
+        --cloakroom-scroll-thumb-hover: color-mix(in srgb, var(--primary-dark) 70%, #3f63ea 30%);
+        max-width: 1320px;
+    }
+
+    .cloakroom-admin-shell h1 {
+        margin-bottom: 2rem !important;
+    }
+
+    .cloakroom-admin-shell .row {
+        --bs-gutter-x: 1.5rem;
+        --bs-gutter-y: 1.5rem;
+    }
+
+    .cloakroom-admin-shell .card {
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    .cloakroom-admin-shell .card-header,
+    .cloakroom-admin-shell .card-body {
+        padding: 1rem 1.15rem;
+    }
+
+    .cloakroom-admin-shell .form-label {
+        margin-bottom: 0.5rem;
+    }
+
+    .cloakroom-admin-shell .form-control,
+    .cloakroom-admin-shell .form-select {
+        min-height: 44px;
+        padding: 0.6rem 0.75rem;
+    }
+
     .form-control:focus, .form-select:focus {
         border-color: #0d6efd;
         box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+
+    .cloakroom-admin-shell .btn {
+        background: var(--cloakroom-btn-blue) !important;
+        background-image: none !important;
+        border-color: var(--cloakroom-btn-blue) !important;
+        color: #fff !important;
+    }
+
+    .cloakroom-admin-shell .btn:hover,
+    .cloakroom-admin-shell .btn:focus,
+    .cloakroom-admin-shell .btn:active {
+        background: var(--cloakroom-btn-blue-hover) !important;
+        border-color: var(--cloakroom-btn-blue-hover) !important;
+        color: #fff !important;
+    }
+
+    .student-scroll {
+        max-height: 380px;
+        overflow-y: auto;
+        padding-right: 4px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--cloakroom-scroll-thumb) var(--cloakroom-scroll-track);
+    }
+
+    .student-scroll::-webkit-scrollbar {
+        width: 10px;
+    }
+
+    .student-scroll::-webkit-scrollbar-track {
+        background: var(--cloakroom-scroll-track);
+        border-radius: 999px;
+    }
+
+    .student-scroll::-webkit-scrollbar-thumb {
+        background: var(--cloakroom-scroll-thumb);
+        border-radius: 999px;
+    }
+
+    .student-scroll::-webkit-scrollbar-thumb:hover {
+        background: var(--cloakroom-scroll-thumb-hover);
+    }
+
+    .student-row {
+        padding: 0.75rem 0.5rem !important;
+        gap: 1rem;
+    }
+
+    .cloakroom-admin-shell .table th,
+    .cloakroom-admin-shell .table td {
+        padding: 0.9rem 0.75rem;
+        vertical-align: middle;
+    }
+
+    @media (max-width: 767.98px) {
+        .cloakroom-admin-shell .card-header,
+        .cloakroom-admin-shell .card-body {
+            padding: 0.9rem;
+        }
+
+        .student-row {
+            align-items: flex-start !important;
+        }
     }
 </style>
 {% endblock %}
