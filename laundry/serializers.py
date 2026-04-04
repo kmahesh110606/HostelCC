@@ -2,6 +2,7 @@ import calendar
 import logging
 from datetime import date, datetime, time, timedelta
 
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 from django.utils import timezone
 
@@ -9,6 +10,16 @@ from .models import LaundryEvent, LaundryHoliday, LaundryRoomRange, LaundrySched
 
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_student_block_name(student) -> str:
+    if not student:
+        return ""
+    try:
+        block = student.block
+    except ObjectDoesNotExist:
+        return ""
+    return (getattr(block, "block_name", "") or "").strip()
 
 
 def _normalize_upper(value: str | None) -> str:
@@ -87,7 +98,7 @@ def _is_submission_day(schedule: LaundrySchedule, target_date: date) -> bool:
         return False
 
     student = schedule.student
-    block_name = student.block.block_name if student.block else ""
+    block_name = _safe_student_block_name(student)
     if block_name:
         matching_rules = _matching_room_rules_for_date(block_name, target_date)
         if matching_rules:
@@ -266,8 +277,7 @@ class LaundryScheduleSerializer(serializers.ModelSerializer):
 
     def get_block_name(self, obj: LaundrySchedule) -> str:
         student = getattr(obj, "student", None)
-        block = getattr(student, "block", None) if student else None
-        return (getattr(block, "block_name", "") or "").strip()
+        return _safe_student_block_name(student)
 
     def get_next_submission_date(self, obj: LaundrySchedule):
         next_date = self._get_cached_next_submission_date(obj)

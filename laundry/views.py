@@ -4,6 +4,7 @@ import re
 from datetime import date, timedelta
 
 from django.core.cache import cache
+from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -26,6 +27,16 @@ from .serializers import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_student_block_name(student) -> str:
+    if not student:
+        return ""
+    try:
+        block = student.block
+    except ObjectDoesNotExist:
+        return ""
+    return (getattr(block, "block_name", "") or "").strip()
 
 
 def _normalize_upper(value: str | None) -> str:
@@ -161,12 +172,16 @@ def _build_tags_printable_html(block_name: str, token_start: int, token_end: int
 
 
 def _infer_student_day_from_room_ranges(student):
-    if not student or not student.block:
+    if not student:
+        return None
+
+    block_name = _safe_student_block_name(student)
+    if not block_name:
         return None
 
     rules = LaundryRoomRange.objects.filter(
         is_active=True,
-        block_name__iexact=student.block.block_name,
+        block_name__iexact=block_name,
     )
     matching_rules = [rule for rule in rules if _room_in_rule(student.room_no, rule.room_from, rule.room_to)]
     if not matching_rules:
@@ -347,7 +362,7 @@ def _is_submission_allowed_for_today(schedule: LaundrySchedule) -> tuple[bool, s
     today_date = timezone.localdate()
     student = schedule.student
     student_room = _normalize_upper(student.room_no)
-    student_block = _normalize_upper(student.block.block_name if student.block else "")
+    student_block = _normalize_upper(_safe_student_block_name(student))
 
     if student_block:
         block_rules_qs = LaundryRoomRange.objects.filter(is_active=True, block_name__iexact=student_block)
@@ -443,7 +458,7 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
         if cached:
             return Response(cached)
 
-        block_name = schedule.student.block.block_name if schedule.student.block else ""
+        block_name = _safe_student_block_name(schedule.student)
         student_email = (
             (schedule.student.user.email if schedule.student.user else "")
             or (schedule.student.user.username if schedule.student.user else "")
@@ -575,7 +590,7 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
                     "student_name": schedule.student.name,
                     "student_roll_no": schedule.student.roll_no,
                     "room_no": schedule.student.room_no,
-                    "block_name": schedule.student.block.block_name if schedule.student.block else "",
+                    "block_name": _safe_student_block_name(schedule.student),
                     "assigned_token_code": schedule.assigned_token_code,
                 }
             )
@@ -651,7 +666,7 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
                 )
 
             qr_block = _normalize_upper(parsed_qr.get("block_name"))
-            student_block = _normalize_upper(student.block.block_name if student.block else "")
+            student_block = _normalize_upper(_safe_student_block_name(student))
             if qr_block and qr_block != student_block:
                 return Response(
                     {"detail": f"Block mismatch. Expected {student_block}, got {qr_block}.", "color": "red"},
@@ -722,7 +737,7 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-                student_block = _normalize_block_name(schedule.student.block.block_name if schedule.student.block else "")
+                student_block = _normalize_block_name(_safe_student_block_name(schedule.student))
                 if student_block and parsed_token["block_name"] != student_block:
                     return Response(
                         {
@@ -812,7 +827,7 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
                 "student_name": schedule.student.name,
                 "student_roll_no": schedule.student.roll_no,
                 "room_no": schedule.student.room_no,
-                "block_name": schedule.student.block.block_name if schedule.student.block else "",
+                "block_name": _safe_student_block_name(schedule.student),
                 "assigned_token_code": token_before_collection if event_type == LaundryEvent.EventType.COLLECTION else schedule.assigned_token_code,
             }
         )

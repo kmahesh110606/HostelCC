@@ -92,7 +92,7 @@ def item_scanner(request, item_type):
     
     venues = Venue.objects.filter(is_active=True)
     item_types = ItemType.objects.filter(is_active=True)
-    blocks = HostelBlock.objects.all().order_by("name")
+    blocks = HostelBlock.objects.all().order_by("block_name")
     
     context = {
         'page_title': f'{selected_item.name} Submission',

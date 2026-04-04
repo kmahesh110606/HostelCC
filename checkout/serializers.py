@@ -52,7 +52,7 @@ class ClockRoomSubmissionSerializer(serializers.ModelSerializer):
     student_roll = serializers.CharField(source='student.roll_no', read_only=True)
     item_type_name = serializers.CharField(source='item_type.name', read_only=True)
     venue_name = serializers.CharField(source='current_venue.name', read_only=True)
-    block_name = serializers.CharField(source='hostel_block.name', read_only=True)
+    block_name = serializers.CharField(source='hostel_block.block_name', read_only=True)
     scanned_by_name = serializers.CharField(source='scanned_by_admin.get_full_name', read_only=True)
     chair_status = serializers.CharField(source='chair_submission.status', read_only=True)
     

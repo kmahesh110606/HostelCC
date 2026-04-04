@@ -8,6 +8,7 @@ from datetime import date, datetime, time, timedelta
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
+from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils.dateparse import parse_date
@@ -44,6 +45,16 @@ def _bump_laundry_admin_cache_version() -> None:
 
 def _normalize_block_name(value: str | None) -> str:
     return re.sub(r"[^A-Z0-9]", "", (value or "").strip().upper())
+
+
+def _safe_student_block_name(student) -> str:
+    if not student:
+        return ""
+    try:
+        block = student.block
+    except ObjectDoesNotExist:
+        return ""
+    return (getattr(block, "block_name", "") or "").strip()
 
 
 def _parse_token_code(value: str | None):
@@ -129,7 +140,7 @@ def _get_token_assignment_rows(block_filter: str = ""):
                 "token_code": schedule.assigned_token_code,
                 "student_roll_no": student.roll_no if student else "",
                 "student_name": student.name if student else "",
-                "block_name": student.block.block_name if student and student.block else "",
+                "block_name": _safe_student_block_name(student),
                 "room_no": student.room_no if student else "",
                 "assigned_at": timezone.localtime(schedule.token_assigned_at) if schedule.token_assigned_at else None,
                 "ready_at": timezone.localtime(schedule.laundry_done_at) if schedule.laundry_done_at else None,
@@ -190,12 +201,16 @@ def _local_date_from_dt(value):
 
 
 def _infer_student_day_from_room_ranges(student):
-    if not student or not student.block:
+    if not student:
+        return None
+
+    student_block_name = _safe_student_block_name(student)
+    if not student_block_name:
         return None
 
     rules = LaundryRoomRange.objects.filter(
         is_active=True,
-        block_name__iexact=student.block.block_name,
+        block_name__iexact=student_block_name,
     )
     matching_rules = [rule for rule in rules if _room_in_rule(student.room_no, rule.room_from, rule.room_to)]
     if not matching_rules:
@@ -395,7 +410,7 @@ def _build_student_month_days(student_schedule, room_rules, holiday_cache=None):
     highlight_days = set()
     room_no = student_schedule.student.room_no
     if room_rules:
-        block_name = student_schedule.student.block.block_name if student_schedule.student.block else ""
+        block_name = _safe_student_block_name(student_schedule.student)
         for day in range(1, last_day + 1):
             current = date(year, month, day)
             matching_rules = _matching_room_rules_for_date(block_name, current, preloaded_rules=room_rules, holiday_cache=holiday_cache)
@@ -473,7 +488,7 @@ def _is_student_submission_day(student_schedule, target_date: date, room_rules, 
         return False
 
     room_no = student_schedule.student.room_no
-    block_name = student_schedule.student.block.block_name if student_schedule.student.block else ""
+    block_name = _safe_student_block_name(student_schedule.student)
     if room_rules and block_name:
         matching_rules = _matching_room_rules_for_date(
             block_name,
@@ -560,7 +575,7 @@ def _build_manager_block_ranges_for_today(
     )
     students_by_block = {}
     for student in students:
-        block_name = (student.block.block_name if student.block else "").strip().upper()
+        block_name = _safe_student_block_name(student).strip().upper()
         if not block_name:
             continue
         students_by_block.setdefault(block_name, []).append(student)
@@ -837,7 +852,7 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
     student_qr_text = ""
     if student_schedule:
         student_email = (request.user.email or request.user.username or "").strip().lower()
-        block_name = student_schedule.student.block.block_name if student_schedule.student.block else ""
+        block_name = _safe_student_block_name(student_schedule.student)
         room_no = student_schedule.student.room_no
         student_qr_text = json.dumps(
             {
@@ -852,9 +867,10 @@ def laundry_portal(request: HttpRequest) -> HttpResponse:
         )
 
     student_room_rules = []
-    if student_schedule and student_schedule.student and student_schedule.student.block:
-        student_block = student_schedule.student.block.block_name
-        student_room_rules = list(all_room_ranges.filter(block_name__iexact=student_block))
+    if student_schedule and student_schedule.student:
+        student_block = _safe_student_block_name(student_schedule.student)
+        if student_block:
+            student_room_rules = list(all_room_ranges.filter(block_name__iexact=student_block))
 
     calendar_days, schedule_month_name, schedule_year = _build_student_month_days(student_schedule, student_room_rules, holiday_cache=holiday_dates)
 
@@ -1030,7 +1046,7 @@ def download_laundry_logs_csv(request: HttpRequest) -> HttpResponse:
                 student.id if student else "",
                 student.roll_no if student else "",
                 student.name if student else "",
-                student.block.block_name if student and student.block else "",
+                _safe_student_block_name(student),
                 student.room_no if student else "",
                 schedule.get_day_of_week_display() if schedule else "",
                 schedule.submission_status if schedule else "",
@@ -1094,7 +1110,7 @@ def download_laundry_schedule_csv(request: HttpRequest) -> HttpResponse:
                 student.id if student else "",
                 student.roll_no if student else "",
                 student.name if student else "",
-                student.block.block_name if student and student.block else "",
+                _safe_student_block_name(student),
                 student.room_no if student else "",
                 student_user.email if student_user else "",
                 item.submission_status,

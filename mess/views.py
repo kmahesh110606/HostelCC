@@ -1,6 +1,7 @@
 from django.core.cache import cache
 from django.db.models import Avg, Count, Q
 from django.db import IntegrityError
+import logging
 from django.utils import timezone
 import json
 from rest_framework.exceptions import PermissionDenied
@@ -26,6 +27,9 @@ from .serializers import (
     MessMenuSerializer,
     NightMessLogSerializer,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_feedback_menu_item(menu_item: str):
@@ -217,6 +221,15 @@ class FeedbackViewSet(viewsets.ModelViewSet):
             raise ValidationError(
                 "You have already rated this menu item this month. "
                 "You can only rate each menu item once per month."
+            )
+        except Exception:
+            logger.exception(
+                "Unexpected error while creating feedback for user_id=%s student_id=%s",
+                getattr(self.request.user, "id", None),
+                getattr(student, "id", None),
+            )
+            raise ValidationError(
+                "Unable to submit feedback right now. Please verify your input and try again."
             )
 
     @action(detail=True, methods=["post"])
