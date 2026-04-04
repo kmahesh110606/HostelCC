@@ -576,7 +576,32 @@ class LaundryScheduleViewSet(viewsets.ModelViewSet):
             separators=(",", ":"),
         )
 
-        schedule_data = LaundryScheduleSerializer(schedule, context={"request": request}).data
+        month_submission_days = [
+            int(entry.get("day"))
+            for entry in calendar_days
+            if entry.get("highlighted") and entry.get("day")
+        ]
+        schedule_data = {
+            "id": schedule.id,
+            "student": schedule.student_id,
+            "student_roll_no": schedule.student.roll_no,
+            "block_name": _safe_student_block_name(schedule.student),
+            "room_no": schedule.student.room_no,
+            "day_of_week": schedule.day_of_week,
+            "qr_token": str(schedule.qr_token),
+            "submission_status": bool(schedule.submission_status),
+            "collection_status": bool(schedule.collection_status),
+            "assigned_token_code": schedule.assigned_token_code or "",
+            "last_submission_at": schedule.last_submission_at.isoformat() if schedule.last_submission_at else None,
+            "laundry_done_at": schedule.laundry_done_at.isoformat() if schedule.laundry_done_at else None,
+            "token_assigned_at": schedule.token_assigned_at.isoformat() if schedule.token_assigned_at else None,
+            "due_collection_by": schedule.due_collection_by.isoformat() if schedule.due_collection_by else None,
+            "today_status_code": student_today_status.get("code", ""),
+            "today_status_label": student_today_status.get("label", ""),
+            "next_submission_date": next_submission_date.isoformat() if next_submission_date else None,
+            "server_today_ist": timezone.localdate().isoformat(),
+            "month_submission_days": month_submission_days,
+        }
         return Response(
             {
                 "student_schedule": schedule_data,
