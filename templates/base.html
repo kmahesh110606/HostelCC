@@ -9,24 +9,24 @@
     :root {
       /* Light Mode */
       --light-bg: #edf2ff;
-      --light-bg-gradient: radial-gradient(circle at 12% 18%, #e0e7ff 0%, rgba(224, 231, 255, 0) 36%), radial-gradient(circle at 88% 12%, #dbeafe 0%, rgba(219, 234, 254, 0) 32%), linear-gradient(165deg, #f8faff 0%, #eef2ff 42%, #eaf0ff 100%);
+      --light-bg-gradient: linear-gradient(180deg, #f8faff 0%, #edf3ff 100%);
       --light-panel: rgba(255, 255, 255, 0.74);
       --light-text: #121827;
       --light-muted: #5f6b86;
-      --light-line: rgba(99, 102, 241, 0.24);
+      --light-line: rgba(28, 57, 187, 0.24);
       
       /* Dark Mode */
       --dark-bg: #0B0F1A;
-      --dark-bg-gradient: radial-gradient(circle at 14% 10%, rgba(99, 102, 241, 0.28) 0%, rgba(99, 102, 241, 0) 35%), radial-gradient(circle at 84% 16%, rgba(96, 165, 250, 0.26) 0%, rgba(96, 165, 250, 0) 34%), radial-gradient(circle at 52% 86%, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0) 36%), linear-gradient(165deg, #0b0f1a 0%, #10172b 45%, #111a31 100%);
+      --dark-bg-gradient: linear-gradient(180deg, #0b0f1a 0%, #101a33 100%);
       --dark-panel: rgba(255, 255, 255, 0.05);
       --dark-text: #edf2ff;
       --dark-muted: #b6c2df;
       --dark-line: rgba(255, 255, 255, 0.14);
       
       /* Accent Colors */
-      --primary-dark: #4F46E5;
-      --primary: #6366F1;
-      --primary-light: #60A5FA;
+      --primary-dark: #132B8D;
+      --primary: #1C39BB;
+      --primary-light: #335BD6;
       --success: #22C55E;
       --warning: #F59E0B;
       --error: #EF4444;
@@ -43,10 +43,10 @@
       --radius-sm: 12px;
       --radius-md: 16px;
       --radius-lg: 22px;
-      --shadow-sm: 8px 8px 22px rgba(5, 8, 18, 0.32), -7px -7px 18px rgba(40, 56, 94, 0.16);
-      --shadow-md: 14px 14px 34px rgba(5, 8, 18, 0.44), -10px -10px 26px rgba(48, 66, 108, 0.19);
-      --shadow-lg: 20px 20px 46px rgba(3, 6, 14, 0.52), -14px -14px 32px rgba(55, 76, 128, 0.22);
-      --soft-glow: 0 0 0 1px rgba(147, 163, 255, 0.18), 0 0 26px rgba(99, 102, 241, 0.2);
+      --shadow-sm: 0 4px 12px rgba(12, 24, 62, 0.18);
+      --shadow-md: 0 10px 24px rgba(12, 24, 62, 0.24);
+      --shadow-lg: 0 16px 34px rgba(12, 24, 62, 0.3);
+      --soft-glow: none;
       --motion-fast: 220ms;
       --motion-medium: 280ms;
       --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
@@ -71,9 +71,9 @@
         --muted: var(--dark-muted);
         --line: var(--dark-line);
         --icon-filter: invert(93%) sepia(12%) saturate(1038%) hue-rotate(183deg) brightness(108%) contrast(101%);
-        --shadow-sm: 8px 8px 22px rgba(5, 8, 18, 0.32), -7px -7px 18px rgba(40, 56, 94, 0.16);
-        --shadow-md: 14px 14px 34px rgba(5, 8, 18, 0.44), -10px -10px 26px rgba(48, 66, 108, 0.19);
-        --shadow-lg: 20px 20px 46px rgba(3, 6, 14, 0.52), -14px -14px 32px rgba(55, 76, 128, 0.22);
+        --shadow-sm: 0 4px 12px rgba(12, 24, 62, 0.22);
+        --shadow-md: 0 10px 24px rgba(12, 24, 62, 0.28);
+        --shadow-lg: 0 16px 34px rgba(12, 24, 62, 0.34);
       }
     }
     
@@ -85,9 +85,9 @@
       --muted: var(--dark-muted);
       --line: var(--dark-line);
       --icon-filter: invert(93%) sepia(12%) saturate(1038%) hue-rotate(183deg) brightness(108%) contrast(101%);
-      --shadow-sm: 8px 8px 22px rgba(5, 8, 18, 0.32), -7px -7px 18px rgba(40, 56, 94, 0.16);
-      --shadow-md: 14px 14px 34px rgba(5, 8, 18, 0.44), -10px -10px 26px rgba(48, 66, 108, 0.19);
-      --shadow-lg: 20px 20px 46px rgba(3, 6, 14, 0.52), -14px -14px 32px rgba(55, 76, 128, 0.22);
+      --shadow-sm: 0 4px 12px rgba(12, 24, 62, 0.22);
+      --shadow-md: 0 10px 24px rgba(12, 24, 62, 0.28);
+      --shadow-lg: 0 16px 34px rgba(12, 24, 62, 0.34);
     }
     
     html[data-theme="light"] {
@@ -98,9 +98,9 @@
       --muted: var(--light-muted);
       --line: var(--light-line);
       --icon-filter: invert(27%) sepia(6%) saturate(600%) hue-rotate(180deg) brightness(93%) contrast(88%);
-      --shadow-sm: 8px 8px 20px rgba(15, 23, 42, 0.08), -7px -7px 16px rgba(255, 255, 255, 0.82);
-      --shadow-md: 12px 12px 30px rgba(15, 23, 42, 0.12), -10px -10px 24px rgba(255, 255, 255, 0.9);
-      --shadow-lg: 18px 18px 40px rgba(15, 23, 42, 0.16), -14px -14px 30px rgba(255, 255, 255, 0.95);
+      --shadow-sm: 0 4px 10px rgba(28, 57, 187, 0.1);
+      --shadow-md: 0 10px 20px rgba(28, 57, 187, 0.14);
+      --shadow-lg: 0 16px 30px rgba(28, 57, 187, 0.18);
     }
 
     html[data-theme="dark"] .tab,
@@ -203,9 +203,30 @@
       border-radius: var(--radius-lg);
       border: 1px solid var(--line);
       background: var(--panel);
-      box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .tab,
+    .feed-card,
+    .community-panel,
+    .comment-modal-card,
+    .notification-card,
+    .day-panel,
+    .meal-card,
+    .action-card,
+    .poll-modal-card,
+    .laundry-card,
+    .student-calendar-card,
+    .laundry-confirm-card,
+    .discipline-card,
+    .auth-panel,
+    .messages li,
+    .nav-item,
+    .role-badge,
+    .theme-toggle {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      box-shadow: var(--shadow-sm) !important;
     }
 
     /* Uniform fallback for templates still using inline panel styles */
@@ -213,9 +234,9 @@
     [style*="background:var(--panel)"],
     [style*="background: color-mix(in srgb, var(--panel)"] {
       background: color-mix(in srgb, var(--panel) 88%, rgba(255, 255, 255, 0.08) 12%) !important;
-      box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--shadow-sm);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
     }
 
     [style*="border: 1px solid var(--line)"],
@@ -245,9 +266,7 @@
       border-radius: var(--radius-lg);
       border: 1px solid var(--line);
       background: var(--panel);
-      box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
+      box-shadow: var(--shadow-sm);
     }
     
     .navbar {
@@ -261,7 +280,7 @@
       right: 0;
       z-index: 120;
       box-shadow: var(--shadow-sm);
-      backdrop-filter: blur(18px);
+      backdrop-filter: none;
       overflow: hidden;
     }
 
