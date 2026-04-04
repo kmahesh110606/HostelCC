@@ -169,7 +169,7 @@ class CloakroomEntryViewSet(viewsets.GenericViewSet):
             raise PermissionDenied("Only hostel staff can submit cloakroom entries.")
 
         qr_text = (request.data.get("qr_text") or "").strip()
-        basket_id = (request.data.get("basket_id") or "").strip()
+        basket_id = str(request.data.get("basket_id") or "").strip()
         item_name = (request.data.get("item_name") or "").strip()
         storage_room_no = (request.data.get("storage_room_no") or "").strip().upper()
         notes = (request.data.get("notes") or "").strip()
