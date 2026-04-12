@@ -196,18 +196,10 @@ SECURE_HSTS_SECONDS = 0 if DEBUG else int(os.getenv("SECURE_HSTS_SECONDS", "3600
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
 SECURE_HSTS_PRELOAD = not DEBUG
 
-REDIS_SSL_CERT_REQS = os.getenv("REDIS_SSL_CERT_REQS", "").strip()
-cache_options = {
-    "CLIENT_CLASS": "django_redis.client.DefaultClient",
-}
-if REDIS_SSL_CERT_REQS:
-    cache_options["CONNECTION_POOL_KWARGS"] = {"ssl_cert_reqs": REDIS_SSL_CERT_REQS}
-
 CACHES = {
     "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.getenv("REDIS_URL", "redis://redis:6379/1"),
-        "OPTIONS": cache_options,
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "hostelcc-local-cache",
         "TIMEOUT": 300,
     }
 }
