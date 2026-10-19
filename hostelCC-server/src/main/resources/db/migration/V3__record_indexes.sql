@@ -1,0 +1,15 @@
+CREATE INDEX users_block_role_active ON users(block_id,role,active);
+CREATE INDEX users_room_active ON users(room_id,active);
+CREATE INDEX users_mess_active ON users(mess_id,active);
+CREATE INDEX users_name_id ON users(name,id);
+CREATE INDEX outings_block_created ON outings(block_id,created_at);
+CREATE INDEX discipline_block_created ON discipline(block_id,created_at);
+CREATE INDEX maintenance_assignment_status ON maintenance(assignee_id,status);
+CREATE INDEX maintenance_block_created ON maintenance(block_id,created_at);
+CREATE INDEX feedback_mess_created ON feedback(mess_id,created_at);
+CREATE INDEX feedback_block_created ON feedback(block_id,created_at);
+CREATE INDEX cloakroom_storage_status ON cloakroom(storage_id,status);
+CREATE INDEX cloakroom_requests_student ON cloakroom_requests(student_id,created_at);
+CREATE INDEX audit_resource ON audit(resource_type,resource_id);
+CREATE INDEX audit_actor_created ON audit(actor_id,created_at);
+CREATE INDEX sessions_user ON sessions(user_id);

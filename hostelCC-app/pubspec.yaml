@@ -1,0 +1,23 @@
+name: hostel_cc_app
+description: HostelCC campus workspace for students and scoped staff duties.
+publish_to: none
+version: 2.0.0+2
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  intl: ^0.20.2
+  mobile_scanner: ^6.0.2
+  qr_flutter: ^4.1.0
+  flutter_secure_storage: ^9.2.4
+  share_plus: ^10.1.4
+  cross_file: ^0.3.4+2
+  file_selector: ^1.1.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+flutter:
+  uses-material-design: true

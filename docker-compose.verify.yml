@@ -1,0 +1,4 @@
+# Only for the isolated verification project; never include in deployment.
+services:
+  postgres:
+    ports: ['127.0.0.1:55439:5432']

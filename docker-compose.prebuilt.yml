@@ -1,0 +1,6 @@
+# First run: cd hostelCC-server; ./mvnw verify
+services:
+  server:
+    build:
+      context: ./hostelCC-server
+      dockerfile: Dockerfile.prebuilt

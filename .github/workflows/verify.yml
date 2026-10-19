@@ -1,0 +1,88 @@
+﻿name: Verify HostelCC
+on: [push, pull_request]
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: hostelcc_tests
+          POSTGRES_USER: hostelcc
+          POSTGRES_PASSWORD: integration-test-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U hostelcc -d hostelcc_tests"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: hostelCC-server/pom.xml
+      - run: chmod +x mvnw && ./mvnw -B verify
+        working-directory: hostelCC-server
+      - run: ./mvnw -B test
+        working-directory: hostelCC-server
+        env:
+          TEST_DB_URL: jdbc:postgresql://localhost:5432/hostelcc_tests
+          TEST_DB_USER: hostelcc
+          TEST_DB_PASSWORD: integration-test-only
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: HostelCC-web/package-lock.json
+      - run: npm ci && npm run lint && npm run build
+        working-directory: HostelCC-web
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get && flutter analyze && flutter test && flutter build web
+        working-directory: hostelCC-app
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: hostelCC-server/pom.xml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: HostelCC-web/package-lock.json
+      - run: chmod +x mvnw && ./mvnw -B package -DskipTests
+        working-directory: hostelCC-server
+      - shell: pwsh
+        run: ./scripts/setup-local.ps1
+      - run: docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.prebuilt.yml up --build -d --wait
+      - run: npm ci && npx playwright install --with-deps chromium && npx playwright test
+        working-directory: HostelCC-web
+        env:
+          HOSTELCC_BASE_URL: http://localhost:8080
+          MAILPIT_URL: http://localhost:8025
+      - if: failure()
+        run: docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml logs --tail 100
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-report
+          path: HostelCC-web/playwright-report
+      - if: always()
+        run: docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml down --volumes

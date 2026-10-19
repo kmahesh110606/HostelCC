@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: hostelcc-server
+  datasource:
+    url: ${DB_URL:}
+    username: ${DB_USER:}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      minimum-idle: 1
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
+      mail.smtp.starttls.required: ${SMTP_STARTTLS:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: never
+  tomcat:
+    max-http-form-post-size: 1MB
+    threads:
+      max: 40
+      min-spare: 2
+  shutdown: graceful
+app:
+  jwt-secret: ${JWT_SECRET:}
+  cookie-secure: ${COOKIE_SECURE:true}
+  mail-from: ${SMTP_FROM:hostelcc@localhost}
+  admin-email: ${ADMIN_EMAIL:}
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173}
+  otp-ip-limit: ${OTP_IP_LIMIT:300}

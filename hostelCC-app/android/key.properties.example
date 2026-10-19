@@ -1,0 +1,5 @@
+# Keep the real key.properties and keystore outside version control.
+storeFile=/absolute/path/to/hostelcc-upload.jks
+storePassword=replace-locally
+keyAlias=hostelcc
+keyPassword=replace-locally

@@ -1,0 +1,10 @@
+{
+    email {$ADMIN_EMAIL}
+}
+{$SITE_DOMAIN} {
+    encode gzip
+    header Strict-Transport-Security "max-age=31536000"
+    @api path /api/*
+    reverse_proxy @api server:8080
+    reverse_proxy web:80
+}

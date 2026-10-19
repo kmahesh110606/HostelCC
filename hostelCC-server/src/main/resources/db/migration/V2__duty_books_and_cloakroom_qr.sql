@@ -1,0 +1,10 @@
+CREATE TABLE duty_scopes (id varchar(64) PRIMARY KEY, user_id varchar(64) NOT NULL REFERENCES users(id), book varchar(30) NOT NULL CHECK(book IN ('HOSTEL','MESS','OUTINGS','DISCIPLINE','MAINTENANCE','CLOAKROOM')), target_id varchar(64) NOT NULL, active boolean NOT NULL DEFAULT true, UNIQUE(user_id,book,target_id));
+ALTER TABLE storage_rooms ADD COLUMN item_type varchar(30) NOT NULL DEFAULT 'CHAIR';
+ALTER TABLE storage_rooms ADD COLUMN token_start integer NOT NULL DEFAULT 1;
+ALTER TABLE storage_rooms ADD COLUMN token_end integer NOT NULL DEFAULT 10000;
+ALTER TABLE storage_rooms ADD COLUMN next_token integer NOT NULL DEFAULT 1;
+ALTER TABLE cloakroom ADD COLUMN token_number integer;
+ALTER TABLE cloakroom ADD COLUMN token_room_id varchar(64) REFERENCES storage_rooms(id);
+CREATE UNIQUE INDEX cloakroom_room_token ON cloakroom(token_room_id,token_number);
+CREATE TABLE cloakroom_requests (id varchar(64) PRIMARY KEY, qr_token varchar(100) NOT NULL UNIQUE, student_id varchar(64) NOT NULL REFERENCES users(id), storage_id varchar(64) NOT NULL REFERENCES storage_rooms(id), item varchar(30) NOT NULL, state varchar(20) NOT NULL DEFAULT 'PENDING', entry_id varchar(64) REFERENCES cloakroom(id), created_at varchar(40) NOT NULL);
+ALTER TABLE polls ADD COLUMN enabled boolean NOT NULL DEFAULT true;

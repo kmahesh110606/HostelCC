@@ -1,0 +1,22 @@
+services:
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?Set SITE_DOMAIN to the public hostname}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+    ports: ['80:80', '443:443', '443:443/udp']
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    mem_limit: 64m
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+    restart: unless-stopped
+volumes:
+  caddy_data:
+  caddy_config:

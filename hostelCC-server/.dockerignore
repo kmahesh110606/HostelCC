@@ -1,0 +1,6 @@
+legacy
+data
+target
+.env*
+.git
+scripts

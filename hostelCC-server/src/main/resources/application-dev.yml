@@ -1,0 +1,8 @@
+app:
+  jwt-secret: ${JWT_SECRET:local-development-only-key-change-before-deployment-2026}
+  cookie-secure: ${COOKIE_SECURE:false}
+  admin-email: ${ADMIN_EMAIL:admin@hostelcc.local}
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:hostelcc;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1}
+    username: ${DB_USER:sa}
