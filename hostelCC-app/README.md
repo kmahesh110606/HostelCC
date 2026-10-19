@@ -19,3 +19,5 @@ flutter build apk --release --dart-define=API_BASE_URL=https://your-host/api
 ```
 
 Keystores, signing properties, cookies and environment secrets must stay out of version control. iOS builds require macOS and Apple signing credentials. Physical camera and signed store-release testing remain deployment/device checks.
+
+The app includes floor layout editing and room/student drill-down, dining sessions and anonymous item/caterer ratings, scoped gate records, custom duty books and CSV/PDF reports. Native cached reads use encrypted device storage with a 15-minute lifetime, 60-entry and 1 MB limit; browser builds do not persist this private cache. Offline writes are not queued. Logout and authorization failures purge the cache. No push notification service is installed.

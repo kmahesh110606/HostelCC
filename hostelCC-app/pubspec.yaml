@@ -15,6 +15,9 @@ dependencies:
   share_plus: ^10.1.4
   cross_file: ^0.3.4+2
   file_selector: ^1.1.0
+  pdf: ^3.12.0
+  # Compatible with the archive version resolved by Flutter 3.41.
+  image: 4.5.4
 dev_dependencies:
   flutter_test:
     sdk: flutter

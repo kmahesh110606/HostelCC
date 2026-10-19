@@ -9,6 +9,10 @@ import 'package:share_plus/share_plus.dart';
 import 'services/api.dart';
 import 'forms.dart';
 import 'student_import.dart';
+import 'dining.dart';
+import 'campus.dart';
+import 'operations.dart';
+import 'remote_options.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,11 +28,11 @@ class HostelApp extends StatelessWidget {
       theme: ThemeData(
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xff136d55),
-              surface: const Color(0xfff8faf6)),
-          scaffoldBackgroundColor: const Color(0xfff5f7f3),
+              seedColor: const Color(0xff003366),
+              surface: const Color(0xfff8fafc)),
+          scaffoldBackgroundColor: const Color(0xfff1f5f9),
           appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xfff5f7f3),
+              backgroundColor: Color(0xfff1f5f9),
               surfaceTintColor: Colors.transparent),
           inputDecorationTheme: InputDecorationTheme(
               border:
@@ -41,6 +45,19 @@ class HostelApp extends StatelessWidget {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                   side: const BorderSide(color: Color(0xffe3e9df))))),
+      builder: (context, child) => ValueListenableBuilder<String?>(
+          valueListenable: Api.cacheNotice,
+          builder: (context, notice, _) => Column(children: [
+                if (notice != null)
+                  SafeArea(
+                      bottom: false,
+                      child: Material(
+                          color: const Color(0xfffff0c2),
+                          child: Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Text(notice)))),
+                Expanded(child: child!)
+              ])),
       home: const SessionGate());
 }
 
@@ -198,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Icon(Icons.apartment_rounded,
-                                    size: 42, color: Color(0xff136d55)),
+                                    size: 42, color: Color(0xff003366)),
                                 const SizedBox(height: 16),
                                 Text('HostelCC.',
                                     style: Theme.of(context)
@@ -207,10 +224,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ?.copyWith(
                                             fontWeight: FontWeight.w700)),
                                 const SizedBox(height: 38),
-                                Text(
-                                    sent
-                                        ? 'Check your inbox.'
-                                        : 'Make yourself at home.',
+                                Text(sent ? 'Check your inbox.' : 'Sign in',
                                     style: Theme.of(context)
                                         .textTheme
                                         .headlineSmall),
@@ -218,9 +232,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Text(
                                     sent
                                         ? 'If ${email.text} is registered, a six-digit code is on its way. It expires in 10 minutes.'
-                                        : 'Your hostel, connected. Sign in with your registered email address.',
+                                        : 'Use your registered email address.',
                                     style: const TextStyle(
-                                        color: Color(0xff7b8f75), height: 1.6)),
+                                        color: Color(0xff64748b), height: 1.6)),
                                 const SizedBox(height: 28),
                                 if (!sent)
                                   TextFormField(
@@ -323,16 +337,17 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 const sections = <String, (String, IconData)>{
+  'dining': ('Mess', Icons.restaurant),
+  'campus': ('Floor plans', Icons.apartment),
+  'gate': ('Entry / exit', Icons.door_front_door),
+  'books': ('Book definitions', Icons.book),
+  'reports': ('Reports', Icons.table_chart),
   'overview': ('Overview', Icons.dashboard_outlined),
   'announcements': ('Announcements', Icons.campaign_outlined),
   'users': ('People', Icons.people_outline),
   'blocks': ('Hostel blocks', Icons.apartment),
   'rooms': ('Rooms', Icons.bed_outlined),
   'scopes': ('Duty books', Icons.menu_book_outlined),
-  'menus': ('Mess menu', Icons.restaurant_menu),
-  'feedback': ('Mess feedback', Icons.rate_review_outlined),
-  'polls': ('Polling', Icons.poll_outlined),
-  'messChanges': ('Mess changes', Icons.swap_horiz),
   'messes': ('Messes', Icons.restaurant),
   'outings': ('Outings & leave', Icons.directions_walk),
   'discipline': ('Discipline', Icons.shield_outlined),
@@ -397,6 +412,7 @@ class _WorkspaceState extends State<Workspace> {
   void initState() {
     super.initState();
     user = widget.initialUser;
+    if (user['role'] == 'MESS_MANAGER') page = 'dining';
     refresh();
   }
 
@@ -425,6 +441,24 @@ class _WorkspaceState extends State<Workspace> {
   }
 
   bool visible(String p) {
+    if (user['role'] == 'MESS_MANAGER') return p == 'dining';
+    if (p == 'books') return admin;
+    if (p == 'reports') return !student;
+    if (p == 'dining') {
+      return global ||
+          student ||
+          user['role'] == 'MESS_MANAGER' ||
+          has(user, 'MESS') ||
+          has(user, 'HOSTEL');
+    }
+    if (p == 'gate') return global || student || has(user, 'OUTINGS');
+    if (p == 'campus') {
+      return global ||
+          ['WARDEN', 'SUPERVISOR'].contains(user['role']) &&
+              (has(user, 'HOSTEL') ||
+                  has(user, 'OUTINGS') ||
+                  has(user, 'DISCIPLINE'));
+    }
     if (['overview', 'announcements'].contains(p)) {
       return true;
     }
@@ -437,9 +471,7 @@ class _WorkspaceState extends State<Workspace> {
     if (global) {
       return true;
     }
-    if (['menus', 'feedback', 'polls', 'messChanges'].contains(p)) {
-      return student || has(user, 'MESS') || has(user, 'HOSTEL');
-    }
+
     if (['users', 'blocks', 'rooms'].contains(p)) {
       return has(user, 'HOSTEL') ||
           p == 'users' && (has(user, 'OUTINGS') || has(user, 'DISCIPLINE'));
@@ -462,31 +494,32 @@ class _WorkspaceState extends State<Workspace> {
   String resource(String p) =>
       {
         'storageRooms': 'storage-rooms',
-        'messChanges': 'mess-changes',
         'cloakroomRequests': 'cloakroom/request'
       }[p] ??
       p;
   bool canCreate(String p) {
-    if (['overview', 'audit', 'cloakroom', 'scan'].contains(p)) {
+    if ([
+      'overview',
+      'audit',
+      'cloakroom',
+      'scan',
+      'dining',
+      'campus',
+      'gate',
+      'books',
+      'reports'
+    ].contains(p)) {
       return false;
-    }
-    if (p == 'feedback') {
-      return student;
     }
     if (p == 'cloakroomRequests') {
       return student && user['cloakroomAccess'] == true;
     }
-    if (p == 'messChanges') {
-      return student && user['messChangeAccess'] == true;
-    }
+
     if (admin) {
       return true;
     }
     if (p == 'announcements') {
       return has(user, 'HOSTEL');
-    }
-    if (['menus', 'polls'].contains(p)) {
-      return has(user, 'MESS');
     }
     if (p == 'outings') {
       return student || has(user, 'OUTINGS');
@@ -499,7 +532,7 @@ class _WorkspaceState extends State<Workspace> {
   }
 
   Future<void> edit(String p, [Map<String, dynamic>? row]) async {
-    final r = resource(p), update = row != null && p != 'menus';
+    final r = resource(p), update = row != null;
     final initial = <String, dynamic>{
       'active': true,
       'role': 'STUDENT',
@@ -569,14 +602,6 @@ class _WorkspaceState extends State<Workspace> {
         button('Edit', () => edit(p, row)),
       if (p == 'announcements' && has(user, 'HOSTEL', row['blockId']))
         button('Edit', () => edit(p, row)),
-      if (p == 'menus' && has(user, 'MESS', row['messId']))
-        button('Edit menu', () => edit(p, row)),
-      if (p == 'feedback' && has(user, 'MESS', row['messId']))
-        button(
-            'Reply',
-            () => action(p, row, 'reply',
-                fields: [const Field('reply', 'Reply', type: 'long')],
-                initial: {'reply': row['reply']})),
       if (p == 'outings') ...[
         if (has(user, 'OUTINGS', row['blockId'])) ...[
           if (row['status'] == 'PENDING') ...[
@@ -605,12 +630,6 @@ class _WorkspaceState extends State<Workspace> {
           has(user, 'DISCIPLINE', row['blockId']))
         button(
             'Return ID', () => action(p, row, 'return card', fields: [note])),
-      if (p == 'messChanges' && admin && row['status'] == 'PENDING')
-        for (final name in ['approve', 'reject'])
-          button(
-              label(name),
-              () => action(p, row, name,
-                  fields: [const Field('note', 'Note', optional: true)])),
       if (p == 'cloakroom' &&
           row['status'] == 'STORED' &&
           has(user, 'CLOAKROOM', row['storageId'])) ...[
@@ -624,6 +643,8 @@ class _WorkspaceState extends State<Workspace> {
             'Relocate',
             () => action(p, row, 'move', fields: [
                   Field('storageId', 'Target room',
+                      remote:
+                          '/options/storageRooms?block=${Uri.encodeComponent(row['blockId'].toString())}',
                       type: 'select',
                       options: rows(data, 'storageRooms')
                           .where((r) =>
@@ -644,7 +665,8 @@ class _WorkspaceState extends State<Workspace> {
               'Assign',
               () => action(p, row, 'assign', fields: [
                     Field('assigneeId', 'Housekeeping staff',
-                        remote: '/options/housekeeping?block=${Uri.encodeComponent(row['blockId'].toString())}',
+                        remote:
+                            '/options/housekeeping?block=${Uri.encodeComponent(row['blockId'].toString())}',
                         type: 'select',
                         options: rows(data, 'users')
                             .where((u) =>
@@ -686,11 +708,8 @@ class _WorkspaceState extends State<Workspace> {
     return v.toString();
   }
 
-  Widget status(dynamic value) => Chip(
-      label: Text(label(value), style: const TextStyle(fontSize: 11)),
-      side: BorderSide.none,
-      visualDensity: VisualDensity.compact,
-      backgroundColor: const Color(0xffedf2e6));
+  Widget status(dynamic value) =>
+      Text(label(value), style: const TextStyle(fontSize: 12));
   Widget record(String p, Map<String, dynamic> row) {
     final title = row['title'] ??
         row['name'] ??
@@ -727,7 +746,13 @@ class _WorkspaceState extends State<Workspace> {
                               height: 1.5))),
               Wrap(spacing: 6, children: [
                 TextButton(
-                    onPressed: () => showDetails(row),
+                    onPressed: () => p == 'users' && row['role'] == 'STUDENT'
+                        ? Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => StudentHistoryScreen(
+                                    api: widget.api, id: row['id'])))
+                        : showDetails(row),
                     child: const Text('Details')),
                 ...actions(p, row)
               ])
@@ -736,22 +761,6 @@ class _WorkspaceState extends State<Workspace> {
 
   List<String> previewKeys(String p) => switch (p) {
         'announcements' => ['body', 'createdAt'],
-        'menus' => [
-            'messName',
-            'day',
-            'breakfast',
-            'lunch',
-            'snacks',
-            'dinner'
-          ],
-        'feedback' => [
-            'messName',
-            'meal',
-            'mealDate',
-            'rating',
-            'comment',
-            'reply'
-          ],
         'outings' => [
             'kind',
             'destination',
@@ -787,9 +796,8 @@ class _WorkspaceState extends State<Workspace> {
         'users' => ['email', 'role', 'rollNo', 'blockName', 'roomNumber'],
         'rooms' => ['blockName', 'roomType', 'occupied', 'capacity'],
         'blocks' => ['contactEmail', 'contactPhone', 'active'],
-        'messes' => ['occupied', 'capacity', 'active'],
+        'messes' => ['occupied', 'active'],
         'audit' => ['actorName', 'detail', 'createdAt'],
-        'messChanges' => ['messName', 'decisionNote', 'createdAt'],
         _ => ['createdAt']
       };
   void showDetails(Map<String, dynamic> row) {
@@ -842,8 +850,7 @@ class _WorkspaceState extends State<Workspace> {
                 style: const TextStyle(
                     fontSize: 29, fontWeight: FontWeight.w600, height: 1.2)),
             const SizedBox(height: 12),
-            const Text('Your day on campus, a little more organised.',
-                style: TextStyle(color: Color(0xff859776))),
+            const Text('', style: TextStyle(color: Color(0xff859776))),
             const SizedBox(height: 12),
             Text(
                 user['blockName'] ??
@@ -904,49 +911,6 @@ class _WorkspaceState extends State<Workspace> {
               label: const Text('Report repair'))
         ])
     ]);
-  }
-
-  Widget poll(Map<String, dynamic> p) {
-    final open = p['enabled'] == true &&
-        DateTime.parse(p['closesAt']).isAfter(DateTime.now());
-    final voted = (p['myVote'] ?? '') != '';
-    return Card(
-        margin: const EdgeInsets.only(bottom: 16),
-        child: Padding(
-            padding: const EdgeInsets.all(22),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(p['messName'],
-                  style: const TextStyle(color: Color(0xff81966f))),
-              const SizedBox(height: 10),
-              Text(p['title'], style: Theme.of(context).textTheme.titleLarge),
-              Text('Closes ${display(p['closesAt'], 'closesAt')}',
-                  style: const TextStyle(fontSize: 12)),
-              status(open ? 'OPEN' : 'CLOSED'),
-              for (final o in p['options'])
-                Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: OutlinedButton(
-                        onPressed: student && open && !voted
-                            ? () => action('polls', p, 'Vote for ${o['label']}',
-                                initial: {'optionId': o['id']})
-                            : null,
-                        child: Row(children: [
-                          Expanded(child: Text(o['label'])),
-                          if (o['id'] == p['myVote'])
-                            const Icon(Icons.check_circle_outline, size: 17),
-                          Text('${o['votes']} votes')
-                        ]))),
-              if (has(user, 'MESS', p['messId']))
-                TextButton(
-                    onPressed: () => action(
-                        'polls', p, open ? 'Disable voting' : 'Enable voting',
-                        path: '/polls/${p['id']}/state',
-                        initial: {'enabled': p['enabled'] != true}),
-                    child: Text(p['enabled'] == true
-                        ? 'Disable voting'
-                        : 'Enable voting'))
-            ])));
   }
 
   Widget pass(Map<String, dynamic> q) => Card(
@@ -1072,7 +1036,15 @@ class _WorkspaceState extends State<Workspace> {
                     });
                     Navigator.pop(context);
                     searchTimer?.cancel();
-                    if (!['overview', 'scan'].contains(e.key)) {
+                    if (![
+                      'overview',
+                      'scan',
+                      'dining',
+                      'campus',
+                      'gate',
+                      'books',
+                      'reports'
+                    ].contains(e.key)) {
                       loadPage(e.key, 0, '');
                     }
                   })
@@ -1105,93 +1077,120 @@ class _WorkspaceState extends State<Workspace> {
                 ? const EmptyState(
                     title: 'Assignment changed',
                     subtitle: 'Choose another duty from the menu.')
-                : page == 'scan'
-                    ? ScanScreen(
-                        api: widget.api,
-                        data: data,
-                        user: user,
-                        onProcessed: refresh)
-                    : RefreshIndicator(
-                        onRefresh: refresh,
-                        child: Align(
-                            alignment: Alignment.topCenter,
-                            child: ConstrainedBox(
-                                constraints:
-                                    const BoxConstraints(maxWidth: 820),
-                                child: ListView(
-                                    padding: const EdgeInsets.fromLTRB(
-                                        20, 16, 20, 100),
-                                    children: [
-                                      if (error != null)
-                                        MaterialBanner(
-                                            content: Text(error!),
-                                            actions: [
-                                              TextButton(
-                                                  onPressed: refresh,
-                                                  child: const Text('Retry'))
-                                            ]),
-                                      if (page == 'overview')
-                                        overview()
-                                      else ...[
-                                        if (page == 'cloakroomRequests')
-                                          const Padding(
-                                              padding:
-                                                  EdgeInsets.only(bottom: 18),
-                                              child: Text(
-                                                  'Generate one pass per item. Submit your chair first, then show each pass to the staff assigned to its room.')),
-                                        TextField(
-                                            key: ValueKey(page),
-                                            decoration: const InputDecoration(
-                                                hintText: 'Search records',
-                                                prefixIcon: Icon(Icons.search)),
-                                            onChanged: (v) {
-                                              setState(() => search = v);
-                                              searchTimer?.cancel();
-                                              final resource = page;
-                                              searchTimer = Timer(
-                                                  const Duration(
-                                                      milliseconds: 300),
-                                                  () =>
-                                                      loadPage(resource, 0, v));
-                                            }),
-                                        Row(children: [
-                                          Expanded(
-                                              child: Text(
-                                                  '$total records ? Page ${pageNumber + 1}')),
-                                          IconButton(
-                                              tooltip: 'Previous page',
-                                              onPressed: pageNumber == 0
-                                                  ? null
-                                                  : () => loadPage(page,
-                                                      pageNumber - 1, search),
-                                              icon: const Icon(
-                                                  Icons.chevron_left)),
-                                          IconButton(
-                                              tooltip: 'Next page',
-                                              onPressed:
-                                                  (pageNumber + 1) * 25 >= total
-                                                      ? null
-                                                      : () => loadPage(
-                                                          page,
-                                                          pageNumber + 1,
-                                                          search),
-                                              icon: const Icon(
-                                                  Icons.chevron_right))
-                                        ]),
-                                        const SizedBox(height: 20),
-                                        if (entries.isEmpty)
-                                          const EmptyState(
-                                              title: 'No records yet',
-                                              subtitle:
-                                                  'Records in your assigned scope will appear here.'),
-                                        for (final row in entries)
-                                          page == 'polls'
-                                              ? poll(row)
-                                              : page == 'cloakroomRequests'
-                                                  ? pass(row)
-                                                  : record(page, row)
-                                      ]
-                                    ])))));
+                : page == 'dining'
+                    ? DiningScreen(api: widget.api, user: user)
+                    : page == 'campus'
+                        ? CampusScreen(api: widget.api, user: user)
+                        : ['gate', 'books', 'reports'].contains(page)
+                            ? OperationsScreen(
+                                api: widget.api, user: user, section: page)
+                            : page == 'scan'
+                                ? ScanScreen(
+                                    api: widget.api,
+                                    data: data,
+                                    user: user,
+                                    onProcessed: refresh)
+                                : RefreshIndicator(
+                                    onRefresh: refresh,
+                                    child: Align(
+                                        alignment: Alignment.topCenter,
+                                        child: ConstrainedBox(
+                                            constraints: const BoxConstraints(
+                                                maxWidth: 820),
+                                            child: ListView(
+                                                padding:
+                                                    const EdgeInsets.fromLTRB(
+                                                        20, 16, 20, 100),
+                                                children: [
+                                                  if (error != null)
+                                                    MaterialBanner(
+                                                        content: Text(error!),
+                                                        actions: [
+                                                          TextButton(
+                                                              onPressed:
+                                                                  refresh,
+                                                              child: const Text(
+                                                                  'Retry'))
+                                                        ]),
+                                                  if (page == 'overview')
+                                                    overview()
+                                                  else ...[
+                                                    if (page ==
+                                                        'cloakroomRequests')
+                                                      const Padding(
+                                                          padding:
+                                                              EdgeInsets.only(
+                                                                  bottom: 18),
+                                                          child: Text(
+                                                              'Generate one pass per item. Submit your chair first, then show each pass to the staff assigned to its room.')),
+                                                    TextField(
+                                                        key: ValueKey(page),
+                                                        decoration:
+                                                            const InputDecoration(
+                                                                hintText:
+                                                                    'Search records',
+                                                                prefixIcon:
+                                                                    Icon(Icons
+                                                                        .search)),
+                                                        onChanged: (v) {
+                                                          setState(
+                                                              () => search = v);
+                                                          searchTimer?.cancel();
+                                                          final resource = page;
+                                                          searchTimer = Timer(
+                                                              const Duration(
+                                                                  milliseconds:
+                                                                      300),
+                                                              () => loadPage(
+                                                                  resource,
+                                                                  0,
+                                                                  v));
+                                                        }),
+                                                    Row(children: [
+                                                      Expanded(
+                                                          child: Text(
+                                                              '$total records ? Page ${pageNumber + 1}')),
+                                                      IconButton(
+                                                          tooltip:
+                                                              'Previous page',
+                                                          onPressed: pageNumber ==
+                                                                  0
+                                                              ? null
+                                                              : () => loadPage(
+                                                                  page,
+                                                                  pageNumber -
+                                                                      1,
+                                                                  search),
+                                                          icon: const Icon(Icons
+                                                              .chevron_left)),
+                                                      IconButton(
+                                                          tooltip: 'Next page',
+                                                          onPressed: (pageNumber +
+                                                                          1) *
+                                                                      25 >=
+                                                                  total
+                                                              ? null
+                                                              : () => loadPage(
+                                                                  page,
+                                                                  pageNumber +
+                                                                      1,
+                                                                  search),
+                                                          icon: const Icon(Icons
+                                                              .chevron_right))
+                                                    ]),
+                                                    const SizedBox(height: 20),
+                                                    if (entries.isEmpty)
+                                                      const EmptyState(
+                                                          title:
+                                                              'No records yet',
+                                                          subtitle:
+                                                              'Records in your assigned scope will appear here.'),
+                                                    for (final row in entries)
+                                                      page == 'cloakroomRequests'
+                                                          ? pass(row)
+                                                          : record(page, row)
+                                                  ]
+                                                ])))));
   }
 }
 
@@ -1286,20 +1285,12 @@ class _ScanScreenState extends State<ScanScreen> {
             'Choose your assigned room, scan the item pass, and confirm the operation.',
             style: TextStyle(height: 1.6)),
         const SizedBox(height: 20),
-        DropdownButtonFormField<String>(
-            initialValue: room,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Cloakroom'),
-            items: rows(widget.data, 'storageRooms')
-                .where((r) =>
-                    r['active'] == true &&
-                    has(widget.user, 'CLOAKROOM', r['id']))
-                .map((r) => DropdownMenuItem(
-                    value: r['id'].toString(),
-                    child: Text('${r['name']} · ${label(r['itemType'])}',
-                        overflow: TextOverflow.ellipsis)))
-                .toList(),
-            onChanged: busy ? null : (v) => setState(() => room = v)),
+        RemoteOption(
+            api: widget.api,
+            path: '/options/storageRooms',
+            title: 'Cloakroom',
+            value: room,
+            onSelected: (o) => setState(() => room = o?['value'])),
         const SizedBox(height: 16),
         SegmentedButton<String>(
             segments: const [

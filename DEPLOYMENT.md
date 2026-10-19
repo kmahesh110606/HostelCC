@@ -1,4 +1,4 @@
-﻿# Deployment
+# Deployment
 
 ## EC2 with Docker Compose
 
@@ -55,4 +55,12 @@ For updates, back up, load/pull the new image tags and repeat `up -d --no-build 
 
 The local override runs Mailpit on loopback port 8025, HTTP on loopback port 8080, and PostgreSQL inside Docker. `.env.local` is generated with random secrets. The isolated integration-test override publishes PostgreSQL on loopback 55439; do not use it in production. Native Android emulators use `http://10.0.2.2:8080/api`.
 
-References: [Compose readiness](https://docs.docker.com/compose/how-tos/startup-order/), [Caddy automatic HTTPS](https://caddyserver.com/docs/automatic-https), [Mailpit Docker](https://mailpit.axllent.org/docs/install/docker/).
+References: [Compose readiness](https://docs.docker.com/compose/how-tos/startup-order/), [Caddy automatic HTTPS](https://caddyserver.com/docs/automatic-https).
+
+## Scheduled backups and reports
+
+Add `-f docker-compose.backup.yml` to your Compose command to run daily custom-format PostgreSQL backups and occupancy, outing and food-performance CSV reports. Configure `BACKUP_DIRECTORY` (default `./backups`), `BACKUP_INTERVAL_SECONDS` (86400) and `BACKUP_RETENTION_DAYS` (14). The sidecar writes a `last-success` marker and has a freshness health check. Protect this directory: database backups contain personal records and authentication tables. Copy encrypted backups off the host and periodically restore into a separate database. This optional service adds a 96 MB memory allowance.
+
+For infrastructure database administration, add `-f docker-compose.tools.yml --profile database-tools`. Adminer is available only on `127.0.0.1:8081`; on EC2 use an SSH tunnel. Select PostgreSQL, server `postgres`, database/user `hostelcc`, and the configured database password. This is an infrastructure credential, separate from application email OTP. Stop the optional tool when finished.
+
+Migration V4 removes the old identified feedback records and mess-change tables and removes caterer capacity. This is the fresh-rebuild schema transition; back up any earlier test database before applying it. It does not import Django or SQLite data.

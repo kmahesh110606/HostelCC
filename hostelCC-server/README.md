@@ -15,3 +15,5 @@ Student CSV imports are administrator-only, transactional and validated again on
 Tests default to isolated H2. To run the same suite on an empty disposable PostgreSQL database, set TEST_DB_URL, TEST_DB_USER and TEST_DB_PASSWORD, then run Maven verify. Never point these variables at a database containing live records.
 
 No Python runtime or legacy migration tooling is required.
+
+DiningController exposes menu upload, session controls, anonymous ratings and performance under `/api/dining`. CampusController exposes floors, room occupants, student histories, gate records and custom book definitions under `/api/campus`. Dining responses are separated from the unique session/student participation ledger. Domain exports omit that ledger. V4 removes the obsolete identified-feedback and mess-change schema; there is no caterer-capacity limit.

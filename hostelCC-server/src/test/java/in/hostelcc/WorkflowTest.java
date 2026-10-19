@@ -44,10 +44,10 @@ class WorkflowTest {
         }
     }
     @BeforeEach void setup() {
-        for(String table:List.of("cloakroom_requests","audit","votes","poll_options","polls","feedback","menus","mess_changes","maintenance","cloakroom","discipline","outings","announcements","sessions","otp_challenges","otp_requests","duty_scopes","users","storage_rooms","rooms","mess_blocks","messes","blocks")) db.exec("DELETE FROM "+table);
+        for(String table:List.of("item_ratings","food_feedback","feedback_participation","session_items","feedback_sessions","food_items","floor_elements","floors","gate_events","cloakroom_requests","audit","votes","poll_options","polls","menus","maintenance","cloakroom","discipline","outings","announcements","sessions","otp_challenges","otp_requests","duty_scopes","duty_books","users","storage_rooms","rooms","mess_blocks","messes","blocks")) db.exec("DELETE FROM "+table);
         codes.clear(); doAnswer(inv->{ codes.put(inv.getArgument(0),inv.getArgument(1)); return null; }).when(mail).send(anyString(),anyString());
         for(String b:List.of("A","B")) db.exec("INSERT INTO blocks(id,name) VALUES(?,?)",b,"Block "+b);
-        db.exec("INSERT INTO messes(id,name,capacity) VALUES('M','Main Mess',100)"); db.exec("INSERT INTO mess_blocks VALUES('M','A')"); db.exec("INSERT INTO mess_blocks VALUES('M','B')");
+        db.exec("INSERT INTO messes(id,name) VALUES('M','Main Mess')"); db.exec("INSERT INTO mess_blocks VALUES('M','A')"); db.exec("INSERT INTO mess_blocks VALUES('M','B')");
         user("admin","ADMIN",null); user("director","DIRECTOR",null); user("warden","WARDEN",null); user("supervisor","SUPERVISOR",null); user("messwarden","WARDEN",null); user("house","HOUSEKEEPING",null); user("student","STUDENT","A"); user("other","STUDENT","B"); user("second","STUDENT","A");
         scope("warden","HOSTEL","A");scope("warden","DISCIPLINE","A");scope("supervisor","OUTINGS","A");scope("messwarden","MESS","M");
         storage("CHAIR_A","A","CHAIR",100,101); storage("BUCKET_A","A","BUCKET",200,201); storage("CHAIR_B","B","CHAIR",100,101);
@@ -95,7 +95,7 @@ class WorkflowTest {
     }
     @Test void csvPreviewIsNonMutatingAndImportIsAtomic() throws Exception {
         var admin=signed("admin");var student=signed("student");
-        String csv="name,email,rollNo,block,room,mess,phone,cloakroomAccess,messChangeAccess\r\n\"Rao, Ananya\",csv@example.test,CSV001,Block A,,Main Mess,,true,false\r\n";
+        String csv="name,email,rollNo,block,room,mess,phone,cloakroomAccess\r\n\"Rao, Ananya\",csv@example.test,CSV001,Block A,,Main Mess,,true\r\n";
         long before=db.count("SELECT count(*) FROM users");
         assertEquals(403,student.call("POST","/admin/students/import/validate",Map.of("csv",csv)).status());
         var preview=admin.call("POST","/admin/students/import/validate",Map.of("csv",csv));
@@ -227,6 +227,80 @@ class WorkflowTest {
         assertEquals(403,student.call("POST","/discipline/"+record+"/action",Map.of("note","Return")).status());
         assertEquals(200,warden.call("POST","/discipline/"+record+"/action",Map.of("note","Collected")).status());
         assertEquals(409,warden.call("POST","/discipline/"+record+"/action",Map.of("note","Again")).status());
+    }
+    @Test void anonymousFeedbackHasOneParticipationAndNoIdentityInResponseOrExport() throws Exception {
+        var admin=signed("admin");var director=signed("director");var w=signed("messwarden");var student=signed("student");
+        user("caterer","MESS_MANAGER",null);var caterer=signed("caterer");
+        var body=Map.<String,Object>of("messId","M","title","Lunch review","opensAt",Instant.now().minusSeconds(60).toString(),"closesAt",Instant.now().plusSeconds(3600).toString(),"enabled",true,"items",List.of("Rice","Dal"));
+        assertEquals(403,caterer.call("POST","/dining/sessions",body).status());
+        String session=str(director.call("POST","/dining/sessions",body).body(),"id");assertFalse(session.isBlank());
+        var items=db.list("SELECT item_id FROM session_items WHERE session_id=?",session);var ratings=new HashMap<String,Object>();items.forEach(i->ratings.put(str(i,"itemId"),4));
+        var response=Map.<String,Object>of("rating",3,"kind","COMPLAINT","comment","Food was cold","ratings",ratings);
+        assertEquals(409,student.call("POST","/dining/sessions/"+session+"/submit",response).status());
+        assertEquals(200,w.call("POST","/dining/enabled",Map.of("messId","M","enabled",true)).status());
+        assertEquals(200,student.call("POST","/dining/sessions/"+session+"/submit",response).status());
+        assertEquals(409,student.call("POST","/dining/sessions/"+session+"/submit",response).status());
+        assertEquals(1,db.count("SELECT count(*) FROM feedback_participation"));assertEquals(1,db.count("SELECT count(*) FROM food_feedback"));
+        var feedback=rows(caterer.call("GET","/dining/feedback?mess=M",null),"items");assertEquals(1,feedback.size());
+        assertFalse(feedback.getFirst().containsKey("studentId"));assertFalse(feedback.getFirst().containsKey("createdAt"));assertFalse(feedback.getFirst().containsKey("blockId"));
+        assertFalse(db.one("SELECT * FROM food_feedback").containsKey("studentId"));assertFalse(db.one("SELECT * FROM feedback_participation").containsKey("feedbackId"));
+        assertFalse(admin.call("GET","/admin/export",null).body().containsKey("feedback_participation"));
+        assertEquals(403,caterer.call("GET","/dining/performance?mess=M",null).status());assertEquals(403,caterer.call("POST","/dining/enabled",Map.of("messId","M","enabled",false)).status());
+        assertEquals(200,director.call("GET","/dining/performance?mess=M",null).status());
+        assertEquals(200,director.call("POST","/dining/enabled",Map.of("messId","M","enabled",false)).status());
+        assertEquals(409,signed("second").call("POST","/dining/sessions/"+session+"/submit",response).status());
+        assertEquals(403,student.call("GET","/dining/feedback?mess=M",null).status());
+    }
+    @Test void feedbackRacesAndInvalidItemRatingsCannotCreatePartialResponses() throws Exception {
+        var w=signed("messwarden");w.call("POST","/dining/enabled",Map.of("messId","M","enabled",true));
+        String session=str(w.call("POST","/dining/sessions",Map.of("messId","M","title","Breakfast","opensAt",Instant.now().minusSeconds(60).toString(),"closesAt",Instant.now().plusSeconds(600).toString(),"enabled",true,"items",List.of("Idli"))).body(),"id");
+        var first=signed("student");var second=new Client(); for(var cookie:first.jar.getCookieStore().getCookies())second.jar.getCookieStore().add(URI.create("http://localhost:"+port),(HttpCookie)cookie.clone());
+        assertEquals(400,first.call("POST","/dining/sessions/"+session+"/submit",Map.of("rating",4,"kind","COMMENT","ratings",Map.of("wrong",4))).status());
+        assertEquals(0,db.count("SELECT count(*) FROM feedback_participation"));
+        String item=str(db.one("SELECT item_id FROM session_items WHERE session_id=?",session),"itemId");
+        var b=Map.<String,Object>of("rating",5,"kind","COMMENT","ratings",Map.of(item,4));
+        try(var pool=Executors.newFixedThreadPool(2)){var f1=pool.submit(()->first.call("POST","/dining/sessions/"+session+"/submit",b).status());var f2=pool.submit(()->second.call("POST","/dining/sessions/"+session+"/submit",b).status());var statuses=new ArrayList<>(List.of(f1.get(),f2.get()));Collections.sort(statuses);assertEquals(List.of(200,409),statuses);}
+        assertEquals(1,db.count("SELECT count(*) FROM item_ratings"));
+    }
+    @Test void floorsAreEditableOnlyByAdminAndResidentHistoriesStayInScope() throws Exception {
+        var admin=signed("admin");var supervisor=signed("supervisor");
+        String room=str(admin.call("POST","/rooms",Map.of("blockId","A","number","301","capacity",2,"roomType","NON_AC")).body(),"id");db.exec("UPDATE users SET room_id=? WHERE id='student'",room);
+        var element=Map.<String,Object>of("kind","ROOM","roomId",room,"label","301","x",20,"y",20,"width",100,"height",80);
+        var body=new HashMap<String,Object>(Map.of("blockId","A","name","Third floor","width",800,"height",600,"sortOrder",3,"elements",List.of(element)));
+        assertEquals(403,supervisor.call("POST","/campus/floors",body).status());
+        String floor=str(admin.call("POST","/campus/floors",body).body(),"id");assertFalse(floor.isBlank());
+        assertEquals(200,supervisor.call("GET","/campus/floors/"+floor,null).status());
+        assertEquals(403,signed("student").call("GET","/campus/floors/"+floor,null).status());
+        assertEquals(200,supervisor.call("GET","/campus/students/student",null).status());assertEquals(403,supervisor.call("GET","/campus/students/other",null).status());
+        assertEquals(403,signed("other").call("GET","/campus/students/student/discipline",null).status());
+        body.put("version",0);assertEquals(200,admin.call("PUT","/campus/floors/"+floor,body).status());assertEquals(409,admin.call("PUT","/campus/floors/"+floor,body).status());
+        body.put("version",1);body.put("elements",List.of(element,element));assertEquals(400,admin.call("PUT","/campus/floors/"+floor,body).status());assertEquals(1,db.count("SELECT count(*) FROM floor_elements WHERE floor_id=?",floor));
+    }
+    @Test void gateRegisterAndCustomBookRevocationEnforceScope() throws Exception {
+        var admin=signed("admin");var supervisor=signed("supervisor");
+        String book=str(admin.call("POST","/campus/books",Map.of("name","Evening gate book","baseBook","OUTINGS")).body(),"id");
+        var grant=admin.call("POST","/scopes",Map.of("userId","supervisor","bookId",book,"book","HOSTEL","targetId","A","active",true));assertEquals(200,grant.status());
+        assertEquals(200,supervisor.call("POST","/campus/gate",Map.of("studentId","student","direction","EXIT","note","Library")).status());
+        assertEquals(409,supervisor.call("POST","/campus/gate",Map.of("studentId","student","direction","EXIT")).status());
+        assertEquals(403,supervisor.call("POST","/campus/gate",Map.of("studentId","other","direction","ENTRY")).status());
+        assertEquals(200,supervisor.call("POST","/campus/gate",Map.of("studentId","student","direction","ENTRY")).status());
+        assertEquals(2,rows(signed("student").call("GET","/campus/students/student/gate",null),"items").size());
+        assertEquals(200,admin.call("PUT","/campus/books/"+book,Map.of("name","Evening gate book","baseBook","OUTINGS","active",false)).status());
+        assertEquals(403,supervisor.call("POST","/campus/gate",Map.of("studentId","student","direction","EXIT")).status());
+    }
+    @Test void menusAllowDirectorsAndScopedFoodWardensButNotCaterersAndUploadsAreAtomic() throws Exception {
+        user("caterer","MESS_MANAGER",null);scope("caterer","MESS","M");var c=signed("caterer");var director=signed("director");
+        var monday=Map.of("day","MON","breakfast","Idli","lunch","Rice","snacks","Tea","dinner","Chapati");
+        assertEquals(403,c.call("POST","/dining/menus/upload",Map.of("messId","M","menus",List.of(monday))).status());
+        assertEquals(200,director.call("POST","/dining/menus/upload",Map.of("messId","M","menus",List.of(monday))).status());
+        var bad=new HashMap<>(monday);bad.put("day","TUE");bad.put("dinner","");
+        var changed=new HashMap<>(monday);changed.put("breakfast","Changed");
+        assertEquals(400,director.call("POST","/dining/menus/upload",Map.of("messId","M","menus",List.of(changed,bad))).status());
+        assertEquals("Idli",str(db.one("SELECT * FROM menus WHERE weekday='MON'"),"breakfast"));
+        assertEquals(200,director.call("POST","/dining/menus/upload",Map.of("messId","M","csv","day,breakfast,lunch,snacks,dinner\nTUE,\"Dosa, chutney\",Rice,Tea,Chapati\n")).status());
+        assertEquals("Dosa, chutney",str(db.one("SELECT * FROM menus WHERE weekday='TUE'"),"breakfast"));
+        assertTrue(rows(c.call("GET","/workspace",null),"menus").isEmpty());
+        assertEquals(404,signed("student").call("POST","/mess-changes",Map.of("messId","M")).status());
     }
     @Test void simultaneousOtpVerificationSucceedsOnlyOnce() throws Exception {
         var c=new Client(); c.call("POST","/auth/request-code",Map.of("email","student@example.test"));

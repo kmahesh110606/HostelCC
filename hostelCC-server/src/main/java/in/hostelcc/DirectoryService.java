@@ -19,13 +19,13 @@ public class DirectoryService {
     }
     public void mess(Actor a,String id) {
         if(a.global()) return;
-        if(a.is("STUDENT") && id.equals(a.messId())) return;
+        if(a.is("STUDENT","MESS_MANAGER") && id.equals(a.messId())) return;
         if(a.has("MESS",id)) return;
         if(db.list("SELECT block_id FROM mess_blocks WHERE mess_id=?",id).stream().anyMatch(b->a.has("HOSTEL",str(b,"blockId")))) return;
         throw error(403,"This mess is outside your assignment");
     }
     public boolean seesMess(Actor a,String id) { try { mess(a,id); return true; } catch(org.springframework.web.server.ResponseStatusException e) { return false; } }
-    public void manageMess(Actor a,String id) { a.duty("MESS",id); }
+    public void manageMess(Actor a,String id) { if(a.is("ADMIN","DIRECTOR")) return; a.require("WARDEN"); a.duty("MESS",id); }
     @Transactional
     public String block(Actor a,String id,Map<String,Object> body) {
         a.require("ADMIN"); String name=required(body,"name",100), email=optional(body,"contactEmail",254),phone=optional(body,"contactPhone",30);
@@ -53,16 +53,16 @@ public class DirectoryService {
     }
     @Transactional
     public String messSave(Actor a,String id,Map<String,Object> b) {
-        a.require("ADMIN"); String name=required(b,"name",120); int capacity=integer(b,"capacity",1,100000); var blocks=ids(b,"blockIds");
+        a.require("ADMIN"); String name=required(b,"name",120); var blocks=ids(b,"blockIds");
         if(blocks.isEmpty()) throw error(400,"Assign at least one block");
         for(String bid:blocks) db.one("SELECT id FROM blocks WHERE id=? AND active=true",bid);
-        if(id==null) { id=id(); db.exec("INSERT INTO messes(id,name,capacity) VALUES(?,?,?)",id,name,capacity); }
+        if(id==null) { id=id(); db.exec("INSERT INTO messes(id,name) VALUES(?,?)",id,name); }
         else {
             db.one("SELECT id FROM messes WHERE id=? FOR UPDATE",id);
             long occupied=db.count("SELECT count(*) FROM users WHERE mess_id=? AND role='STUDENT' AND active=true",id);
-            if(occupied>capacity || occupied>0 && Boolean.FALSE.equals(b.get("active"))) throw error(409,"Reassign students before reducing capacity or deactivating this mess");
+            if(occupied>0 && Boolean.FALSE.equals(b.get("active"))) throw error(409,"Reassign students before reducing capacity or deactivating this mess");
             for(var u:db.list("SELECT DISTINCT block_id FROM users WHERE mess_id=? AND role='STUDENT' AND active=true",id)) if(!blocks.contains(str(u,"blockId"))) throw error(409,"This mess still serves students in a removed block");
-            db.exec("UPDATE messes SET name=?,capacity=?,active=? WHERE id=?",name,capacity,b.getOrDefault("active",true),id);
+            db.exec("UPDATE messes SET name=?,active=? WHERE id=?",name,b.getOrDefault("active",true),id);
         }
         db.exec("DELETE FROM mess_blocks WHERE mess_id=?",id);
         for(String bid:blocks) db.exec("INSERT INTO mess_blocks VALUES(?,?)",id,bid);
@@ -75,7 +75,6 @@ public class DirectoryService {
     public void assignMess(String uid,String mess,String block) {
         var m=db.one("SELECT * FROM messes WHERE id=? AND active=true FOR UPDATE",mess);
         if(db.count("SELECT count(*) FROM mess_blocks WHERE mess_id=? AND block_id=?",mess,block)==0) throw error(400,"Mess does not serve this block");
-        if(db.count("SELECT count(*) FROM users WHERE mess_id=? AND role='STUDENT' AND active=true AND id<>?",mess,uid)>=((Number)m.get("capacity")).intValue()) throw error(409,"Selected mess is full");
     }
     @Transactional
     public String user(Actor a,String id,Map<String,Object> b) {
@@ -101,9 +100,9 @@ public class DirectoryService {
         if(role.equals("MESS_MANAGER") && mess.isEmpty()) throw error(400,"Assign a mess to the manager");
         if(!role.equals("STUDENT") && !role.equals("MESS_MANAGER")) mess="";
         if(!mess.isEmpty()) db.one("SELECT id FROM messes WHERE id=?",mess);
-        if(old==null) db.exec("INSERT INTO users(id,email,name,role,phone,roll_no,block_id,room_id,mess_id,cloakroom_access,mess_change_access,active,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",id,email,name,role,phone,nullable(roll),nullable(block),nullable(room),nullable(mess),bool(b,"cloakroomAccess"),bool(b,"messChangeAccess"),active,now());
+        if(old==null) db.exec("INSERT INTO users(id,email,name,role,phone,roll_no,block_id,room_id,mess_id,cloakroom_access,active,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",id,email,name,role,phone,nullable(roll),nullable(block),nullable(room),nullable(mess),bool(b,"cloakroomAccess"),active,now());
         else {
-            db.exec("UPDATE users SET email=?,name=?,role=?,phone=?,roll_no=?,block_id=?,room_id=?,mess_id=?,cloakroom_access=?,mess_change_access=?,active=? WHERE id=?",email,name,role,phone,nullable(roll),nullable(block),nullable(room),nullable(mess),bool(b,"cloakroomAccess"),bool(b,"messChangeAccess"),active,id);
+            db.exec("UPDATE users SET email=?,name=?,role=?,phone=?,roll_no=?,block_id=?,room_id=?,mess_id=?,cloakroom_access=?,active=? WHERE id=?",email,name,role,phone,nullable(roll),nullable(block),nullable(room),nullable(mess),bool(b,"cloakroomAccess"),active,id);
             db.exec("UPDATE sessions SET revoked=true WHERE user_id=?",id);
             db.exec("DELETE FROM otp_challenges WHERE user_id=?",id);
             if(!role.equals(str(old,"role"))) db.exec("UPDATE duty_scopes SET active=false WHERE user_id=?",id);
@@ -131,7 +130,7 @@ public class DirectoryService {
     }
     @Transactional
     public String scope(Actor a,String assignmentId,Map<String,Object> b) {
-        a.require("ADMIN"); String uid=required(b,"userId",64),book=choice(b,"book","HOSTEL","MESS","OUTINGS","DISCIPLINE","MAINTENANCE","CLOAKROOM"),target=required(b,"targetId",64);
+        a.require("ADMIN"); b=new HashMap<>(b); if(!optional(b,"bookId",64).isBlank())b.put("book",str(db.one("SELECT * FROM duty_books WHERE id=? AND active=true",str(b,"bookId")),"baseBook")); String uid=required(b,"userId",64),book=choice(b,"book","HOSTEL","MESS","OUTINGS","DISCIPLINE","MAINTENANCE","CLOAKROOM"),target=required(b,"targetId",64);
         db.one("SELECT id FROM otp_guard WHERE id=1 FOR UPDATE");
         if(assignmentId!=null) db.one("SELECT id FROM duty_scopes WHERE id=? FOR UPDATE",assignmentId);
         boolean enabled=!Boolean.FALSE.equals(b.get("active"));
@@ -140,6 +139,7 @@ public class DirectoryService {
         if(List.of("ADMIN","DIRECTOR","STUDENT").contains(role)) throw error(400,"Duty assignments are for operational staff");
         if(role.equals("HOUSEKEEPING") && !List.of("CLOAKROOM","MAINTENANCE").contains(book)) throw error(400,"Housekeeping scopes are cloakroom and maintenance");
         if(role.equals("MESS_MANAGER") && !book.equals("MESS")) throw error(400,"Mess managers can be assigned mess books");
+        String template=optional(b,"bookId",64); if(!template.isBlank()) { var custom=db.one("SELECT * FROM duty_books WHERE id=? AND active=true",template); if(!book.equals(str(custom,"baseBook"))) throw error(400,"Book permissions do not match"); }
         String table=book.equals("MESS")?"messes":book.equals("CLOAKROOM")?"storage_rooms":"blocks";
         db.one("SELECT id FROM "+table+" WHERE id=?"+(enabled?" AND active=true":""),target);
         var old=db.list("SELECT id FROM duty_scopes WHERE user_id=? AND book=? AND target_id=?",uid,book,target);
@@ -148,6 +148,7 @@ public class DirectoryService {
         if(assignmentId!=null) db.exec("UPDATE duty_scopes SET user_id=?,book=?,target_id=?,active=? WHERE id=?",uid,book,target,b.getOrDefault("active",true),id);
         else if(old.isEmpty()) db.exec("INSERT INTO duty_scopes(id,user_id,book,target_id,active) VALUES(?,?,?,?,?)",id,uid,book,target,b.getOrDefault("active",true));
         else db.exec("UPDATE duty_scopes SET active=? WHERE id=?",b.getOrDefault("active",true),id);
+        db.exec("UPDATE duty_scopes SET book_id=? WHERE id=?",nullable(template),id);
         db.audit(a,"ASSIGN_DUTY","scopes",id,table.equals("blocks")?target:null,book+"; staff "+uid+"; target "+target+"; active "+b.getOrDefault("active",true)); return id;
     }
 }

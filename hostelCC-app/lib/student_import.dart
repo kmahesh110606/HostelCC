@@ -79,7 +79,7 @@ class _StudentImportScreenState extends State<StudentImportScreen> {
                 await Share.shareXFiles([
                   XFile.fromData(
                       utf8.encode(
-                          'name,email,rollNo,block,room,mess,phone,cloakroomAccess,messChangeAccess\nExample Student,student@example.edu,STUDENT001,North House,101,Main Mess,,false,false\n'),
+                          'name,email,rollNo,block,room,mess,phone,cloakroomAccess\nExample Student,student@example.edu,STUDENT001,North House,101,Main Mess,,false,false\n'),
                       mimeType: 'text/csv',
                       name: 'students-template.csv')
                 ]);

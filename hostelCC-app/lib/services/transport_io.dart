@@ -7,6 +7,11 @@ class Transport {
   final _storage = const FlutterSecureStorage();
   final Map<String, Cookie> _cookies = {};
   String? _origin;
+  Future<void> clear() async {
+    _cookies.clear();
+    if (_origin != null) await _storage.delete(key: 'hostelcc_cookie_$_origin');
+  }
+
   Future<(int, String)> send(
       Uri uri, String method, Map<String, String> headers, String? body) async {
     final origin = '${uri.scheme}://${uri.authority}';

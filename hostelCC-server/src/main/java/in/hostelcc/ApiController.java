@@ -16,7 +16,7 @@ public class ApiController {
     @PostMapping("/polls/{id}/state") Object pollState(@AuthenticationPrincipal Actor a,@PathVariable String id,@RequestBody Map<String,Object> b) { mess.pollState(a,id,b); return Map.of("message","Poll updated"); }
     @GetMapping("/workspace") Object workspace(@AuthenticationPrincipal Actor a) { return workspace.load(a); }
     @GetMapping(value="/admin/export",produces="application/json") org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody export(@AuthenticationPrincipal Actor a) { a.require("ADMIN");return output->workspace.export(a,output); }
-    @GetMapping("/records/{resource}") Object page(@AuthenticationPrincipal Actor a,@PathVariable String resource,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="25") int size,@RequestParam(defaultValue="") String q) { return records.page(a,resource,page,size,q); }
+    @GetMapping("/records/{resource}") Object page(@AuthenticationPrincipal Actor a,@PathVariable String resource,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="25") int size,@RequestParam(defaultValue="") String q,@RequestParam(defaultValue="") String mess) { return records.page(a,resource,page,size,q,mess); }
     @GetMapping("/options/{resource}") Object options(@AuthenticationPrincipal Actor a,@PathVariable String resource,@RequestParam(defaultValue="") String q,@RequestParam(defaultValue="") String block,@RequestParam(defaultValue="") String book,@RequestParam(defaultValue="") String selected) { return records.options(a,resource,q,block,book,selected); }
     @PostMapping("/{resource}") Object create(@AuthenticationPrincipal Actor a,@PathVariable String resource,@RequestBody Map<String,Object> b) {
         String id=switch(resource) {
@@ -28,9 +28,7 @@ public class ApiController {
             case "storage-rooms" -> directory.storage(a,null,b);
             case "announcements" -> mess.announcement(a,null,b);
             case "menus" -> mess.menu(a,b);
-            case "feedback" -> mess.feedback(a,b);
             case "polls" -> mess.poll(a,b);
-            case "mess-changes" -> mess.change(a,b);
             case "outings" -> residence.outing(a,b);
             case "discipline" -> residence.discipline(a,b);
             case "maintenance" -> residence.maintenance(a,b);
@@ -55,9 +53,7 @@ public class ApiController {
             case "discipline" -> residence.returnCard(a,id,b);
             case "cloakroom" -> residence.cloakroomAction(a,id,b);
             case "maintenance" -> residence.maintenanceAction(a,id,b);
-            case "feedback" -> mess.reply(a,id,b);
             case "polls" -> mess.vote(a,id,b);
-            case "mess-changes" -> mess.decideChange(a,id,b);
             default -> throw error(404,"Unknown resource");
         } return Map.of("message","Updated successfully");
     }

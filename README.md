@@ -1,4 +1,4 @@
-﻿# HostelCC
+# HostelCC
 
 Hostel management rebuilt with React and Tailwind, Flutter, and Java 21 / Spring Boot 4.1.1 with Maven. PostgreSQL stores application data. There is no Django runtime, SQLite database, password login, laundry module or community module in this repository.
 
@@ -32,18 +32,19 @@ The default server Dockerfile can also build the JAR itself: omit `docker-compos
 2. Create staff and assign duty books to blocks, messes or specific cloakrooms.
 3. Create students individually or use **People > Import CSV**. Download the template, validate the file, then import. Each file supports 1,000 students and 500 KB; use multiple files for larger intakes. Invalid imports create no accounts. Existing accounts are not overwritten.
 4. Create cloakrooms with an item type, capacity and token range. Enable student cloakroom access and assign housekeeping staff to the rooms.
-5. Publish announcements, weekly menus and polls.
+5. In Floor plans, create each block's floors and place numbered rooms, corridors, stairs, lifts and walls. Create rooms first; each room can appear on only one floor.
+6. Publish announcements and menus. Create feedback sessions with food items and opening/closing times; enable collection for the mess.
 
 Records use server-side search and pagination. Student, room, location and staff selectors support searching beyond the first page.
 
 ## Permissions and workflows
 
-Administrators manage all records, accounts, scopes and settings, and export records. Directors have campus-wide read access. Staff access comes from active duty assignments, rather than a blanket role permission:
+Administrators manage all records, accounts, scopes and settings, and export records. Directors have campus-wide record access and can manage menus, feedback collection and polls. Staff access comes from active duty assignments, rather than a blanket role permission:
 
 | Duty book | Scope and work |
 | --- | --- |
 | HOSTEL | Assigned block students, announcements and hostel records |
-| MESS | Assigned mess menus, feedback replies and poll controls |
+| MESS | Assigned mess menus, anonymous feedback, performance and poll controls |
 | OUTINGS | Assigned block outing/leave approval, departure and return |
 | DISCIPLINE | Assigned block incidents and ID-card history |
 | MAINTENANCE | Assigned block requests and housekeeping assignments |
@@ -56,3 +57,15 @@ Cloakroom passes are separate for each student and item type. A chair must be su
 Browser JWTs are stored in HttpOnly cookies; remember-me lasts up to 30 days. Production cookies require HTTPS. CSRF protection applies to cookie-authenticated mutations. Native mobile sessions use a private cookie jar. Deactivated users and revoked duty assignments lose access on subsequent requests.
 
 See [deployment instructions](DEPLOYMENT.md), [verification evidence](VALIDATION.md), and the README in each application.
+
+## Dining and campus records
+
+Admins, directors and assigned food wardens control the feedback switch, sessions, menus and polls. Students see their assigned mess menu and may submit one anonymous response per open session, rating the caterer and every listed food item, with an optional comment or complaint. Participation is stored separately from responses; responses contain no student ID or timestamp. Avoid identifying yourself in free-text comments. Caterer accounts see only their assigned mess feedback. Management sees caterer averages and individual food-item performance.
+
+Menus can be edited by day or uploaded as CSV or JSON. Templates are available in the web menu screen. Students are assigned to messes manually or through student CSV import; there is no VTOP integration, mess-change workflow or caterer capacity.
+
+Scoped wardens and supervisors can open a floor, select a room and view occupants, then a student's profile, mess, outing/leave, discipline, cloakroom and entry/exit records. The separate entry/exit register records alternating movements. Administrators can define named duty books using the existing permission families and revoke a book and its assignments.
+
+Reports support record selection, search, columns, CSV exports for Excel and PDF output (browser print or native PDF sharing). Optional Compose services provide scheduled database backups and CSV reports, plus a local database administration console; see DEPLOYMENT.md.
+
+The native Flutter app caches authorized reads in encrypted device storage for up to 15 minutes, limited to 60 entries and 1 MB. Cached data is isolated by server, user and scope; logout, denied access and permission changes clear it. Offline views show when the data was saved and require a connection for changes. There are no push notifications.

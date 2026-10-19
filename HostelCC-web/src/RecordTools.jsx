@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 
-export function CollectionControls({ meta = {}, onLoad }) {
+export function CollectionControls({ meta = {}, onLoad, searchable = true }) {
   const [query, setQuery] = useState('');
   const timer = useRef();
   useEffect(() => () => clearTimeout(timer.current), []);
   const page = meta.page || 0, size = meta.size || 25, total = meta.total || 0;
-  return <div className="panel table-tools mb-4"><label className="search"><input aria-label="Search records" placeholder="Search all records…" value={query} maxLength={100} onChange={e => { const q = e.target.value; setQuery(q); clearTimeout(timer.current); timer.current = setTimeout(() => onLoad(0, q), 300) }} /></label><span>{total} records · Page {page + 1} of {Math.max(1, Math.ceil(total / size))}</span><div className="flex gap-3"><button className="button secondary" aria-label="Previous page" disabled={page === 0} onClick={() => onLoad(page - 1, query)}>Previous</button><button className="button secondary" aria-label="Next page" disabled={(page + 1) * size >= total} onClick={() => onLoad(page + 1, query)}>Next</button></div></div>;
+  return <div className="panel table-tools mb-4">{searchable && <label className="search"><input aria-label="Search records" placeholder="Search all records…" value={query} maxLength={100} onChange={e => { const q = e.target.value; setQuery(q); clearTimeout(timer.current); timer.current = setTimeout(() => onLoad(0, q), 300) }} /></label>}<span>{total} records · Page {page + 1} of {Math.max(1, Math.ceil(total / size))}</span><div className="flex gap-3"><button className="button secondary" aria-label="Previous page" disabled={page === 0} onClick={() => onLoad(page - 1, query)}>Previous</button><button className="button secondary" aria-label="Next page" disabled={(page + 1) * size >= total} onClick={() => onLoad(page + 1, query)}>Next</button></div></div>;
 }
 
 export function RemoteSelect({ field, value, onChange }) {
@@ -28,6 +28,12 @@ export function RemoteSelect({ field, value, onChange }) {
     return () => { live = false; clearTimeout(timer) };
   }, [field.remote, query, value]);
   return <span className="block"><input aria-label={`Search ${field.title.toLowerCase()}`} placeholder="Type to search…" value={query} onChange={e => setQuery(e.target.value)} maxLength={100} /><select aria-label={field.title} required={!field.optional} value={value || ''} onChange={e => { const option = options.find(o => o.value === e.target.value); selected.current = option; onChange(e.target.value, option) }}><option value="">{field.placeholder || 'Select an option'}</option>{options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>{error && <small role="alert" className="error">{error}</small>}</span>;
+}
+
+export function RemoteMulti({ field, values = [], onChange }) {
+  const [names, setNames] = useState({});
+  useEffect(() => { let live = true; Promise.all(values.map(async id => { const found = await api(`${field.remote}?selected=${encodeURIComponent(id)}`); return [id, found[0]?.label || 'Unavailable'] })).then(result => { if (live) setNames(Object.fromEntries(result)) }).catch(() => {}); return () => { live = false } }, [field.remote, values]);
+  return <div><RemoteSelect field={{ ...field, title: `Add ${field.title.toLowerCase()}`, optional: true }} value="" onChange={id => id && !values.includes(id) && onChange([...values, id])} />{values.map(id => <div className="flex justify-between py-2" key={id}><span>{names[id] || 'Loading…'}</span><button type="button" onClick={() => onChange(values.filter(v => v !== id))}>Remove</button></div>)}</div>;
 }
 
 export function StudentCsvImport({ onDone }) {

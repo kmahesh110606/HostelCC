@@ -11,7 +11,7 @@ import static in.hostelcc.Store.*;
 @Service
 public class WorkspaceService {
     final Store db; final RecordService records; final ObjectMapper json;
-    static final List<String> COLLECTIONS=List.of("blocks","rooms","users","announcements","messes","menus","feedback","polls","outings","discipline","cloakroom","storageRooms","cloakroomRequests","maintenance","messChanges","audit","scopes");
+    static final List<String> COLLECTIONS=List.of("blocks","rooms","users","announcements","messes","menus","feedback","polls","outings","discipline","cloakroom","storageRooms","cloakroomRequests","maintenance","audit","scopes");
     public WorkspaceService(Store db,RecordService records,ObjectMapper json) { this.db=db;this.records=records;this.json=json; }
     @Transactional(readOnly=true)
     public Map<String,Object> load(Actor a) {
@@ -34,7 +34,7 @@ public class WorkspaceService {
     @Transactional(readOnly=true)
     public void export(Actor a,OutputStream output) throws IOException {
         a.require("ADMIN");output.write('{');boolean firstTable=true;
-        for(String table:List.of("blocks","rooms","messes","mess_blocks","users","duty_scopes","announcements","menus","feedback","polls","poll_options","votes","outings","discipline","storage_rooms","cloakroom","maintenance","mess_changes","audit")) {
+        for(String table:List.of("blocks","rooms","messes","mess_blocks","users","duty_scopes","announcements","menus","food_feedback","item_ratings","feedback_sessions","food_items","session_items","floors","floor_elements","gate_events","duty_books","polls","poll_options","votes","outings","discipline","storage_rooms","cloakroom","maintenance","audit")) {
             if(!firstTable) output.write(',');firstTable=false;
             output.write(("\""+table+"\":[").getBytes(StandardCharsets.UTF_8));
             final boolean[] first={true};

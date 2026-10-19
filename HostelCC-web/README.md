@@ -1,4 +1,4 @@
-﻿# React web application
+# React web application
 
 React 19, Vite, Tailwind CSS and the Spring Boot API. Node 22.12+ is required.
 
@@ -22,3 +22,5 @@ npx playwright test
 ```
 
 Use an isolated Compose project and empty volume for each run. See VALIDATION.md at the repository root.
+
+Floor plans support custom room placement and room/student history navigation. Dining supports CSV/JSON menu uploads, anonymous session feedback and food/caterer performance. Reports provide selectable columns, CSV downloads and print/PDF output. Menu templates are in public/.

@@ -12,6 +12,11 @@ class FakeApi extends Api {
       Map<String, dynamic>? body,
       bool retry = true}) async {
     calls.add((path, method, body));
+    if (path.startsWith('/options/storageRooms')) {
+      return [
+        {'value': 'room', 'label': 'Chair room · Chair', 'blockId': 'A'}
+      ];
+    }
     if (path == '/auth/request-code') {
       return {'message': 'Code sent'};
     }
@@ -104,7 +109,7 @@ void main() {
                   ]
                 },
                 onProcessed: () async {}))));
-    await tester.tap(find.text('Cloakroom'));
+    await tester.tap(find.text('Search and select'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Chair room · Chair').last);
     await tester.pumpAndSettle();

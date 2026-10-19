@@ -14,6 +14,5 @@ ADMIN_EMAIL=$AdminEmail
 HOSTELCC_DB_PASSWORD=$(New-Secret)
 JWT_SECRET=$(New-Secret)
 SITE_PORT=8080
-MAILBOX_PORT=8025
 "@ | Set-Content -LiteralPath $destination -Encoding ascii
 Write-Output 'Created .env.local with fresh local-only secrets. No credentials were printed.'

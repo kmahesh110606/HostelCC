@@ -79,7 +79,8 @@ List<Field> resourceFields(String resource, Map<String, dynamic> data,
       return [
         const Field('name', 'Mess name'),
         const Field('capacity', 'Capacity', type: 'number'),
-        Field('blockIds', 'Blocks served', type: 'multi', options: blocks),
+        Field('blockIds', 'Blocks served',
+            type: 'multi', options: blocks, remote: '/options/blocks'),
         ...active
       ];
     case 'users':
@@ -110,7 +111,6 @@ List<Field> resourceFields(String resource, Map<String, dynamic> data,
               optional: true),
           const Field('cloakroomAccess', 'Enable cloakroom passes',
               type: 'bool'),
-          const Field('messChangeAccess', 'Allow mess change', type: 'bool')
         ] else if (values['role'] == 'MESS_MANAGER')
           select('messId', 'Primary mess',
               options('messes', (m) => m['active'] == true)),
@@ -168,28 +168,12 @@ List<Field> resourceFields(String resource, Map<String, dynamic> data,
         for (final meal in ['breakfast', 'lunch', 'snacks', 'dinner'])
           Field(meal, label(meal), type: 'long')
       ];
-    case 'feedback':
-      return [
-        select('meal', 'Meal',
-            choices(['BREAKFAST', 'LUNCH', 'SNACKS', 'DINNER'])),
-        const Field('mealDate', 'Meal date', type: 'date'),
-        select('rating', 'Rating', choices(['5', '4', '3', '2', '1'])),
-        const Field('comment', 'Feedback', type: 'long', optional: true)
-      ];
     case 'polls':
       return [
         select('messId', 'Mess', messes),
         const Field('title', 'Question'),
         const Field('closesAt', 'Closes at', type: 'datetime'),
         const Field('options', 'Options (one per line)', type: 'lines')
-      ];
-    case 'mess-changes':
-      return [
-        select(
-            'messId',
-            'Requested mess',
-            options('messes',
-                (m) => m['active'] == true && m['id'] != user['messId']))
       ];
     case 'outings':
       return [
@@ -278,6 +262,7 @@ class RecordForm extends StatefulWidget {
   final String title, path, method;
   final Api api;
   final Map<String, dynamic> initial;
+  final Map<String, dynamic> Function(Map<String, dynamic>)? transform;
   final List<Field> Function(Map<String, dynamic>) fields;
   const RecordForm(
       {super.key,
@@ -286,6 +271,7 @@ class RecordForm extends StatefulWidget {
       required this.api,
       required this.fields,
       this.method = 'POST',
+      this.transform,
       this.initial = const {}});
   @override
   State<RecordForm> createState() => _RecordFormState();
@@ -324,7 +310,8 @@ class _RecordFormState extends State<RecordForm> {
               .toList();
         }
       }
-      await widget.api.call(widget.path, method: widget.method, body: body);
+      await widget.api.call(widget.path,
+          method: widget.method, body: widget.transform?.call(body) ?? body);
       if (mounted) {
         Navigator.pop(context, true);
       }
@@ -367,6 +354,44 @@ class _RecordFormState extends State<RecordForm> {
 
   Widget field(Field f) {
     final value = values[f.keyName];
+    if (f.remote != null && f.type == 'multi') {
+      final ids = List<String>.from(value ?? []);
+      return Column(children: [
+        RemoteOption(
+            api: widget.api,
+            path: f.remote!,
+            title: 'Add block',
+            optional: true,
+            onSelected: (o) {
+              final id = o?['value'];
+              if (id != null && !ids.contains(id)) {
+                setState(() => values[f.keyName] = [...ids, id]);
+              }
+            }),
+        for (final id in ids)
+          Row(children: [
+            Expanded(
+                child: RemoteOption(
+                    api: widget.api,
+                    path: f.remote!,
+                    title: 'Block',
+                    value: id,
+                    onSelected: (o) {
+                      if (o != null) {
+                        setState(() => values[f.keyName] = ids
+                            .map((v) => v == id ? o['value'] : v)
+                            .toSet()
+                            .toList());
+                      }
+                    })),
+            IconButton(
+                tooltip: 'Remove block',
+                icon: const Icon(Icons.close),
+                onPressed: () => setState(() =>
+                    values[f.keyName] = ids.where((v) => v != id).toList()))
+          ])
+      ]);
+    }
     if (f.remote != null) {
       return RemoteOption(
           api: widget.api,
@@ -379,6 +404,10 @@ class _RecordFormState extends State<RecordForm> {
                 if (f.keyName == 'blockId') {
                   values['roomId'] = '';
                   values['messId'] = '';
+                }
+                if (f.keyName == 'bookId') {
+                  values['book'] = option?['baseBook'] ?? values['book'];
+                  values['targetId'] = '';
                 }
                 if (f.keyName == 'studentId') {
                   values['studentBlockId'] = option?['blockId'];

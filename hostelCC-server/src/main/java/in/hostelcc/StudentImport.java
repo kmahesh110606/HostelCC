@@ -24,8 +24,8 @@ public class StudentImport {
     Checked check(String csv) {
         var table=parse(csv);if(table.size()<2) throw error(400,"CSV must contain a header and at least one student");
         var headers=table.getFirst().stream().map(String::strip).toList();
-        var allowed=Set.of("name","email","rollNo","block","room","mess","phone","cloakroomAccess","messChangeAccess");
-        if(new HashSet<>(headers).size()!=headers.size() || !headers.containsAll(List.of("name","email","rollNo","block")) || !allowed.containsAll(headers)) throw error(400,"Use the template headers: name,email,rollNo,block,room,mess,phone,cloakroomAccess,messChangeAccess");
+        var allowed=Set.of("name","email","rollNo","block","room","mess","phone","cloakroomAccess");
+        if(new HashSet<>(headers).size()!=headers.size() || !headers.containsAll(List.of("name","email","rollNo","block")) || !allowed.containsAll(headers)) throw error(400,"Use the template headers: name,email,rollNo,block,room,mess,phone,cloakroomAccess");
         var results=new ArrayList<Map<String,Object>>();var errors=new ArrayList<Map<String,Object>>();
         var emails=new HashSet<String>();var rolls=new HashSet<String>();var rooms=new HashMap<String,Integer>();var messes=new HashMap<String,Integer>();
         for(int i=1;i<table.size();i++) {
@@ -46,13 +46,10 @@ public class StudentImport {
                     if(db.count("SELECT count(*) FROM users WHERE room_id=? AND active=true",room)+reserved>((Number)r.get("capacity")).intValue()) throw error(400,"Room capacity would be exceeded");
                 }
                 if(!mess.isBlank()) {
-                    var m=db.one("SELECT capacity FROM messes WHERE id=? FOR UPDATE",mess);
-                    if(db.count("SELECT count(*) FROM mess_blocks WHERE mess_id=? AND block_id=?",mess,block)==0) throw error(400,"Mess does not serve the selected block");
-                    int reserved=messes.merge(mess,1,Integer::sum);
-                    if(db.count("SELECT count(*) FROM users WHERE mess_id=? AND active=true AND role='STUDENT'",mess)+reserved>((Number)m.get("capacity")).intValue()) throw error(400,"Mess capacity would be exceeded");
+                    directory.assignMess("",mess,block);
                 }
                 var student=new LinkedHashMap<String,Object>();student.put("name",name);student.put("email",email);student.put("rollNo",roll);student.put("role","STUDENT");student.put("blockId",block);student.put("roomId",room);student.put("messId",mess);student.put("phone",optional(row,"phone",30));student.put("active",true);
-                for(String flag:List.of("cloakroomAccess","messChangeAccess")) {
+                for(String flag:List.of("cloakroomAccess")) {
                     String value=str(row,flag).toLowerCase(Locale.ROOT);if(!List.of("","true","false").contains(value)) throw error(400,flag+" must be true or false");student.put(flag,value.equals("true"));
                 }
                 results.add(student);

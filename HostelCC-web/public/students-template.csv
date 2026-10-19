@@ -1,2 +1,2 @@
-name,email,rollNo,block,room,mess,phone,cloakroomAccess,messChangeAccess
+name,email,rollNo,block,room,mess,phone,cloakroomAccess
 Example Student,student@example.edu,STUDENT001,North House,101,Main Mess,,false,false

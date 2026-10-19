@@ -34,12 +34,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
       COOKIE_SECURE: 'true'
       ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL}
-      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_AUTH: 'true'
-      SMTP_STARTTLS: 'true'
+      SMTP_AUTH: ${SMTP_AUTH:-false}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
       SMTP_FROM: ${SMTP_FROM:-hostelcc@localhost}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://localhost}
       OTP_IP_LIMIT: ${OTP_IP_LIMIT:-300}

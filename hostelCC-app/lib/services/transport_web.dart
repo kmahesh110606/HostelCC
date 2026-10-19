@@ -2,6 +2,7 @@ import 'package:http/browser_client.dart';
 import 'package:http/http.dart';
 
 class Transport {
+  Future<void> clear() async {}
   final _client = BrowserClient()..withCredentials = true;
   Future<(int, String)> send(
       Uri uri, String method, Map<String, String> headers, String? body) async {

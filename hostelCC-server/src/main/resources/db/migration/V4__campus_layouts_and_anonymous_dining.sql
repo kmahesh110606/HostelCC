@@ -1,0 +1,18 @@
+DROP TABLE feedback;
+DROP TABLE mess_changes;
+ALTER TABLE messes DROP COLUMN capacity;
+ALTER TABLE users DROP COLUMN mess_change_access;
+ALTER TABLE messes ADD COLUMN feedback_enabled boolean NOT NULL DEFAULT false;
+CREATE TABLE food_items (id varchar(64) PRIMARY KEY, mess_id varchar(64) NOT NULL REFERENCES messes(id), name varchar(140) NOT NULL, active boolean NOT NULL DEFAULT true, UNIQUE(mess_id,name));
+CREATE TABLE feedback_sessions (id varchar(64) PRIMARY KEY, mess_id varchar(64) NOT NULL REFERENCES messes(id), title varchar(150) NOT NULL, opens_at varchar(40) NOT NULL, closes_at varchar(40) NOT NULL, enabled boolean NOT NULL DEFAULT false);
+CREATE TABLE session_items (session_id varchar(64) NOT NULL REFERENCES feedback_sessions(id), item_id varchar(64) NOT NULL REFERENCES food_items(id), PRIMARY KEY(session_id,item_id));
+CREATE TABLE feedback_participation (session_id varchar(64) NOT NULL REFERENCES feedback_sessions(id), student_id varchar(64) NOT NULL REFERENCES users(id), PRIMARY KEY(session_id,student_id));
+CREATE TABLE food_feedback (id varchar(64) PRIMARY KEY, session_id varchar(64) NOT NULL REFERENCES feedback_sessions(id), rating integer NOT NULL CHECK(rating BETWEEN 1 AND 5), comment text NOT NULL, kind varchar(20) NOT NULL);
+CREATE TABLE item_ratings (feedback_id varchar(64) NOT NULL REFERENCES food_feedback(id), item_id varchar(64) NOT NULL REFERENCES food_items(id), rating integer NOT NULL CHECK(rating BETWEEN 1 AND 5), PRIMARY KEY(feedback_id,item_id));
+CREATE INDEX food_feedback_session ON food_feedback(session_id);
+CREATE TABLE floors (id varchar(64) PRIMARY KEY, block_id varchar(64) NOT NULL REFERENCES blocks(id), name varchar(80) NOT NULL, sort_order integer NOT NULL DEFAULT 0, width integer NOT NULL, height integer NOT NULL, version integer NOT NULL DEFAULT 0, UNIQUE(block_id,name));
+CREATE TABLE floor_elements (id varchar(64) PRIMARY KEY, floor_id varchar(64) NOT NULL REFERENCES floors(id), room_id varchar(64) UNIQUE REFERENCES rooms(id), kind varchar(20) NOT NULL, label varchar(100) NOT NULL, x integer NOT NULL, y integer NOT NULL, width integer NOT NULL, height integer NOT NULL);
+CREATE TABLE gate_events (id varchar(64) PRIMARY KEY, student_id varchar(64) NOT NULL REFERENCES users(id), block_id varchar(64) NOT NULL REFERENCES blocks(id), direction varchar(10) NOT NULL, note varchar(1000) NOT NULL, recorded_by varchar(64) NOT NULL REFERENCES users(id), recorded_at varchar(40) NOT NULL);
+CREATE INDEX gate_student_time ON gate_events(student_id,recorded_at);
+CREATE TABLE duty_books (id varchar(64) PRIMARY KEY, name varchar(100) NOT NULL UNIQUE, base_book varchar(30) NOT NULL, active boolean NOT NULL DEFAULT true);
+ALTER TABLE duty_scopes ADD COLUMN book_id varchar(64) REFERENCES duty_books(id);

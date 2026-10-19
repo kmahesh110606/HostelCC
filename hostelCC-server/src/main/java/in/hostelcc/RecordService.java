@@ -21,7 +21,7 @@ public class RecordService {
     String person(Actor a,String book) { return a.global()?"true":a.is("STUDENT")?"t.student_id=:uid":grant(book,"t.block_id"); }
     String mess(Actor a,String column) {
         if(a.global()) return "true";
-        if(a.is("STUDENT")) return column+"=:mess";
+        if(a.is("STUDENT","MESS_MANAGER")) return column+"=:mess";
         return "("+grant("MESS",column)+" OR EXISTS (SELECT 1 FROM mess_blocks mb WHERE mb.mess_id="+column+" AND "+grant("HOSTEL","mb.block_id")+"))";
     }
     Map<String,Object> params(Actor a) {
@@ -31,7 +31,9 @@ public class RecordService {
     Query query(Actor a,String resource) {
         String select="t.*",from,where,order="t.id"; List<String> search=List.of();
         switch(resource) {
-            case "blocks" -> { from="blocks t"; where=a.global()?"true":"t.id IN (:blocks)";order="t.name,t.id";search=List.of("t.name"); }
+            case "gate" -> {from="gate_events t JOIN users u ON u.id=t.student_id JOIN blocks b ON b.id=t.block_id";select+=",u.name AS student_name,b.name AS block_name";where=person(a,"OUTINGS");order="t.recorded_at DESC,t.id";search=List.of("u.name","u.roll_no","t.direction","t.note");}
+            case "books" -> {from="duty_books t";where=a.is("ADMIN")?"true":"false";order="t.name";search=List.of("t.name");}
+            case "blocks" -> { from="blocks t";select+=",(SELECT COALESCE(sum(r.capacity),0) FROM rooms r WHERE r.block_id=t.id AND r.active=true) AS capacity,(SELECT count(*) FROM users u WHERE u.block_id=t.id AND u.room_id IS NOT NULL AND u.active=true AND u.role='STUDENT') AS occupied,(SELECT count(*) FROM rooms r WHERE r.block_id=t.id AND r.active=true) AS room_count"; where=a.global()?"true":"t.id IN (:blocks)";order="t.name,t.id";search=List.of("t.name"); }
             case "rooms" -> { from="rooms t JOIN blocks b ON b.id=t.block_id";select+=",b.name AS block_name,(SELECT count(*) FROM users u WHERE u.room_id=t.id AND u.active=true) AS occupied";where=duty(a,"HOSTEL","t.block_id");order="b.name,t.number,t.id";search=List.of("b.name","t.number","t.room_type"); }
             case "users" -> {
                 from="users t LEFT JOIN blocks b ON b.id=t.block_id LEFT JOIN rooms r ON r.id=t.room_id LEFT JOIN messes m ON m.id=t.mess_id";
@@ -39,19 +41,18 @@ public class RecordService {
                 where=a.global()?"true":"((t.role='STUDENT' AND ("+grant("HOSTEL","t.block_id")+" OR "+grant("OUTINGS","t.block_id")+" OR "+grant("DISCIPLINE","t.block_id")+")) OR (t.role='HOUSEKEEPING' AND :role<>'HOUSEKEEPING' AND EXISTS (SELECT 1 FROM duty_scopes h WHERE h.user_id=t.id AND h.active=true AND h.book='MAINTENANCE' AND "+grant("MAINTENANCE","h.target_id")+")))";
                 order="t.name,t.id";search=List.of("t.name","t.email","t.roll_no","t.role","b.name","r.number");
             }
-            case "messes" -> { from="messes t";select+=",(SELECT count(*) FROM users u WHERE u.mess_id=t.id AND u.active=true AND u.role='STUDENT') AS occupied";where=mess(a,"t.id")+(a.is("STUDENT")?" OR EXISTS (SELECT 1 FROM mess_blocks mb WHERE mb.mess_id=t.id AND mb.block_id=:block)":"");order="t.name,t.id";search=List.of("t.name"); }
-            case "menus" -> { from="menus t JOIN messes m ON m.id=t.mess_id";select+=",m.name AS mess_name";where=mess(a,"t.mess_id");order="m.name,CASE t.weekday WHEN 'MON' THEN 1 WHEN 'TUE' THEN 2 WHEN 'WED' THEN 3 WHEN 'THU' THEN 4 WHEN 'FRI' THEN 5 WHEN 'SAT' THEN 6 ELSE 7 END,t.id";search=List.of("m.name","t.weekday","t.breakfast","t.lunch","t.dinner"); }
-            case "feedback" -> { from="feedback t JOIN users u ON u.id=t.student_id JOIN blocks b ON b.id=t.block_id JOIN messes m ON m.id=t.mess_id";select+=",u.name AS student_name,b.name AS block_name,m.name AS mess_name";where="("+person(a,"HOSTEL")+" OR "+grant("MESS","t.mess_id")+")";order="t.created_at DESC,t.id";search=List.of("u.name","m.name","t.comment","t.reply","t.meal_date"); }
-            case "polls" -> { from="polls t JOIN messes m ON m.id=t.mess_id";select+=",m.name AS mess_name";where=mess(a,"t.mess_id");order="t.created_at DESC,t.id";search=List.of("t.title","m.name"); }
-            case "outings","discipline","messChanges","cloakroom" -> {
-                String table=resource.equals("messChanges")?"mess_changes":resource;
+            case "messes" -> { from="messes t";select+=",(SELECT count(*) FROM users u WHERE u.mess_id=t.id AND u.active=true AND u.role='STUDENT') AS occupied";where=mess(a,"t.id");order="t.name,t.id";search=List.of("t.name"); }
+            case "menus" -> { from="menus t JOIN messes m ON m.id=t.mess_id";select+=",m.name AS mess_name";where=a.is("MESS_MANAGER")?"false":mess(a,"t.mess_id");order="m.name,CASE t.weekday WHEN 'MON' THEN 1 WHEN 'TUE' THEN 2 WHEN 'WED' THEN 3 WHEN 'THU' THEN 4 WHEN 'FRI' THEN 5 WHEN 'SAT' THEN 6 ELSE 7 END,t.id";search=List.of("m.name","t.weekday","t.breakfast","t.lunch","t.dinner"); }
+            case "feedback" -> { from="food_feedback t JOIN feedback_sessions f ON f.id=t.session_id JOIN messes m ON m.id=f.mess_id";select+=",m.name AS mess_name,f.title AS session_title,f.mess_id";where=a.is("STUDENT")?"false":mess(a,"f.mess_id");order="t.id";search=List.of("m.name","f.title","t.comment","t.kind"); }
+            case "polls" -> { from="polls t JOIN messes m ON m.id=t.mess_id";select+=",m.name AS mess_name";where=a.is("MESS_MANAGER")?"false":mess(a,"t.mess_id");order="t.created_at DESC,t.id";search=List.of("t.title","m.name"); }
+            case "outings","discipline","cloakroom" -> {
+                String table=resource;
                 from=table+" t JOIN users u ON u.id=t.student_id JOIN blocks b ON b.id=t.block_id";
                 select+=",u.name AS student_name,u.roll_no,b.name AS block_name";
                 where=person(a,resource.equals("outings")?"OUTINGS":resource.equals("discipline")?"DISCIPLINE":"HOSTEL");
                 order="t.created_at DESC,t.id";
                 search=new ArrayList<>(List.of("u.name","u.roll_no","b.name"));
                 if(resource.equals("cloakroom")) { from+=" JOIN storage_rooms s ON s.id=t.storage_id LEFT JOIN storage_rooms origin ON origin.id=t.token_room_id";select+=",s.name AS storage_name,origin.name AS token_room_name";where=a.global()?"true":a.is("STUDENT")?"t.student_id=:uid":grant("CLOAKROOM","t.storage_id");order="t.submitted_at DESC,t.id";search.addAll(List.of("s.name","t.item","t.status","CAST(t.token_number AS varchar)")); }
-                if(resource.equals("messChanges")) { from+=" JOIN messes m ON m.id=t.mess_id";select+=",m.name AS mess_name";search.add("m.name"); }
                 if(resource.equals("outings")) search.addAll(List.of("t.destination","t.status","t.kind"));
                 if(resource.equals("discipline")) search.addAll(List.of("t.violation","t.action_taken"));
             }
@@ -63,6 +64,7 @@ public class RecordService {
             case "announcements" -> { from="announcements t";select+=",(SELECT b.name FROM blocks b WHERE b.id=t.block_id) AS block_name";where=a.global()?"true":"((t.active=true OR "+grant("HOSTEL","t.block_id")+") AND (t.block_id IS NULL OR t.block_id IN (:blocks)) AND (t.audience='ALL' OR t.audience=:role OR "+grant("HOSTEL","t.block_id")+"))";order="t.created_at DESC,t.id";search=List.of("t.title","t.body","t.level"); }
             default -> throw error(404,"Unknown record collection");
         }
+        if(a.is("MESS_MANAGER")&&!List.of("feedback","messes").contains(resource)) where="false";
         return new Query(select,from,"("+where+")",order,search);
     }
     String search(Query q,String text,Map<String,Object> p) {
@@ -73,9 +75,9 @@ public class RecordService {
     }
     @Transactional(readOnly=true)
     public Map<String,Object> page(Actor a,String resource,int page,int size,String text) { return page(a,resource,page,size,text,""); }
-    Map<String,Object> page(Actor a,String resource,int page,int size,String text,String extra) {
+    public Map<String,Object> page(Actor a,String resource,int page,int size,String text,String filterMess) {
         if(page<0||page>1000000||size<1||size>100) throw error(400,"Invalid page (size must be 1 to 100)");
-        Query q=query(a,resource);var p=params(a);String where=q.where()+extra+search(q,text,p);
+        Query q=query(a,resource);var p=params(a);String extra=""; if(!filterMess.isBlank()){if(!resource.equals("polls"))throw error(400,"Unsupported mess filter");p.put("filterMess",filterMess);extra=" AND t.mess_id=:filterMess";}String where=q.where()+extra+search(q,text,p);
         long total=sql.queryForObject("SELECT count(*) FROM "+q.from()+" WHERE "+where,p,Long.class);
         p.put("limit",size);p.put("offset",(long)page*size);
         var items=sql.query("SELECT "+q.select()+" FROM "+q.from()+" WHERE "+where+" ORDER BY "+q.order()+" LIMIT :limit OFFSET :offset",p,(rs,n)->Store.readRow(rs));
@@ -109,7 +111,7 @@ public class RecordService {
             case "staff" -> { a.require("ADMIN");resource="users";extra=" AND t.role NOT IN ('ADMIN','DIRECTOR','STUDENT')"; }
             case "housekeeping" -> { resource="users";extra=" AND t.role='HOUSEKEEPING' AND t.active=true"; }
             case "rooms" -> extra=" AND t.active=true";
-            case "blocks","messes","storageRooms" -> extra=" AND t.active=true";
+            case "books","blocks","messes","storageRooms" -> extra=" AND t.active=true";
             default -> throw error(400,"Unknown option collection");
         }
         // Target IDs are bound as parameters; lookup filters never widen access.
@@ -121,6 +123,6 @@ public class RecordService {
         }
         String filter=selected.isBlank()?extra+search(q,text,p):" AND t.id=:selected";
         var items=sql.query("SELECT "+q.select()+" FROM "+q.from()+" WHERE "+q.where()+filter+" ORDER BY "+q.order()+" LIMIT 30",p,(rs,n)->Store.readRow(rs));
-        return items.stream().map(r->Map.of("value",str(r,"id"),"blockId",str(r,"blockId"),"label",String.join(" · ",java.util.stream.Stream.of(str(r,"name"),str(r,"number"),str(r,"rollNo"),str(r,"blockName")).filter(s->!s.isBlank()).toList()))).toList();
+        return items.stream().map(r->Map.of("value",str(r,"id"),"blockId",str(r,"blockId"),"baseBook",str(r,"baseBook"),"label",String.join(" · ",java.util.stream.Stream.of(str(r,"name"),str(r,"number"),str(r,"rollNo"),str(r,"blockName")).filter(s->!s.isBlank()).toList()))).toList();
     }
 }

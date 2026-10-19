@@ -3,21 +3,4 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       COOKIE_SECURE: 'false'
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
-      SMTP_AUTH: 'false'
-      SMTP_STARTTLS: 'false'
-      SMTP_USERNAME: ''
-      SMTP_PASSWORD: ''
-      SMTP_FROM: hostelcc@localhost
       ALLOWED_ORIGINS: http://localhost:${SITE_PORT:-8080}
-  mailpit:
-    image: axllent/mailpit:v1
-    ports:
-      - '127.0.0.1:${MAILBOX_PORT:-8025}:8025'
-    environment:
-      MP_MAX_MESSAGES: 100
-    mem_limit: 96m
-    logging:
-      driver: json-file
-      options: {max-size: 5m, max-file: '2'}
