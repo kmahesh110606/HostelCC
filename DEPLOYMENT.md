@@ -53,7 +53,7 @@ For updates, back up, load/pull the new image tags and repeat `up -d --no-build 
 
 ## Local development
 
-The local override exposes HTTP on loopback port 8080 and uses PostgreSQL inside Docker. Both local and deployed instances send OTPs through your configured SMTP provider. `.env.local` is generated with random secrets. The isolated integration-test override publishes PostgreSQL on loopback 55439; do not use it in production. Native Android emulators use `http://10.0.2.2:8080/api`.
+The local override exposes HTTP on loopback port 8080 and uses PostgreSQL inside Docker. Localhost temporarily uses DEV_LOGIN_OTP=110606 without SMTP; set DEV_LOGIN_OTP= to test real email delivery. Production always uses your configured SMTP provider. `.env.local` is generated with random secrets. The isolated integration-test override publishes PostgreSQL on loopback 55439; do not use it in production. Native Android emulators use `http://10.0.2.2:8080/api`.
 
 References: [Compose readiness](https://docs.docker.com/compose/how-tos/startup-order/), [Caddy automatic HTTPS](https://caddyserver.com/docs/automatic-https).
 
@@ -68,3 +68,5 @@ Migration V4 removes the old identified feedback records and mess-change tables 
 Build and publish the signed release APK before building the web image, using scripts/publish-apk.ps1 with the public HTTPS API URL. The footer serves /downloads/HostelCC.apk directly; missing artifacts return 404 rather than the SPA page. The localhost debug APK targets an Android emulator and must be replaced for deployment. iOS remains disabled until an App Store release is available.
 
 Only automated browser tests use docker-compose.test.yml, an isolated SMTP capture service. It is absent from normal localhost and production startup. Never include this override on a live installation.
+
+For automatic deployment after passing CI, follow [EC2 CI/CD setup](EC2.md). The workflow is disabled until DEPLOY_ENABLED and the AWS resources are configured.

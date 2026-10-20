@@ -14,7 +14,7 @@ while :; do
     psql -v ON_ERROR_STOP=1 -c "COPY (SELECT m.name AS caterer,i.name AS food_item,count(r.rating) AS responses,avg(r.rating) AS average_rating FROM food_items i JOIN messes m ON m.id=i.mess_id LEFT JOIN item_ratings r ON r.item_id=i.id GROUP BY m.name,i.id,i.name ORDER BY m.name,i.name) TO STDOUT WITH CSV HEADER" > "/backups/food-performance-$stamp.csv"
     psql -v ON_ERROR_STOP=1 -c "COPY (SELECT b.name AS block,o.kind,o.status,count(*) AS records FROM outings o JOIN blocks b ON b.id=o.block_id GROUP BY b.name,o.kind,o.status ORDER BY b.name,o.kind,o.status) TO STDOUT WITH CSV HEADER" > "/backups/outings-$stamp.csv"
     date -u +%Y-%m-%dT%H:%M:%SZ > /backups/last-success
-    find /backups -maxdepth 1 -type f \( -name 'hostelcc-*.dump' -o -name 'occupancy-*.csv' -o -name 'food-performance-*.csv' -o -name 'outings-*.csv' \) -mtime "+$retention" -delete
+    find /backups -maxdepth 1 -type f \( -name 'hostelcc-*.dump' -o -name 'predeploy-*.dump' -o -name 'occupancy-*.csv' -o -name 'food-performance-*.csv' -o -name 'outings-*.csv' \) -mtime "+$retention" -delete
     echo "Backup and reports completed: $stamp"
   else
     echo 'Backup failed; previous backups retained' >&2

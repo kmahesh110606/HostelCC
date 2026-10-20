@@ -15,7 +15,7 @@ cd ..
 docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.prebuilt.yml up --build -d --wait
 ```
 
-Before starting, edit .env.local: set ADMIN_EMAIL to your actual first-admin email, and configure SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM, SMTP_AUTH and SMTP_STARTTLS. Open http://localhost:8080 and sign in with the code delivered to that mailbox. Every role, including admin, uses email OTP; there is no password or default code. The SMTP account password is an email-provider credential only.
+Before starting, edit .env.local and set ADMIN_EMAIL to your first-admin email. Open http://localhost:8080. Every role, including admin, uses OTP. The localhost Compose override temporarily defaults to 110606: request a code first, then enter 110606; no email is sent in that mode. Set DEV_LOGIN_OTP= in .env.local to switch localhost to real SMTP. Public deployments always use random emailed codes. The SMTP account password is an email-provider credential only.
 
 The initial database contains only the bootstrap administrator. ADMIN_EMAIL seeds an empty database; it does not rename an existing administrator. Change existing users through People. The named PostgreSQL volume survives container restarts. Do not use down --volumes on a database you want to retain.
 
@@ -74,3 +74,5 @@ The native Flutter app caches authorized reads in encrypted device storage for u
 ## App downloads
 
 The footer on the login screen and signed-in website provides an Android APK download and a disabled iOS App Store button. Before building the web image, publish an APK with `./scripts/publish-apk.ps1 -ApiUrl https://your-host/api`. Configure Android release signing as described in hostelCC-app/README.md. For localhost emulator testing only, use `-ApiUrl http://10.0.2.2:8080/api -DebugBuild`. Physical devices need a reachable server URL. The script copies the APK into HostelCC-web/public/downloads/HostelCC.apk; rebuild the web image after replacing it. APK binaries and signing secrets are not committed.
+
+For automated EC2 deployment, follow [EC2 CI/CD setup](EC2.md).

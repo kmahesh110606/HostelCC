@@ -2,6 +2,7 @@
 services:
   server:
     environment:
+      DEV_LOGIN_OTP: ''
       SMTP_HOST: test-smtp
       SMTP_PORT: 1025
       SMTP_AUTH: 'false'

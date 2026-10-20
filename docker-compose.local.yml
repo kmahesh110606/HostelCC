@@ -3,4 +3,5 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       COOKIE_SECURE: 'false'
+      DEV_LOGIN_OTP: ${DEV_LOGIN_OTP-110606}
       ALLOWED_ORIGINS: http://localhost:${SITE_PORT:-8080}

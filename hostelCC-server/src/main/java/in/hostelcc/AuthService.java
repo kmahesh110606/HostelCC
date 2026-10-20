@@ -17,9 +17,9 @@ import static in.hostelcc.Store.*;
 @Service
 public class AuthService {
     private final Store db; private final CodeMailer mailer; private final SecretKeySpec key; private final JwtEncoder encoder;
-    private final SecureRandom random=new SecureRandom();
+    private final LoginCodePolicy codes;
     @Value("${app.otp-ip-limit:300}") int ipLimit;
-    public AuthService(Store db,CodeMailer mailer,SecretKeySpec key,JwtEncoder encoder) { this.db=db;this.mailer=mailer;this.key=key;this.encoder=encoder; }
+    public AuthService(Store db,CodeMailer mailer,SecretKeySpec key,JwtEncoder encoder,LoginCodePolicy codes) { this.db=db;this.mailer=mailer;this.key=key;this.encoder=encoder;this.codes=codes; }
     String hash(String value) {
         try { var mac=Mac.getInstance("HmacSHA256"); mac.init(key); return HexFormat.of().formatHex(mac.doFinal(value.getBytes(StandardCharsets.UTF_8))); }
         catch(GeneralSecurityException e) { throw new IllegalStateException(e); }
@@ -36,10 +36,10 @@ public class AuthService {
         db.exec("DELETE FROM otp_requests WHERE requested_at<?",Instant.now().minusSeconds(86400).toString());
         var users=db.list("SELECT id,email FROM users WHERE email=? AND active=true",email);
         if(users.isEmpty()) return;
-        var user=users.getFirst(); String uid=str(user,"id"),code=String.format("%06d",random.nextInt(1000000));
+        var user=users.getFirst(); String uid=str(user,"id"),code=codes.next();
         db.exec("DELETE FROM otp_challenges WHERE user_id=?",uid);
         db.exec("INSERT INTO otp_challenges(user_id,code_hash,expires_at,attempts,consumed) VALUES(?,?,?,0,false)",uid,hash(uid+":"+code),Instant.now().plusSeconds(600).toString());
-        try { mailer.send(email,code); }
+        try { if(!codes.development()) mailer.send(email,code); }
         catch(org.springframework.mail.MailException e) { throw error(503,"Email delivery is unavailable. Please try again later."); }
     }
     public record Login(String token,long seconds,Map<String,Object> user) {}

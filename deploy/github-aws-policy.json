@@ -1,0 +1,31 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["ecr:GetAuthorizationToken", "ssm:GetCommandInvocation"],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["ecr:BatchCheckLayerAvailability", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload", "ecr:PutImage", "ecr:DescribeImages"],
+      "Resource": [
+        "arn:aws:ecr:YOUR_REGION:YOUR_ACCOUNT_ID:repository/hostelcc-server",
+        "arn:aws:ecr:YOUR_REGION:YOUR_ACCOUNT_ID:repository/hostelcc-web"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::YOUR_BUCKET/releases/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": [
+        "arn:aws:ssm:YOUR_REGION::document/AWS-RunShellScript",
+        "arn:aws:ec2:YOUR_REGION:YOUR_ACCOUNT_ID:instance/YOUR_INSTANCE_ID"
+      ]
+    }
+  ]
+}

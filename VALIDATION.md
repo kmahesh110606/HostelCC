@@ -27,3 +27,5 @@ Not performed here: public EC2 deployment, real SMTP-provider delivery, public D
 The server image was exercised using Dockerfile.prebuilt and a Maven-verified JAR. The normal multi-stage Dockerfile is provided for CI/workstations; its full JDK image download did not complete in this environment. The prebuilt route avoids that dependency and is used by the Docker browser CI job.
 
 20 October follow-up: removed the fixed-code login bypass and OTP logging, restored SMTP failure propagation, added a no-challenge login regression, replaced the obsolete browser mailbox dependency with test-only SMTP capture, and added website APK downloads and the disabled iOS button. Provider SMTP delivery and signed APK distribution remain configuration-dependent checks.
+
+CI/CD follow-up: 25 Java tests pass on H2, including development-only fixed-code configuration and rejection outside dev. EC2 deployment definitions and shell syntax are checked locally; AWS provisioning, OIDC role assumption, ECR publishing and a live SSM deployment require account setup and have not been performed here.
