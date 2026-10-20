@@ -21,7 +21,7 @@ class DeploymentSettingsTest {
             "app.cookie-secure","false",
             "app.jwt-secret","replace-with-at-least-32-random-bytes",
             "app.allowed-origins","http://localhost:5173",
-            "spring.mail.host","mailpit",
+            "spring.mail.host","test-smtp",
             "spring.mail.properties.mail.smtp.starttls.required","false").entrySet()) {
             assertThrows(IllegalStateException.class,()->new DeploymentSettings(settings().withProperty(change.getKey(),change.getValue())),change.getKey());
         }

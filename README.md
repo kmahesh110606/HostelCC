@@ -4,19 +4,20 @@ Hostel management rebuilt with React and Tailwind, Flutter, and Java 21 / Spring
 
 ## Start locally with Docker
 
-Install Docker Compose, Java 21 and Node 22.12+. From the repository root in PowerShell:
+Install Docker Compose, Java 21, Node 22.12+ and Flutter 3.41 (with the Android SDK). From the repository root in PowerShell:
 
 ```powershell
 ./scripts/setup-local.ps1
+./scripts/publish-apk.ps1 -ApiUrl http://10.0.2.2:8080/api -DebugBuild
 cd hostelCC-server
 ./mvnw.cmd -B verify
 cd ..
 docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.prebuilt.yml up --build -d --wait
 ```
 
-Open http://localhost:8080. Sign in as `admin@hostelcc.local` and read the email code at http://localhost:8025. To use another first administrator, pass `-AdminEmail you@example.edu` when creating the local configuration. An existing configuration is never overwritten. Every role uses email OTP, including the administrator.
+Before starting, edit .env.local: set ADMIN_EMAIL to your actual first-admin email, and configure SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM, SMTP_AUTH and SMTP_STARTTLS. Open http://localhost:8080 and sign in with the code delivered to that mailbox. Every role, including admin, uses email OTP; there is no password or default code. The SMTP account password is an email-provider credential only.
 
-Mailpit captures development email; it does not deliver email externally. The initial database contains only the bootstrap administrator. The named PostgreSQL volume survives container restarts. Do not use `down --volumes` on a database you want to retain.
+The initial database contains only the bootstrap administrator. ADMIN_EMAIL seeds an empty database; it does not rename an existing administrator. Change existing users through People. The named PostgreSQL volume survives container restarts. Do not use down --volumes on a database you want to retain.
 
 The default server Dockerfile can also build the JAR itself: omit `docker-compose.prebuilt.yml`. Build images on a workstation or CI before transferring them to a small EC2 instance.
 
@@ -69,3 +70,7 @@ Scoped wardens and supervisors can open a floor, select a room and view occupant
 Reports support record selection, search, columns, CSV exports for Excel and PDF output (browser print or native PDF sharing). Optional Compose services provide scheduled database backups and CSV reports, plus a local database administration console; see DEPLOYMENT.md.
 
 The native Flutter app caches authorized reads in encrypted device storage for up to 15 minutes, limited to 60 entries and 1 MB. Cached data is isolated by server, user and scope; logout, denied access and permission changes clear it. Offline views show when the data was saved and require a connection for changes. There are no push notifications.
+
+## App downloads
+
+The footer on the login screen and signed-in website provides an Android APK download and a disabled iOS App Store button. Before building the web image, publish an APK with `./scripts/publish-apk.ps1 -ApiUrl https://your-host/api`. Configure Android release signing as described in hostelCC-app/README.md. For localhost emulator testing only, use `-ApiUrl http://10.0.2.2:8080/api -DebugBuild`. Physical devices need a reachable server URL. The script copies the APK into HostelCC-web/public/downloads/HostelCC.apk; rebuild the web image after replacing it. APK binaries and signing secrets are not committed.

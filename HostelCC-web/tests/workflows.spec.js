@@ -1,14 +1,21 @@
 import { test, expect } from '@playwright/test';
 
-test('admin setup, scoped duties, student outings, item QR check-in and histories', async ({ browser }) => {
-  async function code(_email) {
-    return '110606';
+test('admin setup, scoped duties, student outings, item QR check-in and histories', async ({ browser, request }) => {
+  async function code(email) {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const mailbox = process.env.TEST_MAILBOX_URL || 'http://localhost:8025';
+      const box = await (await request.get(mailbox + '/messages')).json();
+      const mail = box.messages.find(m => m.To.some(to => to.Address === email));
+      if (mail) return mail.Text.match(/\b\d{6}\b/)[0];
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    throw new Error('No test email received');
   }
   async function signIn(email, mobile = false) {
     const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 1050 } });
     const page = await context.newPage();
     const errors = []; page.on('pageerror', e => errors.push(e.message));
-    await page.goto('/'); await page.getByLabel('Email address').fill(email); await page.getByRole('button', { name: 'Send sign-in code' }).click();
+    await page.goto('/'); await expect(page.getByRole('link', { name: 'Download Android APK' })).toHaveAttribute('href', '/downloads/HostelCC.apk'); await expect(page.getByRole('button', { name: /iOS App Store/ })).toBeDisabled(); await page.getByLabel('Email address').fill(email); await page.getByRole('button', { name: 'Send sign-in code' }).click();
     await expect(page.getByRole('heading', { name: 'Check your inbox.' })).toBeVisible(); await page.getByLabel('Verification code').fill(await code(email)); await page.getByRole('button', { name: 'Verify & sign in' }).click();
     await expect(page.getByRole('heading', { name: email === 'caterer@example.test' ? 'Mess' : 'Overview', exact:true })).toBeVisible();
     return { page, context, errors };
@@ -98,4 +105,13 @@ test('admin setup, scoped duties, student outings, item QR check-in and historie
   await navigate(a,'Reports');await a.getByLabel('Records',{exact:true}).selectOption('users');await a.getByLabel('Name',{exact:true}).check();await a.getByLabel('Email',{exact:true}).check();await a.getByLabel('Search',{exact:true}).fill('Imported Student');await a.getByRole('button',{name:'Build report'}).click();await expect(a.getByRole('cell',{name:'Imported Student 039',exact:true})).toBeVisible();
   const reportDownload=a.waitForEvent('download');await a.getByRole('button',{name:'Export CSV / Excel'}).click();await (await reportDownload).saveAs('test-results/student-report.csv');await a.pdf({path:'test-results/student-report.pdf',format:'A4'}); await mw.page.screenshot({path:'test-results/food-performance.png',fullPage:true});
   for (const client of [admin, s, sup, h, mw, caterer]) { expect(client.errors).toEqual([]); await client.context.close(); }
+});
+
+test('Android artifact is served as an APK rather than an HTML fallback', async ({ request }) => {
+  test.skip(process.env.EXPECT_APK !== 'true', 'Publish an APK before artifact validation');
+  const response = await request.get('/downloads/HostelCC.apk', { headers: { Range: 'bytes=0-3' } });
+  expect(response.status()).toBe(206);
+  expect(response.headers()['content-type']).toContain('application/vnd.android.package-archive');
+  expect((await response.body()).subarray(0, 2).toString()).toBe('PK');
+  expect((await request.get('/downloads/missing.apk')).status()).toBe(404);
 });

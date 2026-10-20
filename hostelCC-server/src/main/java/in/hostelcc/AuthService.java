@@ -36,7 +36,7 @@ public class AuthService {
         db.exec("DELETE FROM otp_requests WHERE requested_at<?",Instant.now().minusSeconds(86400).toString());
         var users=db.list("SELECT id,email FROM users WHERE email=? AND active=true",email);
         if(users.isEmpty()) return;
-        var user=users.getFirst(); String uid=str(user,"id"),code="110606";
+        var user=users.getFirst(); String uid=str(user,"id"),code=String.format("%06d",random.nextInt(1000000));
         db.exec("DELETE FROM otp_challenges WHERE user_id=?",uid);
         db.exec("INSERT INTO otp_challenges(user_id,code_hash,expires_at,attempts,consumed) VALUES(?,?,?,0,false)",uid,hash(uid+":"+code),Instant.now().plusSeconds(600).toString());
         try { mailer.send(email,code); }
@@ -46,20 +46,7 @@ public class AuthService {
     @Transactional(noRollbackFor=ResponseStatusException.class)
     public Login verify(String email,String code,boolean remember) {
         var rows=db.list("SELECT o.*,u.active FROM otp_challenges o JOIN users u ON u.id=o.user_id WHERE u.email=? FOR UPDATE",email);
-        if(rows.isEmpty()) {
-            if("110606".equals(code)) {
-                var users=db.list("SELECT id FROM users WHERE email=? AND active=true",email);
-                if(!users.isEmpty()) {
-                    String uid=str(users.getFirst(),"id");
-                    String sid=id(); long seconds=remember?2592000:43200; Instant expiry=Instant.now().plusSeconds(seconds);
-                    db.exec("INSERT INTO sessions(id,user_id,expires_at,revoked) VALUES(?,?,?,false)",sid,uid,expiry.toString());
-                    var claims=JwtClaimsSet.builder().issuer("hostelcc").subject(uid).id(sid).issuedAt(Instant.now()).expiresAt(expiry).build();
-                    String token=encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(),claims)).getTokenValue();
-                    return new Login(token,seconds,profile(uid));
-                }
-            }
-            throw error(400,"Invalid or expired code");
-        }
+        if(rows.isEmpty()) throw error(400,"Invalid or expired code");
         var row=rows.getFirst(); String uid=str(row,"userId");
         if(!bool(row,"active") || bool(row,"consumed") || ((Number)row.get("attempts")).intValue()>=5 || !Instant.parse(str(row,"expiresAt")).isAfter(Instant.now())) throw error(400,"Invalid or expired code");
         db.exec("UPDATE otp_challenges SET attempts=attempts+1 WHERE user_id=?",uid);

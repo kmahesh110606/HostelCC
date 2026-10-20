@@ -13,11 +13,11 @@ Vite proxies `/api` to localhost:8080. Production Nginx serves the built SPA and
 
 Records are searched and paginated by the API. The People screen provides administrator CSV validation/import; searchable selectors find students and staff outside the current page. Cloakroom QR scanning uses the browser camera or manual pass input. Browser camera access requires localhost or HTTPS.
 
-The Playwright workflow expects a fresh database bootstrapped with admin@hostelcc.local and Mailpit. It creates test records and must not run against a live installation:
+The Playwright workflow expects a fresh database bootstrapped with admin@hostelcc.local and the isolated test SMTP service (docker-compose.test.yml). It creates test records and must not run against a live installation:
 
 ```powershell
 $env:HOSTELCC_BASE_URL='http://localhost:18080'
-$env:MAILPIT_URL='http://localhost:18025'
+$env:TEST_MAILBOX_URL='http://localhost:18025'
 npx playwright test
 ```
 

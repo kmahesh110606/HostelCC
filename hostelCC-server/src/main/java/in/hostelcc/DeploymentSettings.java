@@ -15,7 +15,7 @@ public class DeploymentSettings {
         require(secret.length()>=32 && !secret.startsWith("replace-") && !secret.contains("development-only") && !secret.startsWith("test-only"), "Provide a randomly generated JWT_SECRET");
         String origins=env.getProperty("app.allowed-origins", "");
         require(!origins.isBlank() && java.util.Arrays.stream(origins.split(",")).allMatch(s->s.startsWith("https://")&&!s.contains("*")), "ALLOWED_ORIGINS must list explicit HTTPS origins");
-        require(!java.util.List.of("localhost","mailpit","").contains(env.getProperty("spring.mail.host", "localhost")), "Set SMTP_HOST to your mail provider");
+        require(!java.util.List.of("localhost","test-smtp","").contains(env.getProperty("spring.mail.host", "localhost")), "Set SMTP_HOST to your mail provider");
         require(Boolean.parseBoolean(env.getProperty("spring.mail.properties.mail.smtp.starttls.required", "false")), "SMTP_STARTTLS must be true for deployment");
     }
     private static void require(boolean valid,String message) {

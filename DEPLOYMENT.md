@@ -6,7 +6,7 @@ Use an Ubuntu EC2 instance with Docker Engine and the Compose plugin. Point your
 
 Copy `.env.example` to `.env.deploy`. Set a strong unique database password, random JWT signing secret (at least 32 bytes), first administrator email, public hostname, matching HTTPS allowed origin and real SMTP provider credentials. There are no administrator passwords. Bootstrap creates the administrator only when the user table is empty.
 
-Build images on a machine with sufficient memory, using Java 21 for the verified JAR:
+First run scripts/publish-apk.ps1 with the public HTTPS API URL and your Android release signing configuration. Then build images on a machine with sufficient memory, using Java 21 for the verified JAR:
 
 ```sh
 cd hostelCC-server
@@ -53,7 +53,7 @@ For updates, back up, load/pull the new image tags and repeat `up -d --no-build 
 
 ## Local development
 
-The local override runs Mailpit on loopback port 8025, HTTP on loopback port 8080, and PostgreSQL inside Docker. `.env.local` is generated with random secrets. The isolated integration-test override publishes PostgreSQL on loopback 55439; do not use it in production. Native Android emulators use `http://10.0.2.2:8080/api`.
+The local override exposes HTTP on loopback port 8080 and uses PostgreSQL inside Docker. Both local and deployed instances send OTPs through your configured SMTP provider. `.env.local` is generated with random secrets. The isolated integration-test override publishes PostgreSQL on loopback 55439; do not use it in production. Native Android emulators use `http://10.0.2.2:8080/api`.
 
 References: [Compose readiness](https://docs.docker.com/compose/how-tos/startup-order/), [Caddy automatic HTTPS](https://caddyserver.com/docs/automatic-https).
 
@@ -64,3 +64,7 @@ Add `-f docker-compose.backup.yml` to your Compose command to run daily custom-f
 For infrastructure database administration, add `-f docker-compose.tools.yml --profile database-tools`. Adminer is available only on `127.0.0.1:8081`; on EC2 use an SSH tunnel. Select PostgreSQL, server `postgres`, database/user `hostelcc`, and the configured database password. This is an infrastructure credential, separate from application email OTP. Stop the optional tool when finished.
 
 Migration V4 removes the old identified feedback records and mess-change tables and removes caterer capacity. This is the fresh-rebuild schema transition; back up any earlier test database before applying it. It does not import Django or SQLite data.
+
+Build and publish the signed release APK before building the web image, using scripts/publish-apk.ps1 with the public HTTPS API URL. The footer serves /downloads/HostelCC.apk directly; missing artifacts return 404 rather than the SPA page. The localhost debug APK targets an Android emulator and must be replaced for deployment. iOS remains disabled until an App Store release is available.
+
+Only automated browser tests use docker-compose.test.yml, an isolated SMTP capture service. It is absent from normal localhost and production startup. Never include this override on a live installation.

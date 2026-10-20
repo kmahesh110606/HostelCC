@@ -14,5 +14,12 @@ ADMIN_EMAIL=$AdminEmail
 HOSTELCC_DB_PASSWORD=$(New-Secret)
 JWT_SECRET=$(New-Secret)
 SITE_PORT=8080
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_AUTH=true
+SMTP_STARTTLS=true
+SMTP_USERNAME=
+SMTP_PASSWORD=
+SMTP_FROM=
 "@ | Set-Content -LiteralPath $destination -Encoding ascii
-Write-Output 'Created .env.local with fresh local-only secrets. No credentials were printed.'
+Write-Output 'Created .env.local with fresh local-only secrets. Set ADMIN_EMAIL and SMTP settings before signing in. No credentials were printed.'

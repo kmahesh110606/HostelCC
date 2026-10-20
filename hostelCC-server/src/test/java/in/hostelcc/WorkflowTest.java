@@ -74,6 +74,11 @@ class WorkflowTest {
         assertEquals(200,admin.call("PUT","/scopes/"+grant,Map.of("userId","supervisor","book","OUTINGS","targetId","B","active",false)).status());
         assertEquals(0,db.count("SELECT count(*) FROM duty_scopes WHERE user_id='supervisor' AND active=true"));
     }
+    @Test void verificationWithoutAnEmailChallengeCannotSignIn() throws Exception {
+        var client=new Client();
+        assertEquals(400,client.call("POST","/auth/verify-code",Map.of("email","student@example.test","code","110606","remember",true)).status());
+        assertEquals(0,db.count("SELECT count(*) FROM sessions"));
+    }
     @Test void mailFailureStillEnforcesCooldown() throws Exception {
         doThrow(new org.springframework.mail.MailSendException("Test provider offline")).when(mail).send(anyString(),anyString());
         var client=new Client();

@@ -4,6 +4,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY index.html vite.config.js ./
 COPY public public
+RUN test -s public/downloads/HostelCC.apk || (echo "Publish an APK with scripts/publish-apk.ps1 before building the web image" >&2; exit 1)
 COPY src src
 RUN npm run build
 FROM nginx:alpine

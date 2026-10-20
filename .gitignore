@@ -21,3 +21,5 @@ backups/
 **/*.log
 **/__pycache__/
 **/*.sqlite3
+
+HostelCC-web/public/downloads/*.apk

@@ -1,0 +1,18 @@
+# Disposable browser-test infrastructure only. Do not include in normal startup.
+services:
+  server:
+    environment:
+      SMTP_HOST: test-smtp
+      SMTP_PORT: 1025
+      SMTP_AUTH: 'false'
+      SMTP_STARTTLS: 'false'
+      SMTP_USERNAME: ''
+      SMTP_PASSWORD: ''
+      SMTP_FROM: test@hostelcc.local
+  test-smtp:
+    image: node:22-alpine
+    command: [node, /test-smtp.mjs]
+    volumes:
+      - ./scripts/test-smtp.mjs:/test-smtp.mjs:ro
+    ports: ['127.0.0.1:${TEST_MAILBOX_PORT:-8025}:8025']
+    mem_limit: 64m

@@ -52,7 +52,14 @@ jobs:
           cache: true
       - run: flutter pub get && flutter analyze && flutter test && flutter build web
         working-directory: hostelCC-app
+      - run: flutter build apk --debug --dart-define=API_BASE_URL=http://10.0.2.2:8080/api
+        working-directory: hostelCC-app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-test-apk
+          path: hostelCC-app/build/app/outputs/flutter-apk/app-debug.apk
   browser:
+    needs: flutter
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -71,18 +78,24 @@ jobs:
         working-directory: hostelCC-server
       - shell: pwsh
         run: ./scripts/setup-local.ps1
-      - run: docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.prebuilt.yml up --build -d --wait
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-test-apk
+          path: HostelCC-web/public/downloads
+      - run: mv HostelCC-web/public/downloads/app-debug.apk HostelCC-web/public/downloads/HostelCC.apk
+      - run: docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.test.yml -f docker-compose.prebuilt.yml up --build -d --wait
       - run: npm ci && npx playwright install --with-deps chromium && npx playwright test
         working-directory: HostelCC-web
         env:
           HOSTELCC_BASE_URL: http://localhost:8080
-          MAILPIT_URL: http://localhost:8025
+          TEST_MAILBOX_URL: http://localhost:8025
+          EXPECT_APK: 'true'
       - if: failure()
-        run: docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml logs --tail 100
+        run: docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.test.yml logs --tail 100
       - if: always()
         uses: actions/upload-artifact@v4
         with:
           name: browser-report
           path: HostelCC-web/playwright-report
       - if: always()
-        run: docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml down --volumes
+        run: docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.test.yml down --volumes
